@@ -1,14 +1,14 @@
 import "../luciddocks"
 import QtQuick
-import QtQuick.Effects
 import QtQuick.Shapes
 import qs
 
-// the things on the desk, drawn rather than taken from the icon theme so they
-// share one hand with the prints: a folder with its tab and a sheet inside, a
-// page with a folded corner and its type on a tab, and a bin with a lid. A
-// folder comes in two parts - its back, and the front flap - so what it holds
-// can fan out between them
+// the things on the desk, drawn rather than taken from the icon theme, in the
+// hand of the rest of the shell: flat fills with no gloss or shadow, the
+// accent for what you act on, the cards' own surface for paper. A folder with
+// its tab and a sheet inside, a page with a folded corner and its type on a
+// chip, and a bin with a lid. A folder comes in two parts - its back, and the
+// front flap - so what it holds can fan out between them
 Item {
     id: obj
 
@@ -20,33 +20,33 @@ Item {
     property real size: Theme.dp(64)
     // 0 shut, 1 open: the folder's flap, the bin's lid
     property real open: 0
-    // something under the pointer lifts a little off its shadow
-    property bool lifted: false
     // the bin with something in it
     property bool full: false
-    // a page's type, as a word on its tab, and what is on the page: lines of
-    // "text", a zip down an "archive", a note for "audio", a screen for "video"
+    // a page's type, as a word on its chip, and what is on the page: lines of
+    // "text", a zip down an "archive", a note for "audio", a play mark for "video"
     property string tag: ""
     property string variant: "text"
 
     readonly property real s: obj.size
     // the shell's corner dial, kept within what reads at icon size
-    readonly property real k: Math.max(0.15, Math.min(1.6, Theme.cornerScale))
-    readonly property real r: Math.max(1.5, obj.s * 0.075 * obj.k)
+    readonly property real k: Math.max(0.15, Math.min(1.5, Theme.cornerScale))
+    readonly property real r: Math.max(1.5, obj.s * 0.11 * obj.k)
     readonly property bool isFolder: obj.kind === "folder" || obj.kind === "home"
+    readonly property real hairline: Math.max(1, Theme.dp(1))
 
-    // the palette: a folder in the wallpaper's own colour, paper pale in its
-    // hue, and the bin a quiet grey with a breath of it. Never the tertiary
-    readonly property color folderFront: Theme.atTone(Theme.cPrimary, Theme.isLight ? 70 : 74)
-    readonly property color folderFrontLow: Theme.atTone(Theme.cPrimary, Theme.isLight ? 64 : 67)
-    readonly property color folderBack: Theme.atTone(Theme.cPrimary, Theme.isLight ? 52 : 56)
-    readonly property color folderInk: Theme.atTone(Theme.cPrimary, Theme.isLight ? 34 : 30)
-    readonly property color paper: Theme.atTone(Theme.withSat(Theme.cPrimary, 0.5), Theme.isLight ? 96 : 92)
-    readonly property color paperFold: Theme.atTone(Theme.withSat(Theme.cPrimary, 0.5), Theme.isLight ? 84 : 80)
-    readonly property color ink: Theme.atTone(Theme.withSat(Theme.cPrimary, 0.4), 30)
-    readonly property color binBody: Theme.atTone(Theme.withSat(Theme.cPrimary, 0.3), Theme.isLight ? 78 : 72)
-    readonly property color binLid: Theme.atTone(Theme.withSat(Theme.cPrimary, 0.3), Theme.isLight ? 86 : 82)
-    readonly property color binRib: Theme.atTone(Theme.withSat(Theme.cPrimary, 0.3), Theme.isLight ? 62 : 56)
+    // the palette: a folder in the accent the shell fills its buttons with,
+    // its back a step deeper; paper is the cards' own surface, its ink the
+    // cards' text. Never the tertiary
+    readonly property color folderFront: Theme.accent
+    readonly property color folderBack: Theme.atTone(Theme.accent, Theme.toneOf(Theme.accent) + (Theme.isLight ? 14 : -16))
+    readonly property color folderInk: Theme.fgAccent
+    readonly property color paper: Theme.bgOpaque
+    readonly property color paperFold: Theme.bgHigh
+    readonly property color paperEdge: Theme.alpha(Theme.text, Theme.isLight ? 0.14 : 0.12)
+    readonly property color ink: Theme.text
+    readonly property color binBody: Theme.bgOpaque
+    readonly property color binLid: Theme.bgHigh
+    readonly property color binRib: Theme.alpha(Theme.text, 0.2)
 
     // a gulp: something just went in the bin
     property real gulp: 0
@@ -58,15 +58,6 @@ Item {
 
     width: obj.s
     height: obj.s
-    layer.enabled: true
-    layer.smooth: true
-    layer.effect: MultiEffect {
-        shadowEnabled: true
-        shadowBlur: 0.6
-        shadowColor: Qt.rgba(0, 0, 0, obj.lifted ? 0.42 : 0.3)
-        shadowHorizontalOffset: 0
-        shadowVerticalOffset: obj.lifted ? Theme.dp(4) : 1.5
-    }
 
     SequentialAnimation {
         id: gulpAnim
@@ -100,11 +91,11 @@ Item {
 
         readonly property real x0: obj.s * 0.06
         readonly property real x1: obj.s * 0.94
-        readonly property real yTab: obj.s * 0.12
-        readonly property real yTop: obj.s * 0.2
+        readonly property real yTab: obj.s * 0.13
+        readonly property real yTop: obj.s * 0.22
         readonly property real yBot: obj.s * 0.88
-        readonly property real tabEnd: obj.s * 0.4
-        readonly property real slant: obj.s * 0.08
+        readonly property real tabEnd: obj.s * 0.42
+        readonly property real slant: obj.s * 0.07
         readonly property real rt: Math.min(obj.r, (back.yTop - back.yTab) * 0.9)
 
         anchors.fill: parent
@@ -127,23 +118,24 @@ Item {
 
         }
 
-        // the sheet inside, which rises as the flap opens
+        // the sheet inside, a card of the shell's surface that rises as the
+        // flap opens
         Rectangle {
             x: obj.s * 0.15
-            y: obj.s * (0.26 - 0.1 * obj.open)
+            y: obj.s * (0.28 - 0.1 * obj.open)
             width: obj.s * 0.7
             height: obj.s * 0.5
-            radius: Math.max(1, obj.r * 0.5)
-            color: obj.paper
+            radius: Math.max(1, obj.r * 0.6)
+            color: obj.paperFold
             antialiasing: true
 
             Rectangle {
-                x: parent.width * 0.14
-                y: parent.height * 0.18
-                width: parent.width * 0.5
-                height: Math.max(1.5, obj.s * 0.03)
+                x: parent.width * 0.12
+                y: parent.height * 0.14
+                width: parent.width * 0.32
+                height: Math.max(1.5, obj.s * 0.035)
                 radius: height / 2
-                color: Theme.alpha(obj.ink, 0.22)
+                color: Theme.accent
             }
 
         }
@@ -155,11 +147,12 @@ Item {
         id: flap
 
         x: obj.s * 0.06
-        y: obj.s * 0.34
+        y: obj.s * 0.35
         width: obj.s * 0.88
-        height: obj.s * 0.54
+        height: obj.s * 0.53
         visible: obj.isFolder && obj.part === "front"
         radius: obj.r
+        color: obj.folderFront
         antialiasing: true
         transform: Rotation {
             origin.x: flap.width / 2
@@ -171,37 +164,14 @@ Item {
             angle: -obj.open * 26
         }
 
-        gradient: Gradient {
-            GradientStop {
-                position: 0
-                color: obj.folderFront
-            }
-
-            GradientStop {
-                position: 1
-                color: obj.folderFrontLow
-            }
-
-        }
-
-        // a lit top edge, the way a fold catches the light
-        Rectangle {
-            x: flap.radius * 0.6
-            y: 1
-            width: parent.width - flap.radius * 1.2
-            height: Math.max(1, obj.s * 0.018)
-            radius: height / 2
-            color: Qt.rgba(1, 1, 1, 0.35)
-        }
-
         DockGlyph {
             visible: obj.kind === "home"
             anchors.centerIn: parent
-            anchors.verticalCenterOffset: obj.s * 0.01
-            width: parent.height * 0.6
+            width: parent.height * 0.58
             height: width
             pathData: DesktopIcons.glyphs.home
             glyphColor: obj.folderInk
+            fill: 1
         }
 
     }
@@ -211,11 +181,14 @@ Item {
     Item {
         id: page
 
-        readonly property real w: obj.s * 0.68
-        readonly property real h: obj.s * 0.86
+        readonly property real w: obj.s * 0.7
+        readonly property real h: obj.s * 0.88
         readonly property real px0: (obj.s - page.w) / 2
         readonly property real py0: obj.s * 0.06
-        readonly property real ear: page.w * 0.28
+        readonly property real ear: page.w * 0.3
+        // where what is on the page starts and how wide it runs
+        readonly property real inX: page.px0 + page.w * 0.16
+        readonly property real inW: page.w * 0.68
 
         anchors.fill: parent
         visible: obj.kind === "document"
@@ -224,11 +197,12 @@ Item {
             anchors.fill: parent
             preferredRendererType: Shape.CurveRenderer
 
-            // a hairline edge, so a white page still reads on a white sky
+            // the card's surface with a hairline edge, the way a widget sits
+            // on the wallpaper
             ShapePath {
                 fillColor: obj.paper
-                strokeColor: Theme.alpha(obj.ink, 0.16)
-                strokeWidth: 1
+                strokeColor: obj.paperEdge
+                strokeWidth: obj.hairline
                 pathHints: ShapePath.PathSolid | ShapePath.PathNonIntersecting
 
                 PathSvg {
@@ -238,14 +212,14 @@ Item {
                         var w = page.w;
                         var h = page.h;
                         var e = page.ear;
-                        var r = Math.min(obj.r * 0.7, e * 0.5);
+                        var r = Math.min(obj.r, e * 0.6);
                         return "M " + (x + r) + " " + y + " L " + (x + w - e) + " " + y + " L " + (x + w) + " " + (y + e) + " L " + (x + w) + " " + (y + h - r) + " Q " + (x + w) + " " + (y + h) + " " + (x + w - r) + " " + (y + h) + " L " + (x + r) + " " + (y + h) + " Q " + x + " " + (y + h) + " " + x + " " + (y + h - r) + " L " + x + " " + (y + r) + " Q " + x + " " + y + " " + (x + r) + " " + y + " Z";
                     }
                 }
 
             }
 
-            // the folded corner
+            // the folded corner, a tone up from the page
             ShapePath {
                 fillColor: obj.paperFold
                 strokeColor: "transparent"
@@ -255,7 +229,7 @@ Item {
                         var x = page.px0 + page.w - page.ear;
                         var y = page.py0;
                         var e = page.ear;
-                        var r = Math.min(obj.r * 0.6, e * 0.35);
+                        var r = Math.min(obj.r * 0.7, e * 0.4);
                         return "M " + x + " " + y + " L " + x + " " + (y + e - r) + " Q " + x + " " + (y + e) + " " + (x + r) + " " + (y + e) + " L " + (x + e) + " " + (y + e) + " Z";
                     }
                 }
@@ -264,19 +238,20 @@ Item {
 
         }
 
-        // lines of text: a heading in the accent, then the body
+        // text: a short accent rule over the lines, the way a widget heads
+        // its figures with a label in the accent
         Repeater {
-            model: page.visible && obj.variant === "text" ? 5 : 0
+            model: page.visible && obj.variant === "text" ? 4 : 0
 
             Rectangle {
                 required property int index
 
-                x: page.px0 + page.w * 0.16
-                y: page.py0 + page.h * (0.34 + index * 0.11) + (index > 0 ? page.h * 0.03 : 0)
-                width: page.w * (index === 0 ? 0.4 : (index === 4 ? 0.38 : 0.68))
-                height: Math.max(1.5, obj.s * (index === 0 ? 0.05 : 0.032))
+                x: page.inX
+                y: page.py0 + page.h * (0.3 + index * 0.12)
+                width: page.inW * [0.42, 0.9, 0.9, 0.56][index]
+                height: Math.max(1.5, obj.s * (index === 0 ? 0.05 : 0.034))
                 radius: height / 2
-                color: index === 0 ? Theme.alpha(Theme.cPrimary, 0.7) : Theme.alpha(obj.ink, 0.2)
+                color: index === 0 ? Theme.accent : Theme.alpha(obj.ink, index === 1 ? 0.42 : 0.22)
             }
 
         }
@@ -292,7 +267,7 @@ Item {
             y: page.py0
 
             Repeater {
-                model: zip.visible ? Math.floor(page.h * 0.5 / zip.tooth) : 0
+                model: zip.visible ? Math.floor(page.h * 0.42 / zip.tooth) : 0
 
                 Rectangle {
                     required property int index
@@ -302,17 +277,17 @@ Item {
                     width: zip.tooth * 1.6
                     height: zip.tooth * 0.8
                     radius: height / 2
-                    color: Theme.alpha(obj.ink, 0.42)
+                    color: Theme.alpha(obj.ink, 0.32)
                 }
 
             }
 
             Rectangle {
                 x: -width / 2
-                y: page.h * 0.5
-                width: obj.s * 0.12
+                y: page.h * 0.42
+                width: obj.s * 0.13
                 height: obj.s * 0.17
-                radius: Math.min(width / 2, Math.max(1.5, obj.r * 0.5))
+                radius: Math.min(width / 2, Math.max(1.5, obj.r * 0.6))
                 color: Theme.accent
                 antialiasing: true
 
@@ -329,58 +304,52 @@ Item {
 
         }
 
-        // audio: a note; video: a screen with a play mark on it
+        // audio and video: the media widget's own button, an accent disc with
+        // the mark on it
         Rectangle {
-            visible: obj.variant === "video"
-            x: page.px0 + page.w * 0.16
-            y: page.py0 + page.h * 0.3
-            width: page.w * 0.68
-            height: width * 0.66
-            radius: Math.max(1.5, obj.r * 0.6)
+            visible: obj.variant === "audio" || obj.variant === "video"
+            x: page.px0 + (page.w - width) / 2
+            y: page.py0 + page.h * 0.24
+            width: page.w * 0.56
+            height: width
+            radius: width / 2
             color: Theme.accent
             antialiasing: true
 
             DockGlyph {
                 anchors.centerIn: parent
-                width: parent.height * 0.7
+                                width: parent.width * 0.62
                 height: width
-                pathData: DesktopIcons.glyphs.play
+                pathData: obj.variant === "video" ? DesktopIcons.glyphs.play : DesktopIcons.glyphs.note
                 glyphColor: Theme.fgAccent
+                fill: 1
             }
 
         }
 
-        DockGlyph {
-            visible: obj.variant === "audio"
-            x: page.px0 + (page.w - width) / 2
-            y: page.py0 + page.h * 0.24
-            width: page.w * 0.66
-            height: width
-            pathData: "M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6Z"
-            glyphColor: Theme.accent
-        }
-
-        // its type, on a tab that sticks out past the left edge
+        // its type, on a chip at the foot of the page
         Rectangle {
             visible: obj.tag !== "" && obj.s >= 40
-            x: page.px0 - obj.s * 0.08
-            y: page.py0 + page.h - height - obj.s * 0.1
-            width: Math.max(height * 1.4, tagText.implicitWidth + obj.s * 0.12)
+            x: page.inX - page.w * 0.04
+            y: page.py0 + page.h - height - page.h * 0.09
+            width: Math.min(page.w * 0.84, Math.max(height * 1.5, tagText.implicitWidth + obj.s * 0.1))
             height: Math.round(obj.s * 0.2)
-            radius: Math.min(height / 2, Math.max(2, obj.r * 0.6))
-            color: Theme.accent
+            radius: Theme.pill(height)
+            color: Theme.alpha(Theme.accent, Theme.isLight ? 0.16 : 0.2)
             antialiasing: true
 
             Text {
                 id: tagText
 
                 anchors.centerIn: parent
+                width: Math.min(implicitWidth, parent.width - obj.s * 0.06)
                 text: obj.tag
-                color: Theme.fgAccent
+                color: Theme.accent
+                elide: Text.ElideRight
                 font.family: Theme.fontFamily
                 font.pixelSize: Math.max(7, Math.round(obj.s * 0.13))
                 font.weight: Font.Bold
-                font.letterSpacing: 0.3
+                font.letterSpacing: Math.max(0.4, obj.s * 0.012)
             }
 
         }
@@ -406,20 +375,10 @@ Item {
                 y: obj.s * (index === 0 ? 0.2 : 0.23) - obj.lid * obj.s * 0.03
                 width: obj.s * 0.24
                 height: obj.s * 0.3
-                radius: Math.max(1, obj.r * 0.4)
+                radius: Math.max(1, obj.r * 0.5)
                 rotation: index === 0 ? -14 : 10
-                color: obj.paper
+                color: index === 0 ? Theme.accent : obj.paperFold
                 antialiasing: true
-
-                Rectangle {
-                    x: parent.width * 0.18
-                    y: parent.height * 0.22
-                    width: parent.width * 0.6
-                    height: Math.max(1.5, obj.s * 0.03)
-                    radius: height / 2
-                    color: Theme.alpha(obj.ink, 0.25)
-                }
-
             }
 
         }
@@ -441,7 +400,8 @@ Item {
 
             ShapePath {
                 fillColor: obj.binBody
-                strokeColor: "transparent"
+                strokeColor: obj.paperEdge
+                strokeWidth: obj.hairline
                 pathHints: ShapePath.PathSolid | ShapePath.PathNonIntersecting
 
                 PathSvg {
@@ -463,39 +423,39 @@ Item {
 
                 PathMove {
                     x: obj.s * 0.37
-                    y: obj.s * 0.44
+                    y: obj.s * 0.45
                 }
 
                 PathLine {
                     x: obj.s * 0.39
-                    y: obj.s * 0.82
+                    y: obj.s * 0.81
                 }
 
                 PathMove {
                     x: obj.s * 0.5
-                    y: obj.s * 0.44
+                    y: obj.s * 0.45
                 }
 
                 PathLine {
                     x: obj.s * 0.5
-                    y: obj.s * 0.82
+                    y: obj.s * 0.81
                 }
 
                 PathMove {
                     x: obj.s * 0.63
-                    y: obj.s * 0.44
+                    y: obj.s * 0.45
                 }
 
                 PathLine {
                     x: obj.s * 0.61
-                    y: obj.s * 0.82
+                    y: obj.s * 0.81
                 }
 
             }
 
         }
 
-        // the lid and its handle, hinged at the left end
+        // the lid and its handle, in the accent, hinged at the left end
         Item {
             id: lidItem
 
@@ -522,14 +482,14 @@ Item {
                 radius: Math.min(height / 2, obj.r * 0.8)
                 color: "transparent"
                 border.width: Math.max(1.5, obj.s * 0.04)
-                border.color: obj.binLid
+                border.color: Theme.accent
                 antialiasing: true
             }
 
             Rectangle {
                 anchors.fill: parent
                 radius: Math.min(height / 2, obj.r * 0.8)
-                color: obj.binLid
+                color: Theme.accent
                 antialiasing: true
             }
 
