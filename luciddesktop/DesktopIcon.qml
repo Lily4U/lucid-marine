@@ -340,7 +340,7 @@ Item {
         radius: tile.objects ? Theme.radiusLg : (plate.glass ? Theme.radiusMd : Theme.radiusSm)
         color: {
             if (tile.objects)
-                return tile.dropTarget ? Qt.tint(Theme.bg, Theme.alpha(Theme.accent, 0.3)) : Theme.bg;
+                return tile.dropTarget ? Qt.tint(Theme.bg, Theme.alpha(Theme.accent, 0.3)) : (tile.selected ? Qt.tint(Theme.bg, Theme.alpha(Theme.accent, 0.1)) : Theme.bg);
 
             if (tile.dropTarget)
                 return Theme.alpha(Theme.accent, 0.38);
@@ -457,7 +457,6 @@ Item {
             part: "back"
             size: tile.px
             open: object.open
-            lifted: object.lifted
         }
 
         // what a folder holds, fanned out from behind it: three cards that rise
@@ -690,7 +689,6 @@ Item {
                 part: "front"
                 size: tile.px
                 open: tile.dropTarget ? 1 : (tile.fanning ? 0.8 : (tile.hovered ? 0.4 : 0))
-                lifted: tile.hovered || tile.dropTarget
                 full: tile.kind === "trash" && DesktopIcons.trashCount > 0
                 tag: DesktopIcons.typeTag(tile.modelData)
                 variant: tile.pageKind
