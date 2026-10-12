@@ -13,9 +13,11 @@ WidgetBody {
     readonly property real level: w.present ? w.dev.percentage : 0
     readonly property int percent: Math.round(w.level * 100)
     readonly property int state: w.dev ? w.dev.state : UPowerDeviceState.Unknown
-    readonly property bool charging: w.state === UPowerDeviceState.Charging || w.state === UPowerDeviceState.PendingCharge
+    readonly property bool charging: w.state === UPowerDeviceState.Charging
+    // plugged in, but a charge threshold is holding it where it is
+    readonly property bool held: w.state === UPowerDeviceState.PendingCharge
     readonly property bool full: w.state === UPowerDeviceState.FullyCharged
-    readonly property bool low: w.opt("warnLow") !== false && !w.charging && w.level <= 0.2
+    readonly property bool low: w.opt("warnLow") !== false && !w.charging && !w.held && w.level <= 0.2
     readonly property real rate: w.dev ? Math.abs(w.dev.changeRate) : 0
     readonly property real health: (w.dev && w.dev.healthSupported) ? w.dev.healthPercentage : -1
     readonly property color tint: w.low ? Theme.error : w.inkAccent
@@ -28,6 +30,9 @@ WidgetBody {
 
         if (w.charging)
             return "Charging";
+
+        if (w.held)
+            return "Plugged in";
 
         if (w.state === UPowerDeviceState.Empty)
             return "Empty";
@@ -76,11 +81,10 @@ WidgetBody {
 
         // full, or plugged in and held by a charge threshold: upower still divides
         // by a near-zero draw there and reports months, so there's no time to show
-        var filling = w.state === UPowerDeviceState.Charging;
-        if (!filling && w.state !== UPowerDeviceState.Discharging)
+        if (!w.charging && w.state !== UPowerDeviceState.Discharging)
             return "";
 
-        var secs = filling ? w.dev.timeToFull : w.dev.timeToEmpty;
+        var secs = w.charging ? w.dev.timeToFull : w.dev.timeToEmpty;
         if (!secs || secs <= 0)
             return "estimating…";
 
@@ -516,7 +520,7 @@ WidgetBody {
             glyph: "laptop_chromebook"
             label: "This computer"
             value: w.level
-            plugged: w.charging || w.full
+            plugged: w.charging || w.held || w.full
         }
 
         Repeater {
