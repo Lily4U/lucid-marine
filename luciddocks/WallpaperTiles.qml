@@ -245,7 +245,7 @@ Item {
                 Image {
                     anchors.fill: parent
                     // a video shows the thumbnail cut from its first frame
-                    source: !strip.live ? "file://" + slot.path : slot.thumb !== "" ? "file://" + slot.thumb : ""
+                    source: !/\.(mp4|webm|mkv|mov|m4v)$/i.test(slot.path) ? "file://" + slot.path : slot.thumb !== "" ? "file://" + slot.thumb : ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: true

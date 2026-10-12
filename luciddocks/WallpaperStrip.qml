@@ -266,8 +266,9 @@ Item {
                 // one stays off the gui thread
                 Image {
                     anchors.fill: parent
-                    // a video has no picture of its own until its thumbnail is cut
-                    source: slot.thumb !== "" ? "file://" + slot.thumb : strip.live ? "" : "file://" + slot.path
+                    // a video has no picture of its own until its thumbnail is cut; asked of
+                    // the file, since the model can change tab a moment before strip.live does
+                    source: slot.thumb !== "" ? "file://" + slot.thumb : /\.(mp4|webm|mkv|mov|m4v)$/i.test(slot.path) ? "" : "file://" + slot.path
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: slot.thumb === ""
                     cache: true

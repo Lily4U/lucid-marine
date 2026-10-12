@@ -2376,11 +2376,26 @@ PanelWindow {
         property bool applyFallbackIfEmpty: true
         readonly property string script: Qt.resolvedUrl("./wallpaper-thumbs.sh").toString().replace("file://", "")
 
+        // a scan asked for while one runs waits for it: stopping one cut its
+        // output short, which read as an empty folder and put up the fallback
+        property bool again: false
+
         function scan(applyFallback) {
             wallpaperScanner.applyFallbackIfEmpty = applyFallback !== false;
-            wallpaperScanner.running = false;
+            if (wallpaperScanner.running) {
+                wallpaperScanner.again = true;
+                return ;
+            }
             wallpaperScanner.command = [wallpaperScanner.script, Prefs.wallpaperDir].concat(Prefs.liveWallpapers ? ["live"] : []);
             wallpaperScanner.running = true;
+        }
+
+        onExited: {
+            if (!wallpaperScanner.again)
+                return ;
+
+            wallpaperScanner.again = false;
+            wallpaperScanner.scan(wallpaperScanner.applyFallbackIfEmpty);
         }
 
         // the same files keep their cards, and with them their decoded images:

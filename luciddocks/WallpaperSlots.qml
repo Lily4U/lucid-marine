@@ -268,7 +268,7 @@ Item {
                         width: Math.max(parent.width, parent.height * 1.6)
                         height: parent.height
                         // a video shows the thumbnail cut from its first frame
-                        source: slot.path === "" ? "" : !strip.live ? "file://" + slot.path : slot.thumb !== "" ? "file://" + slot.thumb : ""
+                        source: slot.path === "" ? "" : !/\.(mp4|webm|mkv|mov|m4v)$/i.test(slot.path) ? "file://" + slot.path : slot.thumb !== "" ? "file://" + slot.thumb : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
