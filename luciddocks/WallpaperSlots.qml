@@ -24,6 +24,8 @@ Item {
     property int hoveredIndex: -1
     property int currentIndex: -1
     property string appliedPath: ""
+    // the Live tab: the same picker over the videos
+    property bool live: false
     property real stableHeight: height
     property int previewInterval: 300
     property string pendingPreviewPath: ""
@@ -161,6 +163,7 @@ Item {
                 readonly property var rect: strip.slotRect(slot.offset)
                 readonly property var entry: strip.model ? strip.model.get(slot.index) : null
                 readonly property string path: slot.entry ? slot.entry.path : ""
+                readonly property string thumb: slot.entry ? slot.entry.thumb : ""
                 readonly property bool isCurrent: slot.offset === 0
                 readonly property bool isApplied: strip.appliedPath !== "" && strip.appliedPath === slot.path
                 readonly property bool hovered: slotHover.hovered
@@ -264,7 +267,8 @@ Item {
                         anchors.centerIn: parent
                         width: Math.max(parent.width, parent.height * 1.6)
                         height: parent.height
-                        source: slot.path === "" ? "" : "file://" + slot.path
+                        // a video shows the thumbnail cut from its first frame
+                        source: slot.path === "" ? "" : !strip.live ? "file://" + slot.path : slot.thumb !== "" ? "file://" + slot.thumb : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         cache: true
@@ -414,7 +418,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "No wallpapers in this folder"
+            text: strip.live ? "No videos in this folder" : "No wallpapers in this folder"
             color: Theme.subtext
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontBody

@@ -54,6 +54,7 @@ ShellRoot {
         void Zones.offsets;
         void Capture.state;
         void NightLight.active;
+        void LiveWall.wanted;
         void Sounds.dir;
         void Storage.watching;
         void WallTransitions.active;

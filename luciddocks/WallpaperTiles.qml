@@ -22,6 +22,8 @@ Item {
     property int hoveredIndex: -1
     property alias currentIndex: view.currentIndex
     property string appliedPath: ""
+    // the Live tab: the same picker over the videos
+    property bool live: false
     property real stableHeight: height
     property int previewInterval: 300
     property string pendingPreviewPath: ""
@@ -182,6 +184,7 @@ Item {
             id: slot
 
             required property string path
+            required property string thumb
             required property string name
             required property int index
 
@@ -241,7 +244,8 @@ Item {
 
                 Image {
                     anchors.fill: parent
-                    source: "file://" + slot.path
+                    // a video shows the thumbnail cut from its first frame
+                    source: !strip.live ? "file://" + slot.path : slot.thumb !== "" ? "file://" + slot.thumb : ""
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: true
@@ -376,7 +380,7 @@ Item {
 
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
-            text: "No wallpapers in this folder"
+            text: strip.live ? "No videos in this folder" : "No wallpapers in this folder"
             color: Theme.subtext
             font.family: Theme.fontFamily
             font.pixelSize: Theme.fontBody

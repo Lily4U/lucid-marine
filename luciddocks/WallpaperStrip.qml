@@ -21,6 +21,8 @@ Item {
     property alias currentIndex: view.currentIndex
     // the wallpaper actually in use
     property string appliedPath: ""
+    // the Live tab: the same picker over the videos
+    property bool live: false
     property real stableHeight: height
     readonly property real rowHeight: strip.heroH + Theme.dp(62)
     // the hero card at the screen's own density: every tier is drawn from it
@@ -264,7 +266,8 @@ Item {
                 // one stays off the gui thread
                 Image {
                     anchors.fill: parent
-                    source: "file://" + (slot.thumb !== "" ? slot.thumb : slot.path)
+                    // a video has no picture of its own until its thumbnail is cut
+                    source: slot.thumb !== "" ? "file://" + slot.thumb : strip.live ? "" : "file://" + slot.path
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: slot.thumb === ""
                     cache: true
@@ -438,7 +441,7 @@ Item {
 
             Icon {
                 anchors.centerIn: parent
-                name: "wallpaper"
+                name: strip.live ? "movie" : "wallpaper"
                 size: Theme.dp(28)
                 color: Theme.primary
             }
@@ -448,14 +451,14 @@ Item {
         LText {
             anchors.horizontalCenter: parent.horizontalCenter
             role: "titleMedium"
-            text: "No wallpapers in this folder"
+            text: strip.live ? "No videos in this folder" : "No wallpapers in this folder"
             color: Theme.text
         }
 
         LText {
             anchors.horizontalCenter: parent.horizontalCenter
             role: "bodyMedium"
-            text: "Drop images into the theme's wallpaper folder and they show up here."
+            text: strip.live ? "Drop mp4, webm or mkv files into the theme's wallpaper folder and they show up here." : "Drop images into the theme's wallpaper folder and they show up here."
             color: Theme.subtextDim
         }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# set-wallpaper.sh <path-to-image> [dark|light]
+# set-wallpaper.sh <path-to-image-or-video> [dark|light]
 #
 # sets the wallpaper, then regenerates colours if the active theme derives
 # them from the image. ~/.cache/current_theme decides:
@@ -20,6 +20,7 @@ set -euo pipefail
 WALLPAPER="${1:-}"
 CACHE_DIR="$HOME/.cache"
 CURRENT_WALL_FILE="$CACHE_DIR/current_wallpaper"
+CURRENT_LIVE_FILE="$CACHE_DIR/current_live_wallpaper"
 CURRENT_THEME_FILE="$CACHE_DIR/current_theme"
 CURRENT_MODE_FILE="$CACHE_DIR/current_mode"
 LUCID_DIR="$HOME/.config/lucid"
@@ -29,7 +30,7 @@ CURRENT_THEME="$(cat "$CURRENT_THEME_FILE" 2>/dev/null || echo matugen)"
 MODE="${2:-$(cat "$CURRENT_MODE_FILE" 2>/dev/null || echo dark)}"
 
 usage() {
-    echo "usage: $(basename "$0") <path-to-image> [dark|light]"
+    echo "usage: $(basename "$0") <path-to-image-or-video> [dark|light]"
     exit 1
 }
 
@@ -42,6 +43,30 @@ WALLPAPER="${WALLPAPER/#\~/$HOME}"
 if [[ "$MODE" != "dark" && "$MODE" != "light" ]]; then
     echo "error: mode must be dark or light (got: $MODE)" >&2
     usage
+fi
+
+# a video is a live wallpaper. its first frame is what this script sets, and
+# what the colours come from, so everything that reads current_wallpaper keeps
+# getting a picture; the video goes in current_live_wallpaper, and the shell
+# (LiveWall.qml) plays it over that frame, which is where it starts
+LIVE=""
+if [[ "${WALLPAPER,,}" =~ \.(mp4|webm|mkv|mov|m4v)$ ]]; then
+    command -v ffmpeg &>/dev/null || { echo "error: a video wallpaper needs ffmpeg" >&2; exit 1; }
+    LIVE="$WALLPAPER"
+    FRAME_DIR="$CACHE_DIR/lucid/live-frames"
+    FRAME="$FRAME_DIR/$(printf '%s|%s' "$LIVE" "$(stat -c %Y "$LIVE" 2>/dev/null || echo 0)" | sha1sum | cut -c1-16).jpg"
+    if [[ ! -f "$FRAME" ]]; then
+        mkdir -p "$FRAME_DIR"
+        if ! ffmpeg -v error -y -i "$LIVE" -frames:v 1 -q:v 2 "$FRAME.$$.jpg" </dev/null; then
+            rm -f "$FRAME.$$.jpg"
+            echo "error: could not read a frame from $LIVE" >&2
+            exit 1
+        fi
+        mv -f "$FRAME.$$.jpg" "$FRAME"
+    fi
+    touch "$FRAME"
+    find "$FRAME_DIR" -type f -mtime +60 -delete 2>/dev/null || true
+    WALLPAPER="$FRAME"
 fi
 
 # wallpaper daemon: awww, falling back to swww
@@ -237,6 +262,8 @@ fi
 [[ -n "${WALL_DEMO:-}" ]] && exit 0
 
 mkdir -p "$CACHE_DIR"
+# first, so whoever reads current_wallpaper on its change finds the video already
+printf '%s' "$LIVE" > "$CURRENT_LIVE_FILE"
 printf '%s' "$WALLPAPER" > "$CURRENT_WALL_FILE"
 printf '%s' "$MODE" > "$CURRENT_MODE_FILE"
 

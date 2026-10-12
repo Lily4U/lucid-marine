@@ -339,6 +339,20 @@ on the wallpaper you have, without changing anything. The choice is written to
 line by line (never sourced); anything it does not recognise falls back to the
 plain fade.
 
+**Live wallpapers** (Settings → Theme → *Live wallpapers*, off by default):
+videos in the wallpaper folder (mp4, webm, mkv, mov) get a **Live** tab of their
+own in the launcher (`>live`), in the same four picker styles. A video plays
+behind the desktop's icons and widgets; its first frame is what `awww` holds
+under it and what the colours come from, so the palette matches the picture the
+video starts on. The player is a quickshell of its own (`lucidlive/`), started
+by `LiveWall.qml` with the decoder you pick: *Automatic* tries VA-API (the
+integrated GPU) before NVIDIA, so a hybrid laptop keeps its graphics card asleep;
+Intel needs `intel-media-driver` for that. It holds still on a screen whose
+workspace has windows (or only a fullscreen one, or never), behind the lock
+screen, and in game mode it keeps playing, pauses, or stops and leaves the first
+frame. It sits between `awww` and the desktop through layer-rule `order`, which
+`LiveWall.qml` sets with `hyprctl eval` before the player starts.
+
 Type a sum in the search field for a calculator (`2^3^2`, right-associative).
 The answer takes a card above the results, set in display type; Return copies it.
 

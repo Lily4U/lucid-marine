@@ -261,6 +261,9 @@ PanelWindow {
         if (q.indexOf(">clip") === 0)
             return "clipboard";
 
+        if (q.indexOf(">live") === 0)
+            return "live";
+
         if (q.indexOf(">") === 0)
             return "commands";
 
@@ -287,6 +290,9 @@ PanelWindow {
         if (mode === "clipboard")
             return ">clip";
 
+        if (mode === "live")
+            return ">live";
+
         if (mode === "commands")
             return ">";
 
@@ -307,6 +313,9 @@ PanelWindow {
     }
 
     readonly property string mode: dockWindow.modeFor(dockWindow.rawQuery)
+    // pictures and videos share the picker: one tab each
+    readonly property bool pickerMode: dockWindow.mode === "wallpaper" || dockWindow.mode === "live"
+    readonly property var pickerModel: dockWindow.mode === "live" ? liveModel : wallpapersModel
     readonly property string filterQuery: dockWindow.queryFor(dockWindow.rawQuery)
 
     onRawQueryChanged: {
@@ -319,7 +328,7 @@ PanelWindow {
             launcherLoader.item.resetSelection();
     }
     onModeChanged: {
-        if (dockWindow.mode === "wallpaper") {
+        if (dockWindow.pickerMode) {
             // the cards outlive the menu, so the strip is on the current picture
             // from the first frame rather than once the rescan lands
             dockWindow.syncStripToCurrent();
@@ -462,12 +471,12 @@ PanelWindow {
     readonly property real wallTilesContentMax: Math.max(dockWindow.menuContentMax, Math.round((dockWindow.screen ? dockWindow.screen.height : 1080) * 0.62))
     readonly property int wallTilesTile: Math.max(Theme.dp(40), Math.min(dockWindow.wallTilesBase, Math.floor((dockWindow.wallTilesContentMax - dockWindow.wallTilesChrome) / dockWindow.wallTilesRows)))
     readonly property int wallTilesCellW: Prefs.wallpaperTilesAspect === "wide" ? Math.round(dockWindow.wallTilesTile * 16 / 9) : dockWindow.wallTilesTile
-    readonly property int wallTilesWidth: Math.ceil(wallpapersModel.count / dockWindow.wallTilesRows) * dockWindow.wallTilesCellW + Theme.dp(24)
+    readonly property int wallTilesWidth: Math.ceil(dockWindow.pickerModel.count / dockWindow.wallTilesRows) * dockWindow.wallTilesCellW + Theme.dp(24)
     // Pills: the row with every wallpaper in it, when that is narrower than the
     // panel, so a short folder doesn't leave the panel wider than its pills
     // (from WallpaperPills.qml's pillW, fullPillMax and openW)
     readonly property int wallPillsWidth: {
-        var slims = Math.max(0, wallpapersModel.count - 1);
+        var slims = Math.max(0, dockWindow.pickerModel.count - 1);
         var gap = dockWindow.wallCardGap;
         var row;
         if (Prefs.wallpaperPillsShape === "full")
@@ -480,7 +489,7 @@ PanelWindow {
     }
 
     readonly property real menuWidth: {
-        if (dockWindow.mode === "wallpaper") {
+        if (dockWindow.pickerMode) {
             if (dockWindow.wallIsTiles)
                 return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallTilesWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom), dockWindow.maxDockWidth - 48);
 
@@ -503,7 +512,7 @@ PanelWindow {
     readonly property real menuContentMin: dockWindow.resultsHeight > 0 || !launcherLoader.item ? Theme.dp(70) : Math.max(Theme.dp(70), launcherLoader.item.emptyHeight)
     readonly property real menuHeight: {
         var content;
-        if (dockWindow.mode === "wallpaper")
+        if (dockWindow.pickerMode)
             content = dockWindow.wallIsTiles ? dockWindow.wallTilesRows * dockWindow.wallTilesTile + dockWindow.wallTilesChrome : dockWindow.wallHeroH + Theme.dp(70);
         // fixed, so deleting entries doesn't shrink the preview under the cursor
         else if (dockWindow.mode === "clipboard")
@@ -1376,9 +1385,15 @@ PanelWindow {
         dockWindow.rebuildResults();
     }
 
+    // a live wallpaper is the video, not the frame set-wallpaper.sh puts under it
     function currentWallpaperPath() {
         try {
-            return currentWallFile.text().trim();
+            var p = currentWallFile.text().trim();
+            if (p.indexOf("/lucid/live-frames/") === -1)
+                return p;
+
+            var live = LiveWall.video !== "" ? LiveWall.video : currentLiveFile.text().trim();
+            return live !== "" ? live : p;
         } catch (e) {
             return "";
         }
@@ -1427,8 +1442,9 @@ PanelWindow {
     }
 
     function syncStripToCurrent() {
-        for (var i = 0; i < wallpapersModel.count; i++) {
-            if (wallpapersModel.get(i).path === wallpaperState.current) {
+        var model = dockWindow.pickerModel;
+        for (var i = 0; i < model.count; i++) {
+            if (model.get(i).path === wallpaperState.current) {
                 if (launcherLoader.item)
                     launcherLoader.item.setWallpaperIndex(i);
 
@@ -1780,6 +1796,15 @@ PanelWindow {
             wallpaperScanner.scan(false);
         }
 
+        // the videos are only listed while live wallpapers are on, and the Live
+        // tab goes with them
+        function onLiveWallpapersChanged() {
+            wallpaperScanner.scan(false);
+            if (!Prefs.liveWallpapers && dockWindow.mode === "live")
+                dockWindow.setSearchText(">wallpaper");
+
+        }
+
         // the strip's cards and thumbnails are ready before it first opens
         function onLoadedChanged() {
             if (Prefs.loaded)
@@ -1854,6 +1879,10 @@ PanelWindow {
 
         function wallpaper(): void {
             dockWindow.openLauncher(">wallpaper");
+        }
+
+        function live(): void {
+            dockWindow.openLauncher(">live");
         }
 
         function theme(): void {
@@ -2031,6 +2060,11 @@ PanelWindow {
         id: wallpapersModel
     }
 
+    // the videos in the same folder, with Settings -> Theme -> Live wallpapers on
+    ListModel {
+        id: liveModel
+    }
+
     // the strip rescan rides on wallpaperDir, which follows the theme
     onCurrentThemeChanged: dockWindow.rebuildResults()
 
@@ -2062,6 +2096,31 @@ PanelWindow {
         }
     }
 
+    // read once at start, before LiveWall has loaded it
+    FileView {
+        id: currentLiveFile
+
+        path: Quickshell.env("HOME") + "/.cache/current_live_wallpaper"
+        blockLoading: true
+        printErrors: false
+    }
+
+    // the frame under a video lands in current_wallpaper either side of the video
+    // itself, so the video is taken from LiveWall as well
+    Connections {
+        function onVideoChanged() {
+            var p = dockWindow.currentWallpaperPath();
+            if (p === "" || p === dockWindow.appliedWallpaper)
+                return;
+
+            dockWindow.appliedWallpaper = p;
+            wallpaperState.current = p;
+            dockWindow.syncStripToCurrent();
+        }
+
+        target: LiveWall
+    }
+
     FileView {
         id: currentWallFile
 
@@ -2070,7 +2129,7 @@ PanelWindow {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            var p = text().trim();
+            var p = dockWindow.currentWallpaperPath();
             if (p === "" || p === dockWindow.appliedWallpaper)
                 return;
 
@@ -2313,60 +2372,82 @@ PanelWindow {
         function scan(applyFallback) {
             wallpaperScanner.applyFallbackIfEmpty = applyFallback !== false;
             wallpaperScanner.running = false;
-            wallpaperScanner.command = [wallpaperScanner.script, Prefs.wallpaperDir];
+            wallpaperScanner.command = [wallpaperScanner.script, Prefs.wallpaperDir].concat(Prefs.liveWallpapers ? ["live"] : []);
             wallpaperScanner.running = true;
+        }
+
+        // the same files keep their cards, and with them their decoded images:
+        // a rebuild decoded every one again on each open
+        function fill(model, rows) {
+            var same = rows.length === model.count;
+            for (var j = 0; same && j < rows.length; j++) {
+                same = model.get(j).path === rows[j].path;
+            }
+            if (same) {
+                for (var m = 0; m < rows.length; m++) {
+                    if (model.get(m).thumb !== rows[m].thumb)
+                        model.setProperty(m, "thumb", rows[m].thumb);
+
+                }
+                return false;
+            }
+            model.clear();
+            for (var r = 0; r < rows.length; r++) {
+                var base = rows[r].path.substring(rows[r].path.lastIndexOf("/") + 1);
+                var dot = base.lastIndexOf(".");
+                model.append({
+                    "path": rows[r].path,
+                    "name": dot > 0 ? base.substring(0, dot) : base,
+                    "thumb": rows[r].thumb
+                });
+            }
+            return true;
         }
 
         stdout: StdioCollector {
             onStreamFinished: {
-                // path, then the small copy the strip decodes, or "" until it exists
-                var rows = [];
+                // path, the small copy the strip decodes ("" until it exists), and
+                // "video" for a live wallpaper
+                var pictures = [];
+                var videos = [];
                 var lines = text.split("\n");
                 for (var i = 0; i < lines.length; i++) {
                     var cols = lines[i].split("\t");
                     var p = cols[0].trim();
                     if (p !== "")
-                        rows.push({
+                        (cols.length > 2 && cols[2].trim() === "video" ? videos : pictures).push({
                         "path": p,
                         "thumb": cols.length > 1 ? cols[1].trim() : ""
                     });
 
                 }
-                // the same pictures keep their cards, and with them their decoded
-                // images: a rebuild decoded every one again on each open
-                var same = rows.length > 0 && rows.length === wallpapersModel.count;
-                for (var j = 0; same && j < rows.length; j++) {
-                    same = wallpapersModel.get(j).path === rows[j].path;
+                var changed = wallpaperScanner.fill(wallpapersModel, pictures);
+                changed = wallpaperScanner.fill(liveModel, videos) || changed;
+                // a picture without its thumbnail shows the original, a video shows
+                // nothing: look again while the thumbnails are being cut
+                if (videos.some((v) => {
+                    return v.thumb === "";
+                }) && thumbRetry.tries < 10) {
+                    thumbRetry.tries++;
+                    thumbRetry.restart();
+                } else {
+                    thumbRetry.tries = 0;
                 }
-                if (same) {
-                    for (var m = 0; m < rows.length; m++) {
-                        if (wallpapersModel.get(m).thumb !== rows[m].thumb)
-                            wallpapersModel.setProperty(m, "thumb", rows[m].thumb);
-
-                    }
-                    // the open already put the strip on the current picture
-                    return;
-                }
-                wallpapersModel.clear();
-                for (var r = 0; r < rows.length; r++) {
-                    var base = rows[r].path.substring(rows[r].path.lastIndexOf("/") + 1);
-                    var dot = base.lastIndexOf(".");
-                    wallpapersModel.append({
-                        "path": rows[r].path,
-                        "name": dot > 0 ? base.substring(0, dot) : base,
-                        "thumb": rows[r].thumb
-                    });
-                }
-                if (wallpapersModel.count === 0) {
+                if (wallpapersModel.count === 0 && liveModel.count === 0) {
                     if (wallpaperScanner.applyFallbackIfEmpty && dockWindow.appliedWallpaper !== dockWindow.fallbackWallpaper)
                         dockWindow.applyWallpaper(dockWindow.fallbackWallpaper);
 
                     return;
                 }
+                // the open already put the strip on the current picture
+                if (!changed)
+                    return;
+
+                var model = dockWindow.pickerModel;
                 var want = wallpaperState.current;
                 var idx = 0;
-                for (var k = 0; k < wallpapersModel.count; k++) {
-                    if (wallpapersModel.get(k).path === want) {
+                for (var k = 0; k < model.count; k++) {
+                    if (model.get(k).path === want) {
                         idx = k;
                         break;
                     }
@@ -2376,6 +2457,15 @@ PanelWindow {
             }
         }
 
+    }
+
+    Timer {
+        id: thumbRetry
+
+        property int tries: 0
+
+        interval: 1500
+        onTriggered: wallpaperScanner.scan(false)
     }
 
     Process {
@@ -2408,7 +2498,7 @@ PanelWindow {
         running: true
         repeat: true
         onTriggered: {
-            if (dockWindow.mode === "wallpaper")
+            if (dockWindow.pickerMode)
                 return;
 
             wallpaperWatch.command = ["sh", "-c", "d=\"" + Prefs.wallpaperDir + "\"; " + "cur=\"$1\"; " + "if [ -n \"$cur\" ] && [ ! -f \"$cur\" ]; then echo MISSING; fi; " + "if [ -d \"$d\" ]; then " + "f=$(find \"$d\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) | sort | head -n1); " + "if [ -n \"$f\" ]; then echo \"FIRST:$f\"; fi; " + "fi; exit 0", "sh", dockWindow.appliedWallpaper];
@@ -2707,7 +2797,7 @@ PanelWindow {
                 mode: dockWindow.mode
                 model: resultsModel
                 resultCount: dockWindow.resultCount
-                wallpaperModel: wallpapersModel
+                wallpaperModel: dockWindow.pickerModel
                 wallHeroW: dockWindow.wallHeroW
                 wallHeroH: dockWindow.wallHeroH
                 wallMidW: dockWindow.wallMidW

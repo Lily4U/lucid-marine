@@ -8,7 +8,7 @@ import qs.lucidui
 Item {
     id: face
 
-    // "apps" | "commands" | "web" | "run" | "emoji" | "theme" | "wallpaper" | "clipboard"
+    // "apps" | "commands" | "web" | "run" | "emoji" | "theme" | "wallpaper" | "live" | "clipboard"
     property string mode: "apps"
     property var model: null
     property var wallpaperModel: null
@@ -47,12 +47,14 @@ Item {
         "emoji": "Find an emoji",
         "commands": "Search commands",
         "theme": "Search themes",
-        "wallpaper": "Search wallpapers"
+        "wallpaper": "Search wallpapers",
+        "live": "Search live wallpapers"
     })[face.displayMode] || "Search apps and settings"
     readonly property string modeIcon: ({
         "commands": "keyboard_command_key",
         "clipboard": "content_paste",
         "wallpaper": "wallpaper",
+        "live": "movie",
         "theme": "palette",
         "web": "travel_explore",
         "run": "terminal_2",
@@ -60,7 +62,7 @@ Item {
     })[face.displayMode] || "search"
     // the head's trailing readout: what the panel is holding right now
     readonly property string countLabel: {
-        if (face.displayMode === "wallpaper" || face.resultCount === 0)
+        if (face.pickerMode || face.resultCount === 0)
             return "";
 
         if (face.displayMode === "apps" && face.highlightQuery === "")
@@ -78,8 +80,12 @@ Item {
     readonly property bool searchTop: Prefs.launcherSearchTop
     readonly property int chromeHeight: Prefs.launcherChromeH
     readonly property int headBlock: face.headOn ? face.headHeight + Prefs.launcherHeadGap : 0
-    // the launcher's modes, reachable by prefix, by pill or by Ctrl and a digit
-    readonly property var modes: [{
+    // the launcher's modes, reachable by prefix, by pill or by Ctrl and a digit.
+    // Live is there with Settings -> Theme -> Live wallpapers on
+    readonly property var modes: face.allModes.filter((m) => {
+        return m.key !== "live" || Prefs.liveWallpapers;
+    })
+    readonly property var allModes: [{
         "key": "apps",
         "label": "Apps",
         "icon": "apps"
@@ -95,6 +101,10 @@ Item {
         "key": "wallpaper",
         "label": "Wallpapers",
         "icon": "wallpaper"
+    }, {
+        "key": "live",
+        "label": "Live",
+        "icon": "movie"
     }, {
         "key": "theme",
         "label": "Themes",
@@ -114,7 +124,9 @@ Item {
     // what the empty state needs, so the dock never sizes the panel under it
     readonly property real emptyHeight: resultList.emptyExtent
     property string displayMode: "apps"
-    readonly property bool listVisible: face.displayMode !== "wallpaper"
+    // pictures and videos share the picker, a tab each
+    readonly property bool pickerMode: face.displayMode === "wallpaper" || face.displayMode === "live"
+    readonly property bool listVisible: !face.pickerMode
     // clipboard: the first Ctrl+Shift+Del arms clearing everything, a second within 3 s does it
     property bool clearArmed: false
     // bumped whenever the dock rewrites the results, so the preview re-reads the selected row
@@ -211,7 +223,7 @@ Item {
     }
 
     function submit() {
-        if (face.displayMode === "wallpaper") {
+        if (face.pickerMode) {
             if (wallStrip)
                 wallStrip.activateCurrent();
 
@@ -400,7 +412,7 @@ Item {
             id: pickerLoader
 
             anchors.fill: parent
-            visible: face.displayMode === "wallpaper"
+            visible: face.pickerMode
             source: face.pickerFiles[face.pickerStyle] || face.pickerFiles.strip
             onLoaded: pickerRestore.restart()
         }
@@ -451,6 +463,7 @@ Item {
         Binding { target: pickerLoader.item; property: "tinyH"; value: face.wallTinyH; when: pickerLoader.item !== null }
         Binding { target: pickerLoader.item; property: "itemGap"; value: face.wallCardGap; when: pickerLoader.item !== null }
         Binding { target: pickerLoader.item; property: "appliedPath"; value: face.appliedWallpaper; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "live"; value: face.displayMode === "live"; when: pickerLoader.item !== null }
         Binding { target: pickerLoader.item; property: "stableHeight"; value: face.stableContentHeight; when: pickerLoader.item !== null }
 
         Connections {
@@ -566,23 +579,23 @@ Item {
             Keys.onUpPressed: {
                 if (face.listVisible)
                     resultList.step(-1);
-                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerGrid)
+                else if (face.pickerMode && wallStrip && face.pickerGrid)
                     wallStrip.stepVertical(-1);
-                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerUpDown)
+                else if (face.pickerMode && wallStrip && face.pickerUpDown)
                     wallStrip.step(-1);
 
             }
             Keys.onDownPressed: {
                 if (face.listVisible)
                     resultList.step(1);
-                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerGrid)
+                else if (face.pickerMode && wallStrip && face.pickerGrid)
                     wallStrip.stepVertical(1);
-                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerUpDown)
+                else if (face.pickerMode && wallStrip && face.pickerUpDown)
                     wallStrip.step(1);
 
             }
             Keys.onLeftPressed: (event) => {
-                if (face.displayMode === "wallpaper" && (face.pickerGrid || !face.pickerUpDown)) {
+                if (face.pickerMode && (face.pickerGrid || !face.pickerUpDown)) {
                     if (wallStrip)
                         wallStrip.step(-1);
                     event.accepted = true;
@@ -591,7 +604,7 @@ Item {
                 }
             }
             Keys.onRightPressed: (event) => {
-                if (face.displayMode === "wallpaper" && (face.pickerGrid || !face.pickerUpDown) && face.wallpaperModel) {
+                if (face.pickerMode && (face.pickerGrid || !face.pickerUpDown) && face.wallpaperModel) {
                     if (wallStrip)
                         wallStrip.step(1);
                     event.accepted = true;
