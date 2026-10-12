@@ -20,6 +20,11 @@ Singleton {
     readonly property var videoExts: ["mp4", "webm", "mkv", "mov", "m4v"]
 
     property string video: ""
+    // what awww holds: the video's first frame, or the picture that replaced it
+    property string picture: ""
+    // when either last changed, for the player to time its fade against awww's
+    property real changed: 0
+    property bool loaded: false
     property bool gameMode: false
     // "still" in game mode leaves the first frame on awww and stops the player
     readonly property bool wanted: Prefs.liveWallpapers && root.video !== "" && !(root.gameMode && Prefs.liveGameMode === "still")
@@ -47,15 +52,31 @@ Singleton {
         }
         return out;
     }
+    // the player changes with the transition set for pictures; none is a cut
+    readonly property int duration: Prefs.wallTransType === "none" ? 0 : Math.round(Math.max(0, Number(Prefs.wallTransDuration) || 0) * 1000)
+    readonly property var curve: {
+        const c = String(Prefs.wallTransBezier).split(",").map(Number);
+        return c.length === 4 && c.every((n) => {
+            return isFinite(n);
+        }) ? c : [0.54, 0, 0.34, 0.99];
+    }
     readonly property string state: JSON.stringify({
         "video": root.video,
-        "playing": root.playing
+        "picture": root.picture,
+        "playing": root.playing,
+        "duration": root.duration,
+        "curve": root.curve,
+        "changed": root.changed
     })
     property int failures: 0
 
     function isVideo(path) {
         const dot = path.lastIndexOf(".");
         return dot > 0 && root.videoExts.indexOf(path.substring(dot + 1).toLowerCase()) !== -1;
+    }
+
+    function writeState() {
+        stateView.setText(root.state);
     }
 
     function sync() {
@@ -75,7 +96,8 @@ Singleton {
     }
 
     onWantedChanged: root.sync()
-    onStateChanged: stateView.setText(root.state)
+    // the fields of one change land together, in one write
+    onStateChanged: Qt.callLater(root.writeState)
     // a new decoder needs a new process
     onDecodersChanged: {
         if (child.running) {
@@ -85,13 +107,31 @@ Singleton {
     }
     Component.onCompleted: stateView.setText(root.state)
 
+    // two lines from set-wallpaper.sh: the video (empty for a picture), then what
+    // awww was given
     FileView {
         path: root.home + "/.cache/current_live_wallpaper"
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
-        onLoaded: root.video = text().trim()
-        onLoadFailed: root.video = ""
+        onLoaded: {
+            const lines = text().split("\n");
+            const video = (lines[0] || "").trim();
+            const picture = (lines[1] || "").trim();
+            if (video === root.video && picture === root.picture)
+                return;
+
+            if (root.loaded)
+                root.changed = Date.now();
+
+            root.loaded = true;
+            root.picture = picture;
+            root.video = video;
+        }
+        onLoadFailed: {
+            root.loaded = true;
+            root.video = "";
+        }
     }
 
     FileView {
@@ -172,7 +212,8 @@ Singleton {
     Timer {
         id: linger
 
-        interval: 800
+        // the fade into the picture, and a little
+        interval: root.duration + 400
         onTriggered: {
             if (!root.wanted)
                 child.running = false;

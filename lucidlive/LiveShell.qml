@@ -7,16 +7,27 @@ import Quickshell.Wayland
 // The live wallpaper, as a quickshell instance of its own: LiveWall.qml starts it
 // with `quickshell -p` and the decoder it is to use in its environment, because
 // Qt Multimedia reads QT_FFMPEG_DECODING_HW_DEVICE_TYPES once per process. It
-// draws a video on the background layer of every screen and nothing else; what
-// plays, and where it is paused, comes from the state file the shell writes.
-// The first frame of the same video sits under it on awww, so a video that is
-// not up yet, fails, or fades away shows the picture it starts from.
+// draws on the background layer of every screen and nothing else; what plays,
+// and where it is paused, comes from the state file the shell writes.
+//
+// The first frame of the video sits under it on awww, so the change is the
+// player's to make: from one video to the next it crossfades, from a video to a
+// picture it fades into the picture, and from a picture it waits out the awww
+// transition to the first frame before it shows, since that is where it starts.
 ShellRoot {
     id: root
 
     property string video: ""
+    // what awww shows: the video's first frame, or the picture
+    property string picture: ""
     // output name -> false where the video holds still
     property var playing: ({})
+    // the transition Settings -> Theme sets for wallpapers, in ms
+    property int duration: 1000
+    property var curve: [0.54, 0, 0.34, 0.99, 1, 1]
+    // when the wallpaper last changed (ms since the epoch), so a player started
+    // after it knows how much of the awww transition is left
+    property real changed: 0
 
     function urlFor(path) {
         return path === "" ? "" : "file://" + path.split("/").map(encodeURIComponent).join("/");
@@ -30,8 +41,14 @@ ShellRoot {
         onLoaded: {
             try {
                 const s = JSON.parse(text());
-                root.video = typeof s.video === "string" ? s.video : "";
+                root.duration = Math.max(0, Number(s.duration) || 0);
+                if (Array.isArray(s.curve) && s.curve.length === 4)
+                    root.curve = s.curve.concat([1, 1]);
+
+                root.changed = Number(s.changed) || 0;
                 root.playing = s.playing || {};
+                root.picture = typeof s.picture === "string" ? s.picture : "";
+                root.video = typeof s.video === "string" ? s.video : "";
             } catch (e) {
             }
         }
@@ -45,27 +62,56 @@ ShellRoot {
 
             required property var modelData
             readonly property bool play: root.playing[win.modelData.name] !== false
-            // what the player holds; it trails root.video by a fade
-            property string loaded: ""
-            property bool ready: false
-            readonly property bool hasFrame: player.mediaStatus === MediaPlayer.BufferedMedia || player.mediaStatus === MediaPlayer.BufferingMedia
+            readonly property var slots: [slotA, slotB]
+            // the slot on screen, and the one fading in over it
+            property int front: 0
+            property bool waiting: false
+            readonly property var frontSlot: win.slots[win.front]
+            readonly property var backSlot: win.slots[1 - win.front]
 
-            function settle() {
-                // back on the video still loaded, as a quick browse can be
-                if (win.loaded === root.video) {
-                    win.ready = win.loaded !== "" && win.hasFrame;
-                    return;
+            // a video, or the picture a video gives way to
+            function show() {
+                const video = root.video;
+                const picture = video === "" ? root.picture : "";
+                // a change in the middle of one lands the one under way first
+                if (fade.running) {
+                    fade.stop();
+                    win.backSlot.opacity = 1;
+                    win.swap();
                 }
 
-                if (out.opacity > 0) {
-                    win.ready = false;
+                if (win.frontSlot.video === video && win.frontSlot.picture === picture)
+                    return;
+
+                hold.stop();
+                win.waiting = true;
+                win.backSlot.opacity = 0;
+                win.backSlot.load(video, picture);
+                win.tryStart();
+            }
+
+            function swap() {
+                const old = win.frontSlot;
+                win.front = 1 - win.front;
+                old.unload();
+            }
+
+            function tryStart() {
+                if (!win.waiting || !win.backSlot.ready)
+                    return;
+
+                const fresh = !win.frontSlot.ready;
+                // from a picture the frame is still arriving on awww: wait it out,
+                // then the first frame of the video lands on that same frame
+                const left = fresh ? root.duration - (Date.now() - root.changed) : 0;
+                if (left > 30) {
+                    hold.interval = left;
+                    hold.restart();
                     return;
                 }
-                win.loaded = root.video;
-                player.source = root.urlFor(win.loaded);
-                if (win.loaded !== "")
-                    win.play ? player.play() : player.pause();
-
+                win.waiting = false;
+                fade.duration = fresh ? 150 : Math.max(1, root.duration);
+                fade.restart();
             }
 
             screen: win.modelData
@@ -73,12 +119,7 @@ ShellRoot {
             WlrLayershell.layer: WlrLayer.Background
             WlrLayershell.namespace: "lucid-live"
             WlrLayershell.exclusionMode: ExclusionMode.Ignore
-            Component.onCompleted: win.settle()
-            onPlayChanged: {
-                if (win.loaded !== "")
-                    win.play ? player.play() : player.pause();
-
-            }
+            Component.onCompleted: win.show()
 
             anchors {
                 top: true
@@ -89,55 +130,132 @@ ShellRoot {
 
             Connections {
                 function onVideoChanged() {
-                    win.settle();
+                    win.show();
+                }
+
+                function onPictureChanged() {
+                    if (root.video === "")
+                        win.show();
+
                 }
 
                 target: root
+            }
+
+            Timer {
+                id: hold
+
+                onTriggered: {
+                    if (!win.waiting || !win.backSlot.ready)
+                        return;
+
+                    win.waiting = false;
+                    fade.duration = 150;
+                    fade.restart();
+                }
+            }
+
+            NumberAnimation {
+                id: fade
+
+                target: win.backSlot
+                property: "opacity"
+                from: 0
+                to: 1
+                easing.type: Easing.Bezier
+                easing.bezierCurve: root.curve
+                onFinished: win.swap()
             }
 
             // nothing here takes the pointer: the desktop above it does
             mask: Region {
             }
 
-            MediaPlayer {
-                id: player
+            component Slot: Item {
+                id: slot
 
-                loops: MediaPlayer.Infinite
-                videoOutput: out
-                // shown once a frame is up; the first one is the picture under it
-                onMediaStatusChanged: {
-                    if (win.hasFrame)
-                        win.ready = win.loaded !== "" && win.loaded === root.video;
-                    else if (player.mediaStatus === MediaPlayer.InvalidMedia || player.mediaStatus === MediaPlayer.NoMedia)
-                        win.ready = false;
-                }
-                onErrorOccurred: (error, errorString) => {
-                    console.warn("lucid-live:", errorString);
-                    win.ready = false;
-                }
-            }
+                property string video: ""
+                property string picture: ""
+                readonly property bool ready: slot.picture !== "" ? still.status === Image.Ready : (player.mediaStatus === MediaPlayer.BufferedMedia || player.mediaStatus === MediaPlayer.BufferingMedia)
 
-            VideoOutput {
-                id: out
+                function load(video, picture) {
+                    slot.video = video;
+                    slot.picture = picture;
+                    player.source = root.urlFor(video);
+                    if (video !== "")
+                        win.play ? player.play() : player.pause();
+
+                }
+
+                function unload() {
+                    player.stop();
+                    slot.video = "";
+                    slot.picture = "";
+                    player.source = "";
+                    slot.opacity = 0;
+                }
 
                 anchors.fill: parent
-                fillMode: VideoOutput.PreserveAspectCrop
-                opacity: win.ready ? 1 : 0
-                // a new video waits for the old one to fade, then loads
-                onOpacityChanged: {
-                    if (out.opacity === 0)
-                        win.settle();
+                opacity: 0
+                onReadyChanged: {
+                    if (slot.ready && slot === win.backSlot)
+                        win.tryStart();
 
                 }
 
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: 300
-                        easing.type: Easing.OutCubic
+                Connections {
+                    function onPlayChanged() {
+                        if (slot.video !== "")
+                            win.play ? player.play() : player.pause();
+
                     }
 
+                    target: win
                 }
 
+                MediaPlayer {
+                    id: player
+
+                    loops: MediaPlayer.Infinite
+                    videoOutput: out
+                    onErrorOccurred: (error, errorString) => {
+                        return console.warn("lucid-live:", errorString);
+                    }
+                }
+
+                VideoOutput {
+                    id: out
+
+                    anchors.fill: parent
+                    fillMode: VideoOutput.PreserveAspectCrop
+                    visible: slot.video !== ""
+                }
+
+                Image {
+                    id: still
+
+                    anchors.fill: parent
+                    fillMode: Image.PreserveAspectCrop
+                    source: root.urlFor(slot.picture)
+                    sourceSize.width: win.width
+                    asynchronous: true
+                    cache: false
+                    visible: slot.picture !== ""
+                }
+
+            }
+
+            // the one fading in is drawn over the one it replaces
+            Slot {
+                id: slotA
+
+                z: win.front === 0 ? 0 : 1
+            }
+
+            Slot {
+                id: slotB
+
+                z: win.front === 1 ? 0 : 1
             }
 
         }

@@ -262,8 +262,10 @@ fi
 [[ -n "${WALL_DEMO:-}" ]] && exit 0
 
 mkdir -p "$CACHE_DIR"
-# first, so whoever reads current_wallpaper on its change finds the video already
-printf '%s' "$LIVE" > "$CURRENT_LIVE_FILE"
+# first, so whoever reads current_wallpaper on its change finds the video already.
+# the second line is what awww was given, which the player fades to when a
+# video gives way to a picture
+printf '%s\n%s\n' "$LIVE" "$WALLPAPER" > "$CURRENT_LIVE_FILE"
 printf '%s' "$WALLPAPER" > "$CURRENT_WALL_FILE"
 printf '%s' "$MODE" > "$CURRENT_MODE_FILE"
 

@@ -1399,7 +1399,7 @@ PanelWindow {
             if (p.indexOf("/lucid/live-frames/") === -1)
                 return p;
 
-            var live = LiveWall.video !== "" ? LiveWall.video : currentLiveFile.text().trim();
+            var live = LiveWall.video !== "" ? LiveWall.video : currentLiveFile.text().split("\n")[0].trim();
             return live !== "" ? live : p;
         } catch (e) {
             return "";
