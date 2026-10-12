@@ -559,37 +559,21 @@ Item {
             selectionColor: Theme.alpha(Theme.accent, 0.35)
             selectedTextColor: Theme.text
             onTextChanged: face.resetSelection()
+            // up and down walk the wallpapers in every style, so left and right
+            // stay with the text, to move through what is typed
             Keys.onUpPressed: {
                 if (face.listVisible)
                     resultList.step(-1);
                 else if (face.displayMode === "wallpaper" && wallStrip)
-                    wallStrip.stepVertical(-1);
+                    wallStrip.step(-1);
 
             }
             Keys.onDownPressed: {
                 if (face.listVisible)
                     resultList.step(1);
                 else if (face.displayMode === "wallpaper" && wallStrip)
-                    wallStrip.stepVertical(1);
+                    wallStrip.step(1);
 
-            }
-            Keys.onLeftPressed: (event) => {
-                if (face.displayMode === "wallpaper") {
-                    if (wallStrip)
-                        wallStrip.step(-1);
-                    event.accepted = true;
-                } else {
-                    event.accepted = false;
-                }
-            }
-            Keys.onRightPressed: (event) => {
-                if (face.displayMode === "wallpaper" && face.wallpaperModel) {
-                    if (wallStrip)
-                        wallStrip.step(1);
-                    event.accepted = true;
-                } else {
-                    event.accepted = false;
-                }
             }
             Keys.onDeletePressed: (event) => {
                 if (face.displayMode === "clipboard" && (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)) {

@@ -328,7 +328,8 @@ how fast the neighbours shrink and two or three of them on each side),
 *Pills* (slim pills that open into the picture: even, full height, or a
 wave), *Tiles* (a grid of two to five rows, square or wide, the panel cut to
 fit it) and *Bento* (a large picture beside smaller ones, with or without the
-previous one). The same page picks the **transition** the wallpaper changes
+previous one). In every style ↑ and ↓ step through the wallpapers, so ← and
+→ stay with the search field. The same page picks the **transition** the wallpaper changes
 with — fade, wipe, wave, grow, outer and the rest of what `awww` can do, its
 length, angle and easing — from presets or your own, saved and named, and can
 grow it from the card you picked or from the cursor. *Try transition* runs it
