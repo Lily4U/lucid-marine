@@ -52,10 +52,13 @@ Item {
         strip.originY = p.y / strip.Window.height;
     }
 
-    // up and down: the previous or the next wallpaper
+    // arrow keys: one card along, and (for the styles laid out in rows) one row over
     function step(d) {
         if (strip.model)
             view.currentIndex = Math.max(0, Math.min(strip.model.count - 1, view.currentIndex + d));
+    }
+
+    function stepVertical(d) {
     }
 
     function activateCurrent() {

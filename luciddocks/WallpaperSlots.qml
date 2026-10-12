@@ -79,6 +79,9 @@ Item {
             strip.currentIndex = Math.max(0, Math.min(strip.count - 1, strip.currentIndex + d));
     }
 
+    function stepVertical(d) {
+    }
+
     function pathAt(i) {
         var item = (strip.model && i >= 0 && i < strip.count) ? strip.model.get(i) : null;
         return item ? item.path : "";

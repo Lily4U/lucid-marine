@@ -20,6 +20,8 @@ Item {
         "bento": "WallpaperBento.qml"
     })
     property int pickerIndex: -1
+    readonly property bool pickerGrid: face.pickerStyle === "tiles"
+    readonly property bool pickerUpDown: Prefs.wallpaperPickerKeys === "updown"
     property bool pickerSettling: false
     // set by hand, never bound: see the Connections on Prefs below for why
     property string pickerStyle: "strip"
@@ -559,21 +561,43 @@ Item {
             selectionColor: Theme.alpha(Theme.accent, 0.35)
             selectedTextColor: Theme.text
             onTextChanged: face.resetSelection()
-            // up and down walk the wallpapers in every style, so left and right
-            // stay with the text, to move through what is typed
+            // the picker takes one pair of arrows (Settings -> Theme -> Arrow keys)
+            // and the search field keeps the other; Tiles is a grid and takes all four
             Keys.onUpPressed: {
                 if (face.listVisible)
                     resultList.step(-1);
-                else if (face.displayMode === "wallpaper" && wallStrip)
+                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerGrid)
+                    wallStrip.stepVertical(-1);
+                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerUpDown)
                     wallStrip.step(-1);
 
             }
             Keys.onDownPressed: {
                 if (face.listVisible)
                     resultList.step(1);
-                else if (face.displayMode === "wallpaper" && wallStrip)
+                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerGrid)
+                    wallStrip.stepVertical(1);
+                else if (face.displayMode === "wallpaper" && wallStrip && face.pickerUpDown)
                     wallStrip.step(1);
 
+            }
+            Keys.onLeftPressed: (event) => {
+                if (face.displayMode === "wallpaper" && (face.pickerGrid || !face.pickerUpDown)) {
+                    if (wallStrip)
+                        wallStrip.step(-1);
+                    event.accepted = true;
+                } else {
+                    event.accepted = false;
+                }
+            }
+            Keys.onRightPressed: (event) => {
+                if (face.displayMode === "wallpaper" && (face.pickerGrid || !face.pickerUpDown) && face.wallpaperModel) {
+                    if (wallStrip)
+                        wallStrip.step(1);
+                    event.accepted = true;
+                } else {
+                    event.accepted = false;
+                }
             }
             Keys.onDeletePressed: (event) => {
                 if (face.displayMode === "clipboard" && (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier)) {

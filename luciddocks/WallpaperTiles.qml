@@ -49,11 +49,21 @@ Item {
         strip.originY = p.y / strip.Window.height;
     }
 
-    // the grid fills a column before the next, so the next wallpaper is the one
-    // below, or the top of the next column
+    // left and right move a column over, up and down a row inside the column
     function step(d) {
         if (strip.model)
-            view.currentIndex = Math.max(0, Math.min(strip.model.count - 1, view.currentIndex + d));
+            view.currentIndex = Math.max(0, Math.min(strip.model.count - 1, view.currentIndex + d * strip.rows));
+    }
+
+    function stepVertical(d) {
+        if (!strip.model)
+            return;
+
+        var next = view.currentIndex + d;
+        if (next < 0 || next >= strip.model.count || Math.floor(next / strip.rows) !== Math.floor(view.currentIndex / strip.rows))
+            return;
+
+        view.currentIndex = next;
     }
 
     function activateCurrent() {

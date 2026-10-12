@@ -720,6 +720,26 @@ Column {
         }
 
         SettingRow {
+            title: "Arrow keys"
+            description: Prefs.wallpaperPickerStyle === "tiles" ? "Tiles is a grid, so it takes all four arrows. In the other styles, which pair changes the wallpaper; the other pair moves through the search field." : "Which pair changes the wallpaper. The other pair moves through the search field, to edit what you typed."
+            stacked: true
+
+            M3Segmented {
+                width: Math.min(parent.width, Theme.dp(360))
+                current: Prefs.wallpaperPickerKeys
+                options: [{
+                    "key": "sides",
+                    "label": "Left and right"
+                }, {
+                    "key": "updown",
+                    "label": "Up and down"
+                }]
+                onChosen: (key) => Prefs.wallpaperPickerKeys = key
+            }
+
+        }
+
+        SettingRow {
             title: "Pill shape"
             description: "How tall the pills are around the open one: all alike, the full height of the panel, or rising to a peak."
             visible: Prefs.wallpaperPickerStyle === "pills"

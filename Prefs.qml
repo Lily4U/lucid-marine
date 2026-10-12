@@ -379,6 +379,7 @@ Singleton {
     readonly property real interfaceScale: Math.max(0.7, Math.min(1.3, root.uiScale || 1))
     property alias wallpaperFolder: s.wallpaperFolder
     property alias wallpaperPickerStyle: s.wallpaperPickerStyle
+    property alias wallpaperPickerKeys: s.wallpaperPickerKeys
     property alias wallpaperPillsShape: s.wallpaperPillsShape
     property alias wallpaperStripSteps: s.wallpaperStripSteps
     property alias wallpaperStripSides: s.wallpaperStripSides
@@ -755,7 +756,7 @@ Singleton {
         { "key": "users", "icon": "account_circle", "keys": "user account password avatar login admin sudo", "group": "Account", "label": "Account", "title": "Users and Accounts", "blurb": "Who may sign in to this machine, what they are called and what they are allowed to do", "hidden": true },
         { "key": "general", "icon": "tune", "keys": "style islands notches accent darkness surface tint motion animation speed font scale typography interface size zoom smaller bigger density", "group": "Appearance", "label": "General", "title": "General", "blurb": "Size, shape, colour and motion across the whole shell" },
         { "key": "glass", "icon": "blur_on", "keys": "blur transparency opacity translucent frosted kitty terminal windows", "group": "Appearance", "label": "Glass", "title": "Glass", "blurb": "How far the desktop shows through the shell, the terminal and your windows" },
-        { "key": "theme", "icon": "palette", "keys": "colour color scheme wallpaper matugen pywal catppuccin gruvbox nord dark light mode import", "group": "Appearance", "label": "Theme", "title": "Theme and Appearance", "blurb": "Colour schemes, wallpapers and themes you import" },
+        { "key": "theme", "icon": "palette", "keys": "colour color scheme wallpaper picker arrow keys matugen pywal catppuccin gruvbox nord dark light mode import", "group": "Appearance", "label": "Theme", "title": "Theme and Appearance", "blurb": "Colour schemes, wallpapers and themes you import" },
         { "key": "colours", "icon": "format_color_fill", "keys": "matugen style scheme contrast your colour hex picker templates apps render variables", "group": "Appearance", "label": "Colours", "title": "Colours", "blurb": "How Matugen and Your colour build a palette, the applications that follow it, and templates of your own" },
         { "key": "palettes", "icon": "colors", "keys": "gallery schemes base16 base24 tinted import repo file editor export", "group": "Appearance", "label": "Palettes", "title": "Palettes", "blurb": "A gallery of colour schemes, and themes from a repo or a file" },
         { "key": "environment", "icon": "format_paint", "keys": "cursor icons gtk qt fonts application theme", "group": "Appearance", "label": "Environment", "title": "Environment", "blurb": "Cursors, icons, fonts and application themes, across GTK, Qt and Hyprland alike" },
@@ -845,6 +846,7 @@ Singleton {
         "shellGap": 0,
         "wallpaperFolder": "",
         "wallpaperPickerStyle": "strip",
+        "wallpaperPickerKeys": "sides",
         "wallpaperPillsShape": "uniform",
         "wallpaperStripSteps": "normal",
         "wallpaperStripSides": 2,
@@ -1452,6 +1454,9 @@ Singleton {
             property int shellGap: 0
             property string wallpaperFolder: ""
             property string wallpaperPickerStyle: "strip"
+            // "sides": left and right change the wallpaper; "updown": up and down do,
+            // and left and right stay with the search field. Tiles takes all four.
+            property string wallpaperPickerKeys: "sides"
             property string wallpaperPillsShape: "uniform"
             property string wallpaperStripSteps: "normal"
             property int wallpaperStripSides: 2
