@@ -28,6 +28,7 @@ ShellRoot {
     // lucid-specials.lua, the glass mirror, which owns kitty's opacity file,
     // the displays, which own lucid-monitors.lua, the bluetooth file
     // receiver, which has to be listening before anyone sends something, the
+    // pairing agent, which bluez asks before letting a device in, the
     // Hyprland options, which own lucid-settings.lua and follow the palette
     // in border colours,
     // the update check, which runs whether or not the settings app is
@@ -40,6 +41,7 @@ ShellRoot {
         void KdeConnect.installed;
         void Bt.present;
         void BtReceive.status;
+        void BtAgent.status;
         void Net.connectivity;
         void Idle.probed;
         void Env.probed;
