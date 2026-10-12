@@ -74,9 +74,15 @@ WidgetBody {
         if (!w.present || w.opt("showTime") === false)
             return "";
 
-        var secs = w.charging ? (w.dev ? w.dev.timeToFull : 0) : (w.dev ? w.dev.timeToEmpty : 0);
+        // full, or plugged in and held by a charge threshold: upower still divides
+        // by a near-zero draw there and reports months, so there's no time to show
+        var filling = w.state === UPowerDeviceState.Charging;
+        if (!filling && w.state !== UPowerDeviceState.Discharging)
+            return "";
+
+        var secs = filling ? w.dev.timeToFull : w.dev.timeToEmpty;
         if (!secs || secs <= 0)
-            return w.full ? "" : "estimating…";
+            return "estimating…";
 
         var h = Math.floor(secs / 3600);
         var m = Math.round((secs % 3600) / 60);
