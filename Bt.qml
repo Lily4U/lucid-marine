@@ -30,6 +30,9 @@ Singleton {
 
     // pairings started while pairable was off, see pair()
     property var pairQueue: []
+    // addresses pair() started: once bonded they are trusted, so they reconnect on their own
+    // the way the row's "reconnects on its own" switch means
+    property var trustAfterPair: []
     property bool pairableHeld: false
 
     readonly property string blockReason: {
@@ -65,6 +68,9 @@ Singleton {
     function pair(device) {
         if (!device || !root.adapter)
             return ;
+
+        if (root.trustAfterPair.indexOf(device.address) < 0)
+            root.trustAfterPair = root.trustAfterPair.concat([device.address]);
 
         if (root.adapter.pairable && !root.pairableHeld) {
             device.pair();
@@ -424,6 +430,52 @@ Singleton {
             root.pairableHeld = false;
             pairableOff.running = true;
         }
+    }
+
+    // the row that started a pairing is gone by the time it finishes (the device moves to
+    // another group), so this watches the devices themselves
+    Instantiator {
+        model: root.adapter ? root.adapter.devices : null
+
+        delegate: Connections {
+            id: pairWatch
+
+            required property var modelData
+
+            function forget() {
+                root.trustAfterPair = root.trustAfterPair.filter((a) => {
+                    return a !== pairWatch.modelData.address;
+                });
+            }
+
+            function onPairedChanged() {
+                if (!pairWatch.modelData.paired || root.trustAfterPair.indexOf(pairWatch.modelData.address) < 0)
+                    return ;
+
+                pairWatch.forget();
+                pairWatch.modelData.trusted = true;
+                // the link pairing opened counts as connected, so the device's connect() refuses,
+                // yet no profile is up on it: ask bluez for them directly
+                Quickshell.execDetached(["bluetoothctl", "connect", pairWatch.modelData.address]);
+            }
+
+            // a failed pairing lets go of the address; paired and pairing can change in either
+            // order, so look once both have settled
+            function onPairingChanged() {
+                if (pairWatch.modelData.pairing)
+                    return ;
+
+                Qt.callLater(() => {
+                    if (!pairWatch.modelData.pairing && !pairWatch.modelData.paired)
+                        pairWatch.forget();
+
+                });
+            }
+
+            target: pairWatch.modelData
+            ignoreUnknownSignals: true
+        }
+
     }
 
     IpcHandler {
