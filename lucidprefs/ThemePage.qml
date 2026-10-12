@@ -684,6 +684,101 @@ Column {
     }
 
     SettingCard {
+        title: "LIVE WALLPAPERS"
+
+        SettingRow {
+            title: "Live wallpapers"
+            description: "Videos in the wallpaper folder (mp4, webm, mkv) get a Live tab in the launcher and play behind the desktop. The colours come from the first frame."
+            showDivider: Prefs.liveWallpapers
+
+            M3Switch {
+                checked: Prefs.liveWallpapers
+                onToggled: (v) => {
+                    return Prefs.liveWallpapers = v;
+                }
+            }
+
+        }
+
+        SettingRow {
+            title: "Decoder"
+            description: "What decodes the video. Automatic tries the integrated GPU first, so a laptop does not wake its graphics card for a wallpaper, then NVIDIA. The CPU always works, and costs the most."
+            visible: Prefs.liveWallpapers
+            stacked: true
+
+            M3Segmented {
+                width: Math.min(parent.width, Theme.dp(560))
+                current: Prefs.liveDecoder
+                options: [{
+                    "key": "auto",
+                    "label": "Automatic"
+                }, {
+                    "key": "vaapi",
+                    "label": "VA-API"
+                }, {
+                    "key": "cuda",
+                    "label": "NVIDIA"
+                }, {
+                    "key": "cpu",
+                    "label": "CPU"
+                }]
+                onChosen: (key) => Prefs.liveDecoder = key
+            }
+
+        }
+
+        SettingRow {
+            title: "Pause under windows"
+            description: "Hold the video still on a screen whose workspace has windows, or only behind a fullscreen one."
+            visible: Prefs.liveWallpapers
+            stacked: true
+
+            M3Segmented {
+                width: Math.min(parent.width, Theme.dp(480))
+                current: Prefs.livePauseUnder
+                options: [{
+                    "key": "any",
+                    "label": "Any window"
+                }, {
+                    "key": "fullscreen",
+                    "label": "Fullscreen"
+                }, {
+                    "key": "never",
+                    "label": "Never"
+                }]
+                onChosen: (key) => Prefs.livePauseUnder = key
+            }
+
+        }
+
+        SettingRow {
+            title: "In game mode"
+            description: "Keep playing, pause, or stop the player and leave the first frame, which frees what the video was using."
+            visible: Prefs.liveWallpapers
+            showDivider: false
+            stacked: true
+
+            M3Segmented {
+                width: Math.min(parent.width, Theme.dp(480))
+                current: Prefs.liveGameMode
+                options: [{
+                    "key": "play",
+                    "label": "Keep playing"
+                }, {
+                    "key": "pause",
+                    "label": "Pause"
+                }, {
+                    "key": "still",
+                    "label": "Still frame"
+                }]
+                onChosen: (key) => Prefs.liveGameMode = key
+            }
+
+        }
+
+    }
+
+    SettingCard {
         title: "WALLPAPER PICKER"
 
         SettingRow {
@@ -894,101 +989,6 @@ Column {
                 onToggled: (v) => {
                     return Prefs.wallpaperBentoPrev = v;
                 }
-            }
-
-        }
-
-    }
-
-    SettingCard {
-        title: "LIVE WALLPAPERS"
-
-        SettingRow {
-            title: "Live wallpapers"
-            description: "Videos in the wallpaper folder (mp4, webm, mkv) get a Live tab in the launcher and play behind the desktop. The colours come from the first frame."
-            showDivider: Prefs.liveWallpapers
-
-            M3Switch {
-                checked: Prefs.liveWallpapers
-                onToggled: (v) => {
-                    return Prefs.liveWallpapers = v;
-                }
-            }
-
-        }
-
-        SettingRow {
-            title: "Decoder"
-            description: "What decodes the video. Automatic tries the integrated GPU first, so a laptop does not wake its graphics card for a wallpaper, then NVIDIA. The CPU always works, and costs the most."
-            visible: Prefs.liveWallpapers
-            stacked: true
-
-            M3Segmented {
-                width: Math.min(parent.width, Theme.dp(560))
-                current: Prefs.liveDecoder
-                options: [{
-                    "key": "auto",
-                    "label": "Automatic"
-                }, {
-                    "key": "vaapi",
-                    "label": "VA-API"
-                }, {
-                    "key": "cuda",
-                    "label": "NVIDIA"
-                }, {
-                    "key": "cpu",
-                    "label": "CPU"
-                }]
-                onChosen: (key) => Prefs.liveDecoder = key
-            }
-
-        }
-
-        SettingRow {
-            title: "Pause under windows"
-            description: "Hold the video still on a screen whose workspace has windows, or only behind a fullscreen one."
-            visible: Prefs.liveWallpapers
-            stacked: true
-
-            M3Segmented {
-                width: Math.min(parent.width, Theme.dp(480))
-                current: Prefs.livePauseUnder
-                options: [{
-                    "key": "any",
-                    "label": "Any window"
-                }, {
-                    "key": "fullscreen",
-                    "label": "Fullscreen"
-                }, {
-                    "key": "never",
-                    "label": "Never"
-                }]
-                onChosen: (key) => Prefs.livePauseUnder = key
-            }
-
-        }
-
-        SettingRow {
-            title: "In game mode"
-            description: "Keep playing, pause, or stop the player and leave the first frame, which frees what the video was using."
-            visible: Prefs.liveWallpapers
-            showDivider: false
-            stacked: true
-
-            M3Segmented {
-                width: Math.min(parent.width, Theme.dp(480))
-                current: Prefs.liveGameMode
-                options: [{
-                    "key": "play",
-                    "label": "Keep playing"
-                }, {
-                    "key": "pause",
-                    "label": "Pause"
-                }, {
-                    "key": "still",
-                    "label": "Still frame"
-                }]
-                onChosen: (key) => Prefs.liveGameMode = key
             }
 
         }

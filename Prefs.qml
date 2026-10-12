@@ -851,7 +851,7 @@ Singleton {
         "wallpaperFolder": "",
         "wallpaperPickerStyle": "strip",
         "wallpaperPickerKeys": "sides",
-        "liveWallpapers": false,
+        "liveWallpapers": true,
         "liveDecoder": "auto",
         "livePauseUnder": "any",
         "liveGameMode": "pause",
@@ -1468,7 +1468,7 @@ Singleton {
             // videos in the wallpaper folder, played behind the desktop (LiveWall.qml).
             // decoder: auto | vaapi | cuda | cpu; pause under: never | fullscreen | any;
             // in game mode: play | pause | still (the first frame, player stopped)
-            property bool liveWallpapers: false
+            property bool liveWallpapers: true
             property string liveDecoder: "auto"
             property string livePauseUnder: "any"
             property string liveGameMode: "pause"

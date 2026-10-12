@@ -339,9 +339,11 @@ on the wallpaper you have, without changing anything. The choice is written to
 line by line (never sourced); anything it does not recognise falls back to the
 plain fade.
 
-**Live wallpapers** (Settings → Theme → *Live wallpapers*, off by default):
-videos in the wallpaper folder (mp4, webm, mkv, mov) get a **Live** tab of their
-own in the launcher (`>live`), in the same four picker styles. A video plays
+**Live wallpapers** (Settings → Theme → *Live wallpapers*, on by default):
+videos in the wallpaper folder (mp4, webm, mkv, mov) get a side of the picker of
+their own, in the same four styles: a tall *Pictures* / *Live* switch sits beside
+the picker, which opens on whichever kind is on the desktop (`>live` goes
+straight to the videos). A video plays
 behind the desktop's icons and widgets; its first frame is what `awww` holds
 under it and what the colours come from, so the palette matches the picture the
 video starts on. The player is a quickshell of its own (`lucidlive/`), started

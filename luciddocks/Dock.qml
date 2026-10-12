@@ -66,7 +66,12 @@ PanelWindow {
 
     // every write to the search field goes through here, so the face is built
     // before anything tries to set text on it
-    function setSearchText(text) {
+    // the wallpaper picker opens on the tab of what is on the desktop: Live for a
+    // video. exact is the Pictures / Live switch asking for one tab in particular
+    function setSearchText(text, exact) {
+        if (text === ">wallpaper" && !exact && Prefs.liveWallpapers && LiveWall.isVideo(dockWindow.appliedWallpaper))
+            text = ">live";
+
         dockWindow.launcherBuilt = true;
         if (launcherLoader.item)
             launcherLoader.item.searchText = text;
@@ -471,6 +476,8 @@ PanelWindow {
     readonly property real wallTilesContentMax: Math.max(dockWindow.menuContentMax, Math.round((dockWindow.screen ? dockWindow.screen.height : 1080) * 0.62))
     readonly property int wallTilesTile: Math.max(Theme.dp(40), Math.min(dockWindow.wallTilesBase, Math.floor((dockWindow.wallTilesContentMax - dockWindow.wallTilesChrome) / dockWindow.wallTilesRows)))
     readonly property int wallTilesCellW: Prefs.wallpaperTilesAspect === "wide" ? Math.round(dockWindow.wallTilesTile * 16 / 9) : dockWindow.wallTilesTile
+    // the Pictures / Live switch beside the picker, and the gap after it
+    readonly property int wallKindRailWidth: Prefs.liveWallpapers ? Theme.dp(108) : 0
     readonly property int wallTilesWidth: Math.ceil(dockWindow.pickerModel.count / dockWindow.wallTilesRows) * dockWindow.wallTilesCellW + Theme.dp(24)
     // Pills: the row with every wallpaper in it, when that is narrower than the
     // panel, so a short folder doesn't leave the panel wider than its pills
@@ -491,12 +498,12 @@ PanelWindow {
     readonly property real menuWidth: {
         if (dockWindow.pickerMode) {
             if (dockWindow.wallIsTiles)
-                return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallTilesWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom), dockWindow.maxDockWidth - 48);
+                return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallTilesWidth + dockWindow.wallKindRailWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom), dockWindow.maxDockWidth - 48);
 
             if (Prefs.wallpaperPickerStyle === "pills")
-                return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallPillsWidth + dockWindow.panelPadding), dockWindow.maxDockWidth - 48);
+                return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallPillsWidth + dockWindow.wallKindRailWidth + dockWindow.panelPadding), dockWindow.maxDockWidth - 48);
 
-            return Math.min((Prefs.wallpaperPickerStyle === "strip" ? dockWindow.wallStripWidth : dockWindow.wallBaseWidth) + dockWindow.panelPadding + dockWindow.wallHoverRoom, dockWindow.maxDockWidth - 48);
+            return Math.min((Prefs.wallpaperPickerStyle === "strip" ? dockWindow.wallStripWidth : dockWindow.wallBaseWidth) + dockWindow.wallKindRailWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom, dockWindow.maxDockWidth - 48);
         }
 
         // the list plus its preview pane
@@ -1801,7 +1808,7 @@ PanelWindow {
         function onLiveWallpapersChanged() {
             wallpaperScanner.scan(false);
             if (!Prefs.liveWallpapers && dockWindow.mode === "live")
-                dockWindow.setSearchText(">wallpaper");
+                dockWindow.setSearchText(">wallpaper", true);
 
         }
 
@@ -2798,6 +2805,8 @@ PanelWindow {
                 model: resultsModel
                 resultCount: dockWindow.resultCount
                 wallpaperModel: dockWindow.pickerModel
+                kindRailWidth: dockWindow.wallKindRailWidth
+                onPickerKindRequested: (kind) => dockWindow.setSearchText(kind === "live" ? ">live" : ">wallpaper", true)
                 wallHeroW: dockWindow.wallHeroW
                 wallHeroH: dockWindow.wallHeroH
                 wallMidW: dockWindow.wallMidW

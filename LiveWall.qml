@@ -14,7 +14,8 @@ Singleton {
     id: root
 
     readonly property string home: Quickshell.env("HOME")
-    readonly property string stateFile: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/lucid-live.json"
+    // one per shell, so a second copy (a test one, say) never drives this player
+    readonly property string stateFile: (Quickshell.env("XDG_RUNTIME_DIR") || "/tmp") + "/lucid-live-" + Qt.md5(Quickshell.shellDir).substring(0, 8) + ".json"
     readonly property string childConfig: Quickshell.shellDir + "/lucidlive/LiveShell.qml"
     readonly property var videoExts: ["mp4", "webm", "mkv", "mov", "m4v"]
 

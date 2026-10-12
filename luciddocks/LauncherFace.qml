@@ -80,12 +80,8 @@ Item {
     readonly property bool searchTop: Prefs.launcherSearchTop
     readonly property int chromeHeight: Prefs.launcherChromeH
     readonly property int headBlock: face.headOn ? face.headHeight + Prefs.launcherHeadGap : 0
-    // the launcher's modes, reachable by prefix, by pill or by Ctrl and a digit.
-    // Live is there with Settings -> Theme -> Live wallpapers on
-    readonly property var modes: face.allModes.filter((m) => {
-        return m.key !== "live" || Prefs.liveWallpapers;
-    })
-    readonly property var allModes: [{
+    // the launcher's modes, reachable by prefix, by pill or by Ctrl and a digit
+    readonly property var modes: [{
         "key": "apps",
         "label": "Apps",
         "icon": "apps"
@@ -101,10 +97,6 @@ Item {
         "key": "wallpaper",
         "label": "Wallpapers",
         "icon": "wallpaper"
-    }, {
-        "key": "live",
-        "label": "Live",
-        "icon": "movie"
     }, {
         "key": "theme",
         "label": "Themes",
@@ -124,6 +116,8 @@ Item {
     // what the empty state needs, so the dock never sizes the panel under it
     readonly property real emptyHeight: resultList.emptyExtent
     property string displayMode: "apps"
+    // the Pictures / Live switch beside the picker, as wide as the dock makes room for
+    property int kindRailWidth: 0
     // pictures and videos share the picker, a tab each
     readonly property bool pickerMode: face.displayMode === "wallpaper" || face.displayMode === "live"
     readonly property bool listVisible: !face.pickerMode
@@ -147,6 +141,8 @@ Item {
 
     signal activated(int index)
     signal closeRequested()
+    // "wallpaper" or "live", from the switch beside the picker
+    signal pickerKindRequested(string kind)
     signal wallpaperChosen(string path)
     signal wallpaperPreviewed(string path)
     signal backRequested()
@@ -303,7 +299,8 @@ Item {
         height: face.headHeight
         visible: face.headOn
         modes: face.modes
-        current: face.displayMode
+        // the Live tab is the wallpaper picker too
+        current: face.displayMode === "live" ? "wallpaper" : face.displayMode
         countLabel: face.countLabel
         onChosen: (key) => {
             face.modeRequested(key);
@@ -408,10 +405,93 @@ Item {
             clearArmed: face.clearArmed
         }
 
+        // Pictures and Live, tall enough to be seen as the two halves of the picker
+        Column {
+            id: kindRail
+
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: Math.max(0, face.kindRailWidth - Theme.dp(12))
+            spacing: Theme.dp(8)
+            visible: face.pickerMode && face.kindRailWidth > 0
+
+            Repeater {
+                model: [{
+                    "key": "wallpaper",
+                    "label": "Pictures",
+                    "icon": "wallpaper"
+                }, {
+                    "key": "live",
+                    "label": "Live",
+                    "icon": "movie"
+                }]
+
+                Item {
+                    id: kind
+
+                    required property var modelData
+                    readonly property bool on: face.displayMode === kind.modelData.key
+                    readonly property color content: kind.on ? Theme.fgAccent : Theme.subtext
+
+                    width: kindRail.width
+                    height: (kindRail.height - kindRail.spacing) / 2
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.shapeXl
+                        color: kind.on ? Theme.accent : Theme.withBlur(Theme.surfaceHigh)
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Theme.durDefaultEffects
+                            }
+
+                        }
+
+                        StateLayer {
+                            radius: Theme.shapeXl
+                            tint: kind.content
+                            onClicked: {
+                                face.pickerKindRequested(kind.modelData.key);
+                                searchInput.forceActiveFocus();
+                            }
+                        }
+
+                    }
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: Theme.dp(6)
+
+                        Icon {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            name: kind.modelData.icon
+                            size: Theme.dp(26)
+                            fill: kind.on ? 1 : 0
+                            color: kind.content
+                        }
+
+                        LText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            role: "labelLarge"
+                            text: kind.modelData.label
+                            color: kind.content
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
         Loader {
             id: pickerLoader
 
             anchors.fill: parent
+            anchors.leftMargin: kindRail.visible ? face.kindRailWidth : 0
             visible: face.pickerMode
             source: face.pickerFiles[face.pickerStyle] || face.pickerFiles.strip
             onLoaded: pickerRestore.restart()
