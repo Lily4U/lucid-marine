@@ -138,6 +138,8 @@ PanelWindow {
     property string pendingWallpaper: ""
     property point pendingOrigin: Qt.point(-1, -1)
     property string appliedWallpaper: ""
+    // what the picker asked set-wallpaper.sh for since the desktop last caught up
+    property var requestedWallpapers: ({})
     property bool wallpaperArmed: false
     readonly property bool dragging: pinnedRow.dragging || runningRow.dragging
 
@@ -320,7 +322,7 @@ PanelWindow {
     readonly property string mode: dockWindow.modeFor(dockWindow.rawQuery)
     // pictures and videos share the picker: one tab each
     readonly property bool pickerMode: dockWindow.mode === "wallpaper" || dockWindow.mode === "live"
-    readonly property var pickerModel: dockWindow.mode === "live" ? liveModel : wallpapersModel
+    readonly property var pickerModel: dockWindow.pickerModelFor(dockWindow.mode)
     readonly property string filterQuery: dockWindow.queryFor(dockWindow.rawQuery)
 
     onRawQueryChanged: {
@@ -332,8 +334,10 @@ PanelWindow {
         if (launcherLoader.item)
             launcherLoader.item.resetSelection();
     }
+    // onModeChanged reads the mode itself: pickerMode and pickerModel may not
+    // have caught up with it yet when the handler runs
     onModeChanged: {
-        if (dockWindow.pickerMode) {
+        if (dockWindow.mode === "wallpaper" || dockWindow.mode === "live") {
             // the cards outlive the menu, so the strip is on the current picture
             // from the first frame rather than once the rescan lands; on the
             // other tab (Pictures while a video plays) it starts at the first
@@ -1441,6 +1445,7 @@ PanelWindow {
 
         dockWindow.appliedWallpaper = path;
         wallpaperState.current = path;
+        dockWindow.requestedWallpapers[path] = true;
         var cmd = [Quickshell.env("HOME") + "/.config/hypr/scripts/wallpaper/set-wallpaper.sh", path];
         var pos = dockWindow.screenFraction(origin);
         if (Prefs.wallTransOrigin === "card" && pos)
@@ -1449,8 +1454,34 @@ PanelWindow {
         Quickshell.execDetached(cmd);
     }
 
+    // the wallpaper on the desktop changed. One the picker asked for earlier can
+    // land late (a video's first frame takes ffmpeg a while) while the selection
+    // has moved on: that is not news, and following it would pull the selection
+    // back. Anything else (a keybind, another tool) moves the picker to it.
+    function desktopWallpaperChanged() {
+        var p = dockWindow.currentWallpaperPath();
+        if (p === "")
+            return;
+
+        if (p === dockWindow.appliedWallpaper) {
+            dockWindow.requestedWallpapers = {};
+            return;
+        }
+        if (dockWindow.requestedWallpapers[p] === true)
+            return;
+
+        dockWindow.requestedWallpapers = {};
+        dockWindow.appliedWallpaper = p;
+        wallpaperState.current = p;
+        dockWindow.syncStripToCurrent();
+    }
+
+    function pickerModelFor(mode) {
+        return mode === "live" ? liveModel : wallpapersModel;
+    }
+
     function syncStripToCurrent(orFirst) {
-        var model = dockWindow.pickerModel;
+        var model = dockWindow.pickerModelFor(dockWindow.mode);
         for (var i = 0; i < model.count; i++) {
             if (model.get(i).path === wallpaperState.current) {
                 if (launcherLoader.item)
@@ -2120,13 +2151,7 @@ PanelWindow {
     // itself, so the video is taken from LiveWall as well
     Connections {
         function onVideoChanged() {
-            var p = dockWindow.currentWallpaperPath();
-            if (p === "" || p === dockWindow.appliedWallpaper)
-                return;
-
-            dockWindow.appliedWallpaper = p;
-            wallpaperState.current = p;
-            dockWindow.syncStripToCurrent();
+            dockWindow.desktopWallpaperChanged();
         }
 
         target: LiveWall
@@ -2140,13 +2165,7 @@ PanelWindow {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            var p = dockWindow.currentWallpaperPath();
-            if (p === "" || p === dockWindow.appliedWallpaper)
-                return;
-
-            dockWindow.appliedWallpaper = p;
-            wallpaperState.current = p;
-            dockWindow.syncStripToCurrent();
+            dockWindow.desktopWallpaperChanged();
         }
     }
 
