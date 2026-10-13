@@ -192,6 +192,10 @@ Singleton {
         command: ["quickshell", "-p", root.childConfig]
         environment: ({
             "QT_FFMPEG_DECODING_HW_DEVICE_TYPES": root.decoders,
+            // a MediaPlayer also opens every encoding device up front, CUDA
+            // and VDPAU included, which keeps a hybrid laptop's dGPU awake;
+            // the player never encodes
+            "QT_FFMPEG_ENCODING_HW_DEVICE_TYPES": "",
             "LUCID_LIVE_STATE": root.stateFile
         })
         onStarted: alive.restart()
