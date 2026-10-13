@@ -898,8 +898,10 @@ if [[ $WITH_THEMING -eq 1 ]]; then
                                 "dir:$HOME/.local/share/Steam/millennium/themes/Material-Theme"
     # Qt widget apps take their palette from qt6ct, the platform theme
     # modules/env.lua sets. KDE apps then lay a KDE colour scheme over it, so
-    # they get one too - both are pointed at below
-    add_template qt6ct          "$TPL/qt6ct-colors.conf"       '~/.config/qt6ct/colors/lucid.conf' "cmd:qt6ct"
+    # they get one too - both are pointed at below. qt6ct watches its own
+    # folder but not colors/, so the hook touches qt6ct.conf for open apps
+    add_template qt6ct          "$TPL/qt6ct-colors.conf"       '~/.config/qt6ct/colors/lucid.conf' "cmd:qt6ct" \
+                                'touch -c ~/.config/qt6ct/qt6ct.conf'
     add_template kde            "$TPL/kde-colors.colors"       '~/.local/share/color-schemes/Lucid.colors' "cmd:qt6ct"
 
     # firefox and zen keep their chrome css inside a generated profile dir, so

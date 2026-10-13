@@ -877,9 +877,11 @@ Kate, Okular…) need one more step: outside Plasma, they swap that palette for
 Breeze as they start unless `kdeglobals` names a colour scheme. So a second
 template writes `~/.local/share/color-schemes/Lucid.colors`, and `kdeglobals`
 gets `[UiSettings] ColorScheme=Lucid`. A palette you already picked in qt6ct,
-or a scheme already named in `kdeglobals`, stays as it is. Both toolkits only
-read colours when an app starts, so an app that is already open changes the
-next time you open it.
+or a scheme already named in `kdeglobals`, stays as it is. An open Qt app
+repaints a few seconds after the theme changes: qt6ct rereads its palette when
+something in `~/.config/qt6ct` changes, and the template's hook touches
+`qt6ct.conf`. KDE apps only read their colour scheme as they start, so one that
+is already open changes the next time you open it.
 
 Every template in `~/.config/matugen/config.toml` follows whichever palette is
 active, not only the wallpaper ones: picking Nord or Catppuccin renders them
