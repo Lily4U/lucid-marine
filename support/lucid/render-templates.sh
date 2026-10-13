@@ -16,6 +16,7 @@
 #     Settings to show, and a template that failed says so in a toast
 #   - hyprland is reloaded when a template wrote into its config: it only
 #     reads its colours on a reload
+#   - running gtk4 apps repaint when a template wrote into ~/.config/gtk-4.0
 #   - --skip leaves out the template that writes a given file, for files the
 #     caller writes itself
 #   - the colours are kept in ~/.cache/lucid/colours.json, so --again renders
@@ -185,6 +186,7 @@ explain() {
 
 FAILED=()
 HYPR=0
+GTK=0
 while IFS=$'\037' read -r i name input output; do
     [[ -n "$ONLY" && "$name" != "$ONLY" ]] && continue
     out=$(resolve "$output")
@@ -207,6 +209,7 @@ while IFS=$'\037' read -r i name input output; do
         cat "$WORK/common" "$WORK/t$i" > "$one"
         if report=$(matugen -c "$one" json "$COLOURS" -m "$MODE" 2>&1); then
             [[ "$out" == "$HOME/.config/hypr/"* ]] && HYPR=1
+            [[ "$out" == "$HOME/.config/gtk-4.0/"* ]] && GTK=1
         else
             state=failed
             error=$(explain <<< "$report")
@@ -248,6 +251,15 @@ else
 fi
 
 (( HYPR )) && { hyprctl reload &>/dev/null || true; }
+
+# gtk4 and libadwaita reread ~/.config/gtk-4.0/gtk.css when the colour scheme
+# changes, so flip it and back (apply-theme.sh does the same for its own write)
+if (( GTK )) && scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null); then
+    scheme=${scheme//\'/}
+    [[ "$scheme" == prefer-light ]] && other=prefer-dark || other=prefer-light
+    gsettings set org.gnome.desktop.interface color-scheme "$other" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface color-scheme "$scheme" 2>/dev/null || true
+fi
 
 if (( ${#FAILED[@]} )); then
     echo "warning: matugen templates that did not render: ${FAILED[*]} (see $STATE)" >&2

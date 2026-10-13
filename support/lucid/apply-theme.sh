@@ -304,11 +304,14 @@ for gtkdir in "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"; do
 EOF
 done
 
-# gtk apps only repaint when the theme name changes, so toggle it off and back
-if [[ "$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null)" != "" ]]; then
-    GTK_THEME_NAME=$(gsettings get org.gnome.desktop.interface gtk-theme)
-    gsettings set org.gnome.desktop.interface gtk-theme "" 2>/dev/null || true
-    gsettings set org.gnome.desktop.interface gtk-theme "${GTK_THEME_NAME//\'/}" 2>/dev/null || true
+# gtk4 and libadwaita reread ~/.config/gtk-4.0/gtk.css when the colour scheme
+# changes, so flip it and back. a gtk-theme toggle reloads only the theme's own
+# css, and gtk3 reads its gtk.css once at startup: those apps need a reopen
+if SCHEME=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null); then
+    SCHEME=${SCHEME//\'/}
+    [[ "$SCHEME" == prefer-light ]] && OTHER=prefer-dark || OTHER=prefer-light
+    gsettings set org.gnome.desktop.interface color-scheme "$OTHER" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface color-scheme "$SCHEME" 2>/dev/null || true
 fi
 
 # starship — only its palette table is repainted, the prompt stays the user's
