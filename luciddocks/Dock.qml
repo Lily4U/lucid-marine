@@ -335,8 +335,9 @@ PanelWindow {
     onModeChanged: {
         if (dockWindow.pickerMode) {
             // the cards outlive the menu, so the strip is on the current picture
-            // from the first frame rather than once the rescan lands
-            dockWindow.syncStripToCurrent();
+            // from the first frame rather than once the rescan lands; on the
+            // other tab (Pictures while a video plays) it starts at the first
+            dockWindow.syncStripToCurrent(true);
             wallpaperScanner.scan();
             dockWindow.wallpaperArmed = false;
             wallpaperArmTimer.restart();
@@ -1448,7 +1449,7 @@ PanelWindow {
         Quickshell.execDetached(cmd);
     }
 
-    function syncStripToCurrent() {
+    function syncStripToCurrent(orFirst) {
         var model = dockWindow.pickerModel;
         for (var i = 0; i < model.count; i++) {
             if (model.get(i).path === wallpaperState.current) {
@@ -1458,6 +1459,9 @@ PanelWindow {
                 return;
             }
         }
+        // not in this tab: the index left from the other one may not even exist here
+        if (orFirst && launcherLoader.item)
+            launcherLoader.item.setWallpaperIndex(0);
     }
 
     function switchTheme(id) {
