@@ -49,20 +49,6 @@ Item {
     signal chosen(string path)
     signal previewed(string path)
 
-    // x of a slim shape `offset` places from an open one in a row: the open one is
-    // centred, the slim ones follow on both sides with a gap, `sides` of them each
-    function rowX(offset, openW, slimW, gap, sides) {
-        var ox = (strip.width - openW) / 2;
-        var n = Math.abs(offset);
-        if (offset === 0)
-            return ox;
-
-        if (n > sides)
-            return offset > 0 ? strip.width : -slimW;
-
-        return offset > 0 ? ox + openW + gap + (n - 1) * (slimW + gap) : ox - n * (slimW + gap);
-    }
-
     function noteOrigin(card) {
         if (!card || strip.Window.width <= 0 || strip.Window.height <= 0) {
             strip.originX = -1;

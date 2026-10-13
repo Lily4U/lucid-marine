@@ -463,11 +463,29 @@ PanelWindow {
     readonly property int wallTilesTile: Math.max(Theme.dp(40), Math.min(dockWindow.wallTilesBase, Math.floor((dockWindow.wallTilesContentMax - dockWindow.wallTilesChrome) / dockWindow.wallTilesRows)))
     readonly property int wallTilesCellW: Prefs.wallpaperTilesAspect === "wide" ? Math.round(dockWindow.wallTilesTile * 16 / 9) : dockWindow.wallTilesTile
     readonly property int wallTilesWidth: Math.ceil(wallpapersModel.count / dockWindow.wallTilesRows) * dockWindow.wallTilesCellW + Theme.dp(24)
+    // Pills: the row with every wallpaper in it, when that is narrower than the
+    // panel, so a short folder doesn't leave the panel wider than its pills
+    // (from WallpaperPills.qml's pillW, fullPillMax and openW)
+    readonly property int wallPillsWidth: {
+        var slims = Math.max(0, wallpapersModel.count - 1);
+        var gap = dockWindow.wallCardGap;
+        var row;
+        if (Prefs.wallpaperPillsShape === "full")
+            row = Math.max(dockWindow.wallHeroW + slims * (64 + gap), Math.ceil(slims * (64 + gap) / 0.6));
+        else if (Prefs.wallpaperPillsShape === "wave")
+            row = Math.round(dockWindow.wallHeroW * 0.9) + slims * (40 + gap);
+        else
+            row = dockWindow.wallHeroW + slims * (52 + gap);
+        return Math.min(dockWindow.wallBaseWidth + dockWindow.wallHoverRoom, row);
+    }
 
     readonly property real menuWidth: {
         if (dockWindow.mode === "wallpaper") {
             if (dockWindow.wallIsTiles)
                 return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallTilesWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom), dockWindow.maxDockWidth - 48);
+
+            if (Prefs.wallpaperPickerStyle === "pills")
+                return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallPillsWidth + dockWindow.panelPadding), dockWindow.maxDockWidth - 48);
 
             return Math.min((Prefs.wallpaperPickerStyle === "strip" ? dockWindow.wallStripWidth : dockWindow.wallBaseWidth) + dockWindow.panelPadding + dockWindow.wallHoverRoom, dockWindow.maxDockWidth - 48);
         }
