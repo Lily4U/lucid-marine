@@ -235,12 +235,14 @@ Singleton {
     }
 
     // "active": in force since login; "pending": set now, the dock and the
-    // launcher pick it up at the next login; "" before the session is known
+    // launcher pick it up at the next login. with no record of this login the
+    // module came after it, so nothing of ours was set then
     function varState(v) {
-        if (!root.session || !root.session.env || v.on === false)
+        if (v.on === false)
             return "";
 
-        return root.session.env[v.name] === v.value ? "active" : "pending";
+        const env = root.session && root.session.env ? root.session.env : {};
+        return env[v.name] === v.value ? "active" : "pending";
     }
 
     // set at login and since taken off the list or switched off
