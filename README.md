@@ -515,9 +515,20 @@ those opened from keybinds see a change at once, the dock and the launcher at
 the next login, and the page shows which is which. The session's own variables
 (`WAYLAND_DISPLAY`, `HOME` and the like) cannot be set there.
 
+Under the variables, a few suggestions show up when Lucid finds what they fix
+on the machine: Java apps (`_JAVA_AWT_WM_NONREPARENTING`), an NVIDIA card alone
+with its VA-API driver (`LIBVA_DRIVER_NAME`), a screen scaled 2× or more with
+XWayland left unscaled (`GDK_SCALE`). The ones Hyprland's wiki lists for every
+machine are left out on purpose: the toolkits pick Wayland on their own now,
+and `SDL_VIDEODRIVER=wayland` breaks games.
+
 All of it goes to `~/.config/hypr/lucid-startup.lua`, which `modules/startup.lua`
 reads, so a reinstall, which rewrites `autostart.lua` and `env.lua`, keeps it.
-What those two files hold is shown beside it, to be edited there.
+What you added to those two files by hand shows in the same lists, with a
+button that moves a line here and leaves it in the file commented out; a line
+that is more than one plain call stays there, with a button to open the file.
+Lucid's own lines in them (the shell, the wallpaper daemon, the variables
+*Environment* sets) are left out.
 
 ### Everything else
 

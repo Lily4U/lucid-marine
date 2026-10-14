@@ -21,8 +21,6 @@ Singleton {
 
     // the session's own variables; the module refuses them too
     readonly property var protectedNames: ["WAYLAND_DISPLAY", "DISPLAY", "XDG_RUNTIME_DIR", "HYPRLAND_INSTANCE_SIGNATURE", "HYPRLAND_CMD", "HOME", "USER", "LOGNAME", "SHELL", "DBUS_SESSION_BUS_ADDRESS", "XDG_SESSION_ID", "XDG_SESSION_TYPE", "XDG_CURRENT_DESKTOP"]
-    // started by Lucid's own modules/autostart.lua, not worth listing
-    readonly property var lucidOwn: ["awww-daemon", "swww-daemon"]
 
     // [{ name, cmd, entry, on }]: entry is the desktop id an app was picked by
     readonly property var apps: root.parseList(Prefs.startupApps)
@@ -30,9 +28,17 @@ Singleton {
     readonly property var vars: root.parseList(Prefs.startupEnv)
     // what this login started with, from modules/startup.lua
     property var session: null
-    // what modules/autostart.lua and modules/env.lua hold, for showing beside ours
+    // what you added to modules/autostart.lua and modules/env.lua yourself, as
+    // startuptool.py reads them; Lucid's own lines there are left out
     property var configApps: []
     property var configVars: []
+    // what this machine has, for the suggestions
+    property var facts: ({})
+    property bool configProbed: false
+    // the lines the page can take over: one plain call on one line
+    readonly property var movable: root.configApps.concat(root.configVars).filter((l) => {
+        return l.simple;
+    })
     // XDG autostart, as startuptool.py lists it
     property var xdgEntries: []
     property string xdgTarget: ""
@@ -158,13 +164,25 @@ Singleton {
         return e && e.icon ? Quickshell.iconPath(e.icon, true) : "";
     }
 
-    // the program a command runs: "exec 'nextcloud' --background" -> nextcloud
+    // the program a command runs, as startuptool.py works it out:
+    // "command -v nextcloud >/dev/null && exec nextcloud --background" -> nextcloud
     function programOf(cmd) {
-        const words = String(cmd || "").replace(/['"]/g, " ").trim().split(/\s+/);
+        let words = String(cmd || "").replace(/['"]/g, " ").trim().split(/\s+/);
+        const and = words.indexOf("&&");
+        if (and !== -1 && and < words.length - 1)
+            words = words.slice(and + 1);
+
         let i = 0;
-        while (i < words.length && (words[i] === "exec" || words[i] === "env" || /^[A-Za-z_][A-Za-z0-9_]*=/.test(words[i]) || /^-/.test(words[i])))
+        while (i < words.length && (["exec", "env", "command"].indexOf(words[i]) !== -1 || words[i].indexOf("=") !== -1 || /^-/.test(words[i])))
             i++;
         return i < words.length ? words[i].split("/").pop() : "";
+    }
+
+    // the command an app picked from the list was given, so a row can show
+    // a command only when it is not just the app's own
+    function ownCommand(a) {
+        const e = a && a.entry ? DesktopEntries.byId(a.entry) : null;
+        return e ? root.entryCommand(e) : "";
     }
 
     // ---------------------------------------------------------------- variables
@@ -255,13 +273,105 @@ Singleton {
         });
     }
 
+    // variables worth setting on this machine, offered only when Lucid finds
+    // what each fixes. what Hyprland's wiki lists for every machine
+    // (GDK_BACKEND, QT_QPA_PLATFORM, SDL_VIDEODRIVER...) is left out: the
+    // toolkits pick Wayland on their own now, and SDL on Wayland breaks games
+    readonly property var suggestions: {
+        const f = root.facts || {};
+        const gpus = f.gpus || [];
+        const out = [];
+        if (f.java)
+            out.push({
+                "name": "_JAVA_AWT_WM_NONREPARENTING",
+                "value": "1",
+                "why": "Java apps otherwise open as a grey box or close their menus at once: Java knows a fixed list of window managers, and Hyprland is not on it."
+            });
+
+        if (gpus.length === 1 && gpus[0] === "nvidia" && f.libvaNvidia)
+            out.push({
+                "name": "LIBVA_DRIVER_NAME",
+                "value": "nvidia",
+                "why": "Browsers and video players decode video on the NVIDIA card, through libva-nvidia-driver. It can draw more power than decoding on the processor."
+            });
+
+        if (f.zeroScaling && f.maxScale >= 2)
+            out.push({
+                "name": "GDK_SCALE",
+                "value": String(Math.floor(f.maxScale)),
+                "why": "Hyprland leaves apps that run through XWayland unscaled (xwayland:force_zero_scaling), so GTK ones come out tiny; this has them scale themselves. Wayland apps ignore it."
+            });
+
+        const taken = {};
+        for (const v of root.vars)
+            taken[v.name] = true;
+        for (const v of root.configVars)
+            taken[v.name] = true;
+        return out.filter((x) => {
+            return !taken[x.name];
+        });
+    }
+
+    function refreshConfig() {
+        if (!configProc.running)
+            configProc.running = true;
+
+    }
+
+    // lines from the two files: moved ones join the lists here, the rest are
+    // only commented out (an app two things start, kept to one)
+    function take(lines, moved) {
+        if (takeProc.running || lines.length === 0)
+            return ;
+
+        takeProc.command = ["python3", root.helper, "take", JSON.stringify(lines.map((l) => {
+            return {
+                "file": l.file,
+                "line": l.line,
+                "text": l.text,
+                "moved": moved
+            };
+        }))];
+        takeProc.moved = moved;
+        takeProc.lines = lines;
+        takeProc.running = true;
+    }
+
+    function adopt(lines) {
+        let apps = root.apps.slice();
+        let vars = root.vars.slice();
+        for (const l of lines) {
+            if (l.file === "autostart") {
+                const e = l.program ? DesktopEntries.heuristicLookup(l.program) : null;
+                apps.push({
+                    "name": e && e.name ? e.name : (l.program || l.cmd),
+                    "cmd": l.cmd,
+                    "entry": e ? e.id : "",
+                    "on": true
+                });
+            } else if (!vars.some((v) => {
+                return v.name === l.name;
+            })) {
+                vars.push({
+                    "name": l.name,
+                    "value": l.value,
+                    "on": true
+                });
+            }
+        }
+        root.saveApps(apps);
+        root.saveVars(vars);
+    }
+
     // ---------------------------------------------------------------- xdg autostart
 
-    function refreshXdg() {
+    // everything the page shows from outside, read again each time it opens
+    function refresh() {
         if (!listProc.running)
             listProc.running = true;
 
         sessionFile.reload();
+        root.refreshConfig();
     }
 
     function setXdg(id, on) {
@@ -322,48 +432,6 @@ Singleton {
 
         dataFile.current = root.rendered;
         dataFile.setText(root.rendered);
-    }
-
-    // hl.exec_cmd("...") with one plain string, the shape modules/autostart.lua uses
-    function parseConfigApps(text) {
-        const out = [];
-        const re = /hl\.exec_cmd\(\s*"((?:[^"\\]|\\.)*)"\s*\)/;
-        for (const line of String(text).split("\n")) {
-            if (/^\s*--/.test(line))
-                continue;
-
-            const m = re.exec(line);
-            if (!m)
-                continue;
-
-            const cmd = m[1].replace(/\\(.)/g, "$1");
-            const prog = root.programOf(cmd);
-            if (root.lucidOwn.indexOf(prog) === -1)
-                out.push({
-                "cmd": cmd,
-                "program": prog
-            });
-
-        }
-        return out;
-    }
-
-    function parseConfigVars(text) {
-        const out = [];
-        const re = /hl\.env\(\s*"([^"]+)"\s*,\s*"((?:[^"\\]|\\.)*)"/;
-        for (const line of String(text).split("\n")) {
-            if (/^\s*--/.test(line))
-                continue;
-
-            const m = re.exec(line);
-            if (m)
-                out.push({
-                "name": m[1],
-                "value": m[2].replace(/\\(.)/g, "$1")
-            });
-
-        }
-        return out;
     }
 
     Timer {
@@ -441,8 +509,8 @@ Singleton {
         watchChanges: true
         printErrors: false
         onFileChanged: autostartFile.reload()
-        onLoaded: root.configApps = root.parseConfigApps(autostartFile.text())
-        onLoadFailed: root.configApps = []
+        onLoaded: root.refreshConfig()
+        onLoadFailed: root.refreshConfig()
     }
 
     FileView {
@@ -452,8 +520,8 @@ Singleton {
         watchChanges: true
         printErrors: false
         onFileChanged: envFile.reload()
-        onLoaded: root.configVars = root.parseConfigVars(envFile.text())
-        onLoadFailed: root.configVars = []
+        onLoaded: root.refreshConfig()
+        onLoadFailed: root.refreshConfig()
     }
 
     Process {
@@ -478,11 +546,64 @@ Singleton {
     }
 
     Process {
+        id: configProc
+
+        command: ["python3", root.helper, "config"]
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let d = {};
+                try {
+                    d = JSON.parse(this.text.trim() || "{}");
+                } catch (e) {
+                    d = {};
+                }
+                const mine = (l) => {
+                    return !l.lucid;
+                };
+                root.configApps = (d.apps || []).filter(mine);
+                root.configVars = (d.env || []).filter(mine);
+                root.facts = d.facts || {};
+                root.configProbed = true;
+            }
+        }
+
+    }
+
+    Process {
+        id: takeProc
+
+        property bool moved: true
+        property var lines: []
+
+        stdout: StdioCollector {
+            onStreamFinished: {
+                let d = {};
+                try {
+                    d = JSON.parse(this.text.trim() || "{}");
+                } catch (e) {
+                    d = {};
+                }
+                const done = d.done || [];
+                if (takeProc.moved)
+                    root.adopt(takeProc.lines.filter((l) => {
+                    return done.some((x) => {
+                        return x.file === l.file && x.line === l.line;
+                    });
+                }));
+
+                root.refreshConfig();
+            }
+        }
+
+    }
+
+    Process {
         id: setProc
 
         onExited: {
             root.xdgBusy = false;
-            root.refreshXdg();
+            root.refresh();
         }
     }
 
