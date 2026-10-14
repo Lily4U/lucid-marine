@@ -10,6 +10,8 @@ require("modules.autostart")
 ---- ENVIRONMENT VARIABLES ----
 -------------------------------
 require("modules.env")
+-- what Settings > Startup sets: variables, apps opened at login, XDG autostart
+require("modules.startup")
 -----------------------
 ---- LOOK AND FEEL ----
 -----------------------
