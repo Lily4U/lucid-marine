@@ -29,6 +29,8 @@ Column {
     property string newName: ""
     property string newValue: ""
     readonly property string newProblem: page.newName === "" ? "" : Startup.nameProblem(page.newName, -1)
+    // a warning while typing, which still lets it be added
+    readonly property string newAdvice: page.newName === "" ? "" : Startup.adviceFor(page.newName, page.newValue)
 
     function addVar() {
         if (Startup.addVar(page.newName, page.newValue)) {
@@ -315,7 +317,9 @@ Column {
                 monoTitle: true
                 stacked: true
                 description: varRow.state === "active" ? "In force." : (varRow.state === "pending" ? "Set. The dock and the launcher pick it up at your next login." : "")
-                warning: varRow.problem !== "" ? varRow.problem : (modelData.name === "PATH" && modelData.on !== false ? "Replaces the whole search path: put the current one in it too, or apps stop being found." : "")
+                readonly property string advice: Startup.adviceFor(modelData.name, modelData.value)
+
+                warning: varRow.problem !== "" ? varRow.problem : (varRow.advice !== "" ? varRow.advice : (modelData.name === "PATH" && modelData.on !== false ? "Replaces the whole search path: put the current one in it too, or apps stop being found." : ""))
 
                 Row {
                     width: parent.width
@@ -366,6 +370,8 @@ Column {
                 title: modelData.simple ? modelData.name : "A line of Lua"
                 monoTitle: true
                 description: "In " + page.fileName(modelData) + (modelData.simple ? ", set to " + modelData.value : ": " + modelData.text.trim())
+                warning: modelData.simple ? Startup.adviceFor(modelData.name, modelData.value) : ""
+                stacked: envLine.warning !== ""
 
                 M3Button {
                     text: envLine.modelData.simple ? "Move here" : "Open the file"
@@ -392,7 +398,7 @@ Column {
         SettingRow {
             title: "Add a variable"
             stacked: true
-            warning: page.newProblem
+            warning: page.newProblem !== "" ? page.newProblem : page.newAdvice
 
             Row {
                 width: parent.width

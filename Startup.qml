@@ -217,6 +217,52 @@ Singleton {
         return "";
     }
 
+    // variables that are no longer needed or do harm, checked against their
+    // sources: a word of warning, never a refusal. "" when there is nothing to say
+    function adviceFor(name, value) {
+        const v = String(value || "").toLowerCase();
+        const f = root.facts || {};
+        const gpus = f.gpus || [];
+        const alone = (list) => {
+            return v.split(/[;,]/).map((x) => {
+                return x.trim();
+            }).filter((x) => {
+                return x !== "";
+            }).every((x) => {
+                return list.indexOf(x) !== -1;
+            });
+        };
+        switch (name) {
+        case "ELECTRON_OZONE_PLATFORM_HINT":
+            return "Does nothing now: Electron 38 removed it, and Electron apps run on Wayland by themselves.";
+        case "MOZ_ENABLE_WAYLAND":
+            return v === "0" ? "Sends Firefox back to XWayland, blurry on scaled screens and without touchpad gestures. Only worth it to get round a bug." : "Not needed: Firefox runs on Wayland by itself since version 121.";
+        case "NVD_BACKEND":
+            return v === "egl" ? "The EGL backend of libva-nvidia-driver is broken on NVIDIA drivers 525 and later; direct, the default, is the one that works." : (v === "direct" ? "Not needed: direct is already the default." : "");
+        case "STEAM_FORCE_DESKTOPUI_SCALING":
+            return "Has stopped working for some people on Hyprland since 2025, and Steam follows the XWayland scale by itself now.";
+        case "SDL_VIDEODRIVER":
+            return v.indexOf("wayland") !== -1 && v.indexOf("x11") === -1 ? "Games built with an older SDL fail to start with it; Hyprland's wiki says to take it out, or set it to x11, if they do." : "";
+        case "GDK_BACKEND":
+            if (v === "x11")
+                return "Every GTK app goes through XWayland, blurry on scaled screens.";
+
+            return alone(["wayland"]) ? "GTK apps without Wayland support stop opening, with nothing to fall back to. And GTK picks Wayland by itself in this session." : "Not needed: GTK picks Wayland by itself in this session.";
+        case "QT_QPA_PLATFORM":
+            if (v === "xcb")
+                return "Every Qt app goes through XWayland, blurry on scaled screens.";
+
+            return alone(["wayland"]) ? "Apps whose Qt lacks the Wayland plugin, as AppImages and other bundled builds often do, stop starting. And Qt picks Wayland by itself in this session." : "Not needed: Qt picks Wayland by itself in this session.";
+        case "LIBVA_DRIVER_NAME":
+            return v === "nvidia" && gpus.indexOf("nvidia") !== -1 && gpus.length > 1 ? "This machine has another graphics card that already decodes video. This moves decoding to the NVIDIA card, which keeps it awake and can draw more power than decoding on the processor." : "";
+        case "GDK_SCALE":
+            return f.zeroScaling === false ? "Hyprland already scales apps running through XWayland (xwayland:force_zero_scaling is off), so GTK ones end up scaled twice." : "";
+        case "AQ_NO_ATOMIC":
+            return "Hyprland's wiki: heavily not recommended.";
+        }
+        return "";
+    }
+
     function addVar(name, value) {
         if (root.nameProblem(name, -1) !== "")
             return false;

@@ -520,7 +520,14 @@ on the machine: Java apps (`_JAVA_AWT_WM_NONREPARENTING`), an NVIDIA card alone
 with its VA-API driver (`LIBVA_DRIVER_NAME`), a screen scaled 2× or more with
 XWayland left unscaled (`GDK_SCALE`). The ones Hyprland's wiki lists for every
 machine are left out on purpose: the toolkits pick Wayland on their own now,
-and `SDL_VIDEODRIVER=wayland` breaks games.
+and `SDL_VIDEODRIVER=wayland` breaks games. Those, and others that guides still copy around,
+get a word of warning when you type them or keep them in `env.lua` — what each
+does now and why it is not a good idea — without being refused:
+`ELECTRON_OZONE_PLATFORM_HINT` (gone since Electron 38), `MOZ_ENABLE_WAYLAND`
+(Firefox is on Wayland since 121), `GDK_BACKEND` and `QT_QPA_PLATFORM` (and
+worse with no fallback), `SDL_VIDEODRIVER=wayland`, `NVD_BACKEND=egl`,
+`STEAM_FORCE_DESKTOPUI_SCALING`, `LIBVA_DRIVER_NAME=nvidia` on a machine with a
+second graphics card, `GDK_SCALE` without `force_zero_scaling`, `AQ_NO_ATOMIC`.
 
 All of it goes to `~/.config/hypr/lucid-startup.lua`, which `modules/startup.lua`
 reads, so a reinstall, which rewrites `autostart.lua` and `env.lua`, keeps it.
