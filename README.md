@@ -499,6 +499,26 @@ and the swipe between workspaces: how far the fingers travel, which way, how
 fast a flick switches anyway, how far along letting go still switches, going
 past the neighbour and making a new workspace at the end.
 
+### Startup
+
+**Settings → Startup** holds what would otherwise mean editing
+`modules/autostart.lua` and `modules/env.lua`. *Apps* are opened each time you
+log in: pick an installed app or type a command, switch one off without losing
+it, or open it now. *System autostart* lists the entries apps and packages put
+in `~/.config/autostart` and `/etc/xdg/autostart`. Hyprland alone does not read
+them; a session manager such as uwsm does, and the page says which you have.
+Without one, a switch has Lucid start them the way a desktop session would,
+through systemd's own `xdg-desktop-autostart.target`. Each entry can be switched
+off for you alone with the spec's `Hidden=true`, and the page flags an app that
+two of these would start twice. *Environment variables* are set for every app:
+those opened from keybinds see a change at once, the dock and the launcher at
+the next login, and the page shows which is which. The session's own variables
+(`WAYLAND_DISPLAY`, `HOME` and the like) cannot be set there.
+
+All of it goes to `~/.config/hypr/lucid-startup.lua`, which `modules/startup.lua`
+reads, so a reinstall, which rewrites `autostart.lua` and `env.lua`, keeps it.
+What those two files hold is shown beside it, to be edited there.
+
 ### Everything else
 
 - **Users and accounts** — the card at the top of the Settings rail opens a

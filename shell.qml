@@ -44,6 +44,7 @@ ShellRoot {
         void Glass.probed;
         void Monitors.probed;
         void HyprConfig.moduleProbed;
+        void Startup.moduleProbed;
         void Updates.current;
         void Notifs.count;
         void Clip.probed;

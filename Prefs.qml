@@ -611,6 +611,11 @@ Singleton {
     property alias specialCustom: s.specialCustom
     // Hyprland options set from Settings > Windows, as JSON { "general.gaps_in": 8, ... }
     property alias hyprOptions: s.hyprOptions
+    // Settings > Startup: JSON lists of { name, cmd, entry, on } and { name, value, on },
+    // and whether the session starts the XDG autostart entries
+    property alias startupApps: s.startupApps
+    property alias startupEnv: s.startupEnv
+    property alias startupXdg: s.startupXdg
 
     property alias glassApps: s.glassApps
     property alias glassValues: s.glassValues
@@ -756,6 +761,7 @@ Singleton {
         { "key": "network", "icon": "wifi", "keys": "wifi ethernet vpn dns ip proxy internet", "group": "Devices", "label": "Network", "title": "Network", "blurb": "Wi-Fi, wired, VPN and how this machine gets its address" },
         { "key": "bluetooth", "icon": "bluetooth", "keys": "devices pair headphones", "group": "Devices", "label": "Bluetooth", "title": "Bluetooth and Devices", "blurb": "The radio, what it is paired with, and the phone you connect to it" },
         { "key": "kdeconnect", "icon": "smartphone", "keys": "phone kde connect files notifications clipboard", "group": "Devices", "label": "Phone", "title": "Phone", "blurb": "Your phone on this machine over KDE Connect: files, notifications, clipboard and a remote", "toggle": "kdeConnectEnabled" },
+        { "key": "startup", "icon": "start", "keys": "autostart login apps open at login run startup environment variables env xdg session", "group": "System", "label": "Startup", "title": "Startup", "blurb": "Apps opened when you log in, system autostart and environment variables" },
         { "key": "notifications", "icon": "notifications", "keys": "popups toasts do not disturb dnd quiet hours sound muted apps", "group": "System", "label": "Notifications", "title": "Notifications", "blurb": "Popups, quiet hours, sound and which applications may interrupt you", "toggle": "barNotifications" },
         { "key": "idle", "icon": "bedtime", "keys": "sleep suspend lock dim screen off hypridle caffeine", "group": "System", "label": "Idle", "title": "Idle and Sleep", "blurb": "What happens when you walk away: dimming, locking, screen off and suspend", "toggle": "idleEnabled" },
         { "key": "datetime", "icon": "schedule", "keys": "clock time zone location 24 hour seconds week monday sunday timer pomodoro focus break alarm world", "group": "System", "label": "Date & Time", "title": "Date and Time", "blurb": "Where you are, the clock, and its timers" },
@@ -1040,6 +1046,9 @@ Singleton {
         "specialGaps": 0,
         "specialCustom": "[]",
         "hyprOptions": "{}",
+        "startupApps": "[]",
+        "startupEnv": "[]",
+        "startupXdg": false,
         "glassApps": "vscodium",
         "glassValues": "vscodium=0.9",
         "monitorSetups": "{}",
@@ -1631,6 +1640,9 @@ Singleton {
             property int specialGaps: 0
             property string specialCustom: "[]"
             property string hyprOptions: "{}"
+            property string startupApps: "[]"
+            property string startupEnv: "[]"
+            property bool startupXdg: false
             // the apps on the Glass page, and the ones given their own value
             property string glassApps: "vscodium"
             property string glassValues: "vscodium=0.9"

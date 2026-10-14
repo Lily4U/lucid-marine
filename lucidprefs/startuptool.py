@@ -69,9 +69,6 @@ def desktops():
 
 # whether the entry is meant for this desktop, and if not why
 def applies(e):
-    # systemd runs these through a unit of its own, not from this entry
-    if truthy(e.get("X-systemd-skip")):
-        return False, "systemd starts it itself"
     mine = [d.lower() for d in desktops()]
     only = split_list(e.get("OnlyShowIn"))
     if only and not any(d.lower() in mine for d in only):
@@ -79,6 +76,9 @@ def applies(e):
     nots = split_list(e.get("NotShowIn"))
     if any(d.lower() in mine for d in nots):
         return False, "not for " + ", ".join(nots)
+    # systemd runs these through a unit of its own, not from this entry
+    if truthy(e.get("X-systemd-skip")):
+        return False, "systemd starts it itself"
     return True, ""
 
 

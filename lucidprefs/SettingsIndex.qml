@@ -27,6 +27,7 @@ Item {
         "launcher": "app menu start",
         "widgets": "desktop cards",
         "workspaces": "scratchpad special",
+        "startup": "autostart login boot launch run open env variable variables environment export",
         "keybinds": "shortcuts hotkeys keys keyboard",
         "displays": "monitor monitors screen resolution refresh scale hdmi",
         "sound": "audio volume speakers headphones microphone system sounds chime beep usb charger camera",

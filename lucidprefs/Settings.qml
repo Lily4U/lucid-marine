@@ -454,6 +454,9 @@ FloatingWindow {
 
         z: 100
         onChosen: (workspace, entryId) => {
+            if (workspace === Startup.pickerKey)
+                return Startup.addApp(entryId);
+
             return Specials.addApp(workspace, entryId);
         }
     }
@@ -1167,6 +1170,8 @@ FloatingWindow {
                                 return "MonitorsPage.qml";
                             case "input":
                                 return "InputPage.qml";
+                            case "startup":
+                                return "StartupPage.qml";
                             case "bar":
                                 return "BarPage.qml";
                             case "dock":

@@ -92,14 +92,6 @@ function M.apply()
     end
 end
 
--- an app from the list, by its place in it, for Settings' "Open now"
-function M.run(i)
-    local app = config().apps[i]
-    if type(app) == "table" and type(app.cmd) == "string" and app.cmd ~= "" then
-        hl.exec_cmd(app.cmd)
-    end
-end
-
 local function write_session(cfg, env, order, xdg)
     local f = io.open(M.session, "r")
     if f then f:close(); return end

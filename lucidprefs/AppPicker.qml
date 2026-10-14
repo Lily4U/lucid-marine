@@ -32,8 +32,10 @@ Item {
 
     function open(ws) {
         picker.workspace = ws;
-        picker.heading = "Add an app to " + Specials.label(ws);
-        picker.items = Specials.installedApps(ws);
+        // Settings > Startup borrows the picker; every other key is a workspace
+        const startup = ws === Startup.pickerKey;
+        picker.heading = startup ? "Open an app at login" : "Add an app to " + Specials.label(ws);
+        picker.items = startup ? Startup.installedApps() : Specials.installedApps(ws);
         picker.filter = "";
         searchInput.text = "";
         picker.shown = true;
