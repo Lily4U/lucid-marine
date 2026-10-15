@@ -11,6 +11,8 @@ Item {
     property real thickness: Theme.dp(4)
     property bool wavy: false
     property bool animated: true
+    // false holds the wave still instead of running it along the bar
+    property bool flowing: true
     // off for a value that already arrives frame by frame
     property bool valueAnimated: true
     property real amplitude: Theme.dp(3)
@@ -90,7 +92,7 @@ Item {
     }
 
     NumberAnimation on phase {
-        running: lp.wavy && lp.animated && lp.visible
+        running: lp.wavy && lp.animated && lp.flowing && lp.visible
         from: 0
         to: Math.PI * 2
         duration: 1400

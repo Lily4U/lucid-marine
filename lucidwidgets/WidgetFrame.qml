@@ -42,7 +42,7 @@ Item {
     readonly property real bodyH: frame.resizing ? frame.resH / frame.safeZoom : Math.round(frame.bh * frame.sizeScale)
     readonly property real cardW: Math.round(frame.bodyW * frame.zoom)
     readonly property real cardH: Math.round(frame.bodyH * frame.zoom)
-    readonly property int radius: Math.round(Math.min(Theme.radiusXl * frame.zoom, frame.cardH / 2, frame.cardW / 2))
+    readonly property int radius: Math.round(Math.min(body.item !== null && body.item.pill === true ? frame.cardH : Theme.radiusXl * frame.zoom, frame.cardH / 2, frame.cardW / 2))
     // the same corner expressed in the body's own unscaled coordinates
     readonly property real bodyRadius: frame.zoom > 0 ? frame.radius / frame.zoom : frame.radius
     readonly property bool active: frame.hovered || frame.dragging || frame.menuOpen
@@ -271,6 +271,7 @@ Item {
             m.dragX = m.homeX + dx;
             m.dragY = m.homeY + dy;
         }
+        Widgets.setLive(frame.uid, frame.dragX, frame.dragY, frame.width, frame.height);
     }
 
     function endDrag() {
@@ -316,6 +317,7 @@ Item {
         if (frame.dragX === frame.homeX && frame.dragY === frame.homeY)
             Widgets.clearSelection();
 
+        Widgets.liveUid = "";
     }
 
     function beginResize(hx, vy, px, py) {
@@ -377,6 +379,7 @@ Item {
         frame.resY = ny;
         frame.resW = nw;
         frame.resH = nh;
+        Widgets.setLive(frame.uid, nx, ny, nw, nh);
     }
 
     function endResize() {
@@ -387,6 +390,7 @@ Item {
         Widgets.setSize(frame.uid, frame.resW / z, frame.resH / z);
         Widgets.setPos(frame.uid, frame.resX, frame.resY);
         frame.resizing = false;
+        Widgets.liveUid = "";
     }
 
     // the menu's shortcut for the look the visualiser is really after

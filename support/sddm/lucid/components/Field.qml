@@ -7,8 +7,8 @@ Item {
 
     readonly property alias text: input.text
     property bool reveal: false
-    // an account without a password logs in on an empty field
-    readonly property bool canSubmit: (input.text.length > 0 || !Lock.needsPassword) && Lock.acceptsInput && Lock.userName !== ""
+    // an account without a password logs in on an empty field, and so does a fingerprint
+    readonly property bool canSubmit: (input.text.length > 0 || !Lock.needsPassword || Lock.fingerprint) && Lock.acceptsInput && Lock.userName !== ""
     readonly property bool bad: Lock.phase === "failed"
     readonly property bool good: Lock.granted
     // the placeholder waits for the last beads to fade before it comes back
@@ -164,7 +164,7 @@ Item {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         transformOrigin: Item.Left
-        text: Lock.needsPassword ? "Password" : "No password needed"
+        text: !Lock.needsPassword ? "No password needed" : (Lock.fingerprint ? "Password, or Enter for fingerprint" : "Password")
         color: Lock.focused ? Theme.subtext : Theme.subtextDim
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontBodyLg
@@ -319,7 +319,7 @@ Item {
             Glyph {
                 anchors.centerIn: parent
                 size: 20
-                name: field.good ? "check" : "arrow"
+                name: field.good ? "check" : (Lock.fingerprint && input.text.length === 0 ? "finger" : "arrow")
                 color: field.good ? Theme.fgSuccess : (field.canSubmit ? Theme.fgAccent : Theme.subtextDim)
                 opacity: Lock.busy ? 0 : 1
 

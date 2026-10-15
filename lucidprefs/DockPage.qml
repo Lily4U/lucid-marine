@@ -180,12 +180,25 @@ Column {
 
         SettingRow {
             title: "Auto-hide"
-            description: "The dock slides off the bottom of the screen and comes back when the pointer reaches the edge."
+            description: "Always slides the dock off the bottom of the screen until the pointer reaches the edge. Dynamic only does it while a tiled window is open on the workspace, or a floating one overlaps the dock, so it is back whenever the desktop is clear."
+            stacked: true
 
-            M3Switch {
-                checked: Prefs.dockAutoHide
-                onToggled: (v) => {
-                    return Prefs.dockAutoHide = v;
+            M3Segmented {
+                width: parent.width
+                current: !Prefs.dockAutoHide ? "off" : (Prefs.dockDynamicHide ? "dynamic" : "always")
+                options: [{
+                    "key": "off",
+                    "label": "Off"
+                }, {
+                    "key": "always",
+                    "label": "Always"
+                }, {
+                    "key": "dynamic",
+                    "label": "Dynamic"
+                }]
+                onChosen: (k) => {
+                    Prefs.dockAutoHide = k !== "off";
+                    Prefs.dockDynamicHide = k === "dynamic";
                 }
             }
 

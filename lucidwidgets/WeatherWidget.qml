@@ -8,7 +8,6 @@ WidgetBody {
 
     defaultTone: "tertiary"
 
-    readonly property bool metric: w.opt("units") !== "imperial"
     readonly property var report: (WeatherSource.report === null && w.preview) ? w.sample : WeatherSource.report
     readonly property var sample: ({
         "code": 2, "tempC": 19, "tempF": 66, "feelsC": 18, "feelsF": 64, "humidity": 58, "windKmph": 11, "windMph": 7,
@@ -38,8 +37,25 @@ WidgetBody {
         return out;
     }
 
+    readonly property var facts: !w.report ? [] : [{
+        "label": "Feels like",
+        "value": w.t(w.report.feelsC, w.report.feelsF)
+    }, {
+        "label": "High · Low",
+        "value": w.days.length ? w.t(w.days[0].maxC, w.days[0].maxF) + " · " + w.t(w.days[0].minC, w.days[0].minF) : "–"
+    }, {
+        "label": "Rain",
+        "value": (w.report.pop || 0) + "%"
+    }, {
+        "label": "Humidity",
+        "value": w.report.humidity + "%"
+    }, {
+        "label": "Wind",
+        "value": Units.wind(w.report.windKmph, w.report.windMph) + (w.report.windDir ? " " + w.report.windDir : "")
+    }]
+
     function t(c, f) {
-        return (w.metric ? c : f) + "°";
+        return Units.deg(c, f);
     }
 
     function dayName(d, i) {
@@ -162,6 +178,113 @@ WidgetBody {
                 role: "bodySmall"
                 color: w.inkDim
                 text: w.days.length ? "High " + w.t(w.days[0].maxC, w.days[0].maxF) + " · Low " + w.t(w.days[0].minC, w.days[0].minF) : ""
+            }
+
+        }
+
+    }
+
+    // detail: the reading on the left, the rest of the day listed beside it
+    Item {
+        id: detail
+
+        readonly property real split: Theme.dp(140)
+
+        visible: w.ready && w.variant === "detail"
+        anchors.fill: parent
+
+        Column {
+            x: Theme.dp(20)
+            width: detail.split - Theme.dp(34)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 0
+
+            LText {
+                width: parent.width
+                elide: Text.ElideRight
+                role: "labelLarge"
+                color: w.inkDim
+                text: w.place
+            }
+
+            WeatherIcon {
+                size: Theme.dp(54)
+                kind: w.report ? WeatherSource.kindFor(w.report.code, w.night) : "clear"
+                tint: w.inkAccent
+                cloudColor: w.ink
+                animate: !w.preview
+            }
+
+            LText {
+                size: Theme.dp(44)
+                weight: 600
+                rounded: 100
+                color: w.ink
+                text: w.report ? w.t(w.report.tempC, w.report.tempF) : ""
+            }
+
+            LText {
+                width: parent.width
+                elide: Text.ElideRight
+                role: "titleSmall"
+                color: w.ink
+                text: w.report ? WeatherSource.descFor(w.report.code) : ""
+            }
+
+        }
+
+        LinearProgress {
+            x: detail.split - width / 2
+            y: (detail.height - height) / 2
+            width: detail.height - Theme.dp(40)
+            rotation: 90
+            value: 1
+            wavy: true
+            flowing: false
+            valueAnimated: false
+            thickness: Theme.dp(2)
+            amplitude: Theme.dp(3)
+            wavelength: Theme.dp(18)
+            color: Theme.alpha(w.ink, 0.22)
+            trackColor: "transparent"
+        }
+
+        Column {
+            x: detail.split + Theme.dp(18)
+            width: detail.width - x - Theme.dp(20)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: Theme.dp(5)
+
+            Repeater {
+                model: w.variant === "detail" ? w.facts : []
+
+                Item {
+                    id: fact
+
+                    required property var modelData
+
+                    width: parent.width
+                    height: factValue.implicitHeight
+
+                    LText {
+                        anchors.verticalCenter: parent.verticalCenter
+                        role: "bodyMedium"
+                        color: w.inkDim
+                        text: fact.modelData.label
+                    }
+
+                    LText {
+                        id: factValue
+
+                        anchors.right: parent.right
+                        role: "titleSmall"
+                        tabular: true
+                        color: w.ink
+                        text: fact.modelData.value
+                    }
+
+                }
+
             }
 
         }
@@ -365,7 +488,7 @@ WidgetBody {
         id: hr
 
         readonly property var temps: w.hours.map((h) => {
-            return w.metric ? h.tempC : h.tempF;
+            return Units.temp(h.tempC, h.tempF);
         })
         readonly property real lo: Math.min.apply(null, hr.temps.length ? hr.temps : [0])
         readonly property real hi: Math.max.apply(null, hr.temps.length ? hr.temps : [1])

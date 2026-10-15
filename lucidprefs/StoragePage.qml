@@ -730,7 +730,7 @@ Column {
                 readonly property string kind: driveRow.d.removable ? "Removable drive" : (driveRow.d.rota ? "Hard drive" : (driveRow.d.tran === "nvme" ? "NVMe SSD" : "SSD"))
 
                 title: driveRow.d.model || driveRow.d.name
-                description: [driveRow.kind, Storage.size(driveRow.d.size), driveRow.d.temp > 0 ? Math.round(driveRow.d.temp) + " °C" : ""].filter((s) => {
+                description: [driveRow.kind, Storage.size(driveRow.d.size), driveRow.d.temp > 0 ? Units.degUnit(driveRow.d.temp) : ""].filter((s) => {
                     return s !== "";
                 }).join("  ·  ")
                 stacked: true

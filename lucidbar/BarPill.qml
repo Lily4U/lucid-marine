@@ -57,8 +57,14 @@ Item {
     property int compactFadePause: 0
     property int compactFadeDuration: Theme.barMs(220)
 
+    // set in syncFadeTimings: popupExpanding is still stale when the Behaviors start
+    property int popupMorphDuration: pill.morphDuration
+    property var popupMorphCurve: Theme.easeEmphasizedDecel
+
     function syncFadeTimings() {
         var open = pill.expanded || pill.altOpen;
+        pill.popupMorphDuration = open ? pill.morphDuration : Theme.barDurExit;
+        pill.popupMorphCurve = open ? Theme.easeEmphasizedDecel : Theme.easeEmphasizedAccel;
         pill.panelFadePause = Theme.barMs(pill.expanded ? 150 : 0);
         pill.panelFadeDuration = Theme.barMs(pill.expanded ? 220 : 150);
         pill.compactFadePause = Theme.barMs(open ? 0 : 150);
@@ -70,7 +76,28 @@ Item {
     property bool compactHovered: false
     property bool panelTransitioning: false
 
-    readonly property bool hoverLift: Prefs.barHoverGrow > 0 && pill.compactHovered && !pill.anyOpen && pill.shown
+    // joined to a neighbour in Settings > Bar: the shared edge loses its corners
+    // and its gap, so the group reads as one island (or one notch). the bar works
+    // it out; the open popup of popup mode stands apart either way
+    readonly property string modId: pill.moduleId()
+    readonly property bool joinLeft: !!pill.hostWindow && !!pill.hostWindow.joinedLeftOf && pill.modId !== "" && pill.hostWindow.joinedLeftOf(pill.modId)
+    readonly property bool joinRight: !!pill.hostWindow && !!pill.hostWindow.joinedRightOf && pill.modId !== "" && pill.hostWindow.joinedRightOf(pill.modId)
+    readonly property bool joined: pill.joinLeft || pill.joinRight
+
+    // how each corner meets a panel hanging below the bar, from shell.qml's hangPlan
+    readonly property bool notchedPopup: pill.popupMode && Prefs.barPopupNotched
+    readonly property var hangPlan: pill.hostWindow && pill.hostWindow.hangPlan ? pill.hostWindow.hangPlan : null
+    readonly property var hangCorners: pill.hangPlan && pill.modId !== "" ? (pill.hangPlan.corners[pill.modId] || null) : null
+    readonly property var hangTops: pill.hangPlan && pill.modId !== "" ? (pill.hangPlan.tops[pill.modId] || null) : null
+    readonly property var hangSides: pill.hangPlan && pill.modId !== "" ? (pill.hangPlan.sides[pill.modId] || null) : null
+
+    function capped(limits, corner, v) {
+        return limits && limits[corner] !== undefined ? Math.max(0, Math.min(v, limits[corner])) : v;
+    }
+
+    // growing sideways would run into a joined neighbour, so a joined pill lights
+    // up in place instead
+    readonly property bool hoverLift: Prefs.barHoverGrow > 0 && pill.compactHovered && !pill.anyOpen && pill.shown && !pill.joined
     property real hoverGrow: pill.hoverLift ? Math.min(Theme.dp(Prefs.barHoverGrow), Math.max(0, Theme.dp(Prefs.barSpacing) / 2)) : 0
 
     property int hoverGrowDuration: Theme.barMs(150)
@@ -85,12 +112,86 @@ Item {
 
     }
 
+    // hover to open: the pill unfolds on its own once the pointer rests on it,
+    // and folds back when the pointer leaves. Opened this way it deliberately
+    // skips the focus grab - that pulls the keyboard off the focused window, and
+    // merely passing over the bar must not do that - so a click anywhere on the
+    // pill promotes it to an ordinary clicked-open panel, grab and all.
+    readonly property bool hoverOpens: Prefs.barHoverOpen && pill.shown
+    property bool hoverOpen: false
+    readonly property bool surfaceHovered: pill.compactHovered || shellHover.hovered || pillHover.hovered
+
+    function openOnHover() {
+        if (!pill.hoverOpens || pill.anyOpen)
+            return ;
+
+        pill.hoverOpen = true;
+        pill.compactClicked();
+        pill.expanded = true;
+    }
+
+    function closeHoverOpen() {
+        if (!pill.hoverOpen)
+            return ;
+
+        // collapse first: dropping hoverOpen while still expanded would arm the
+        // focus grab for an instant on the way out
+        pill.expanded = false;
+        pill.hoverOpen = false;
+    }
+
+    onSurfaceHoveredChanged: {
+        if (pill.surfaceHovered) {
+            hoverCloseTimer.stop();
+            if (pill.hoverOpens && !pill.anyOpen)
+                hoverOpenTimer.restart();
+
+        } else {
+            hoverOpenTimer.stop();
+            if (pill.hoverOpen)
+                hoverCloseTimer.restart();
+
+        }
+    }
+    onHoverOpensChanged: {
+        if (!pill.hoverOpens)
+            pill.closeHoverOpen();
+
+    }
+
+    // long enough that sweeping the pointer across the bar opens nothing
+    Timer {
+        id: hoverOpenTimer
+
+        interval: 180
+        onTriggered: pill.openOnHover()
+    }
+
+    // in pop-up mode the gap between pill and panel is outside the input region,
+    // so crossing it unhovers both; this rides that out
+    Timer {
+        id: hoverCloseTimer
+
+        interval: 320
+        onTriggered: {
+            if (!pill.surfaceHovered)
+                pill.closeHoverOpen();
+
+        }
+    }
+
     readonly property bool popupMode: Prefs.barPopupMode
     readonly property int openWidth: pill.altOpen ? pill.altWidth : (pill.expanded ? pill.panelWidth : pill.compactWidth)
     readonly property int openHeight: pill.altOpen ? pill.altHeight : (pill.expanded ? pill.panelHeight : pill.compactHeight)
     readonly property int cornerRadius: pill.popupMode ? Math.min(pill.expandedRadius, Math.round(shell.height / 2)) : (pill.anyOpen ? pill.expandedRadius : Prefs.barPillRadius)
-    readonly property int topRadius: Prefs.barNotch && !pill.popupMode ? 0 : pill.cornerRadius
-    readonly property int pillTopRadius: Prefs.barNotch ? 0 : Prefs.barPillRadius
+    readonly property int topRadius: Prefs.barFlush && !pill.popupMode ? 0 : pill.cornerRadius
+    readonly property int pillTopRadius: Prefs.barFlush ? 0 : Prefs.barPillRadius
+    // on the full bar the strip behind already paints the resting pill, so the
+    // pill itself only shows a hover tint
+    readonly property color restingColor: Prefs.barFull ? Theme.alpha(Theme.bg, 0) : Theme.bg
+    // still taller than the pill: a closing panel keeps its colour until it has
+    // folded away, or on the full bar its fading contents float over the desktop
+    readonly property bool surfaceOpen: pill.anyOpen || pill.height > pill.compactHeight + 0.5
     readonly property int barRadius: pill.popupMode ? Prefs.barPillRadius : pill.cornerRadius
     readonly property int barTopRadius: pill.popupMode ? pill.pillTopRadius : pill.topRadius
 
@@ -100,6 +201,8 @@ Item {
     onAnyOpenChanged: {
         if (pill.anyOpen)
             pill.popupIsAlt = pill.altOpen && !pill.expanded;
+        else
+            pill.hoverOpen = false;
 
         panelTransitionTimer.restart();
     }
@@ -119,13 +222,20 @@ Item {
         return 0;
     }
     readonly property bool popupExpanding: pill.popupMode && pill.anyOpen
-    readonly property bool popupOpen: pill.shown && pill.popupMode && shell.y > 0.5
+    readonly property bool popupOpen: pill.shown && pill.popupMode && (pill.notchedPopup ? shell.height > 0.5 : shell.y > 0.5)
     readonly property Item popupItem: shell
 
     readonly property real surfaceX: -pill.hoverGrow
     readonly property real surfaceY: 0
     readonly property real surfaceWidth: (pill.popupMode ? pill.compactWidth : pill.width) + pill.hoverGrow * 2
     readonly property real surfaceHeight: pill.popupMode ? pill.compactHeight : pill.height
+    // the corners ModuleRegion's mask and blur follow
+    readonly property real barTopLeftRadius: pill.popupMode ? pillRect.topLeftRadius : shell.topLeftRadius
+    readonly property real barTopRightRadius: pill.popupMode ? pillRect.topRightRadius : shell.topRightRadius
+    readonly property real barBottomLeftRadius: pill.popupMode ? pillRect.bottomLeftRadius : shell.bottomLeftRadius
+    readonly property real barBottomRightRadius: pill.popupMode ? pillRect.bottomRightRadius : shell.bottomRightRadius
+    readonly property real popupTopLeftRadius: shell.topLeftRadius
+    readonly property real popupTopRightRadius: shell.topRightRadius
 
     implicitWidth: !pill.shown ? 0 : (pill.popupMode ? pill.compactWidth : pill.openWidth)
     implicitHeight: !pill.shown ? 0 : (pill.popupMode ? pill.compactHeight : pill.openHeight)
@@ -216,11 +326,37 @@ Item {
         y: pill.surfaceY
         width: pill.compactWidth + pill.hoverGrow * 2
         height: pill.compactHeight
-        color: Theme.bg
+        color: pill.restingColor
         clip: true
         radius: Prefs.barPillRadius
-        topLeftRadius: pill.pillTopRadius
-        topRightRadius: pill.pillTopRadius
+        topLeftRadius: pill.joinLeft ? 0 : pill.pillTopRadius
+        topRightRadius: pill.joinRight ? 0 : pill.pillTopRadius
+        bottomLeftRadius: pill.capped(pill.hangCorners, "bl", pill.joinLeft ? 0 : Prefs.barPillRadius)
+        bottomRightRadius: pill.capped(pill.hangCorners, "br", pill.joinRight ? 0 : Prefs.barPillRadius)
+
+        HoverHandler {
+            id: pillHover
+
+            enabled: pill.popupMode
+        }
+
+        // over the contents, not on this rect: a handler on a parent never hears
+        // a press a child MouseArea already took
+        Item {
+            anchors.fill: parent
+            z: 1000
+
+            PointHandler {
+                enabled: pill.hoverOpen
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                onActiveChanged: {
+                    if (active)
+                        pill.hoverOpen = false;
+
+                }
+            }
+
+        }
 
         Behavior on color {
             enabled: pill.hostWindow ? pill.hostWindow.laidOut : false
@@ -237,26 +373,57 @@ Item {
     Rectangle {
         id: shell
 
-        width: pill.popupMode ? (pill.anyOpen ? pill.popupWidth : pill.compactWidth + pill.hoverGrow * 2) : pill.width + pill.hoverGrow * 2
-        height: pill.popupMode ? (pill.anyOpen ? pill.popupHeight : pill.compactHeight) : pill.height
-        x: pill.popupMode && pill.anyOpen ? pill.popupX : pill.surfaceX
-        y: pill.popupMode && pill.anyOpen ? pill.compactHeight + Theme.dp(Prefs.barPopupGap) : pill.surfaceY
-        visible: !pill.popupMode || shell.y > 0.5
-        color: Theme.bg
+        // a notched pop-up grows down out of the pill's bottom edge, flush
+        width: pill.popupMode ? (pill.anyOpen ? pill.popupWidth : pill.compactWidth + (pill.notchedPopup ? 0 : pill.hoverGrow * 2)) : pill.width + pill.hoverGrow * 2
+        height: pill.popupMode ? (pill.anyOpen ? pill.popupHeight : (pill.notchedPopup ? 0 : pill.compactHeight)) : pill.height
+        x: pill.popupMode && pill.anyOpen ? pill.popupX : (pill.notchedPopup ? 0 : pill.surfaceX)
+        y: pill.popupMode && (pill.anyOpen || pill.notchedPopup) ? pill.compactHeight + (pill.notchedPopup ? 0 : Theme.dp(Prefs.barPopupGap)) : pill.surfaceY
+        visible: !pill.popupMode || (pill.notchedPopup ? shell.height > 0.5 : shell.y > 0.5)
+        color: (pill.popupMode || pill.surfaceOpen) ? Theme.bg : pill.restingColor
         radius: pill.cornerRadius
-        topLeftRadius: pill.topRadius
-        topRightRadius: pill.topRadius
+        // opened in place, the panel hangs from its own stretch of the group: the
+        // shared top corners stay square, the bottom ones round off below it
+        topLeftRadius: pill.popupMode ? pill.capped(pill.notchedPopup ? pill.hangTops : null, "tl", pill.topRadius) : (pill.joinLeft ? 0 : pill.topRadius)
+        topRightRadius: pill.popupMode ? pill.capped(pill.notchedPopup ? pill.hangTops : null, "tr", pill.topRadius) : (pill.joinRight ? 0 : pill.topRadius)
+        bottomLeftRadius: pill.popupMode ? pill.cornerRadius : pill.capped(pill.hangSides, "bl", pill.capped(pill.hangCorners, "bl", pill.joinLeft && !pill.hangSides ? 0 : pill.cornerRadius))
+        bottomRightRadius: pill.popupMode ? pill.cornerRadius : pill.capped(pill.hangSides, "br", pill.capped(pill.hangCorners, "br", pill.joinRight && !pill.hangSides ? 0 : pill.cornerRadius))
         clip: true
         layer.enabled: pill.surfaceLayered
         layer.samples: 4
+
+        // handlers on the surface itself, so hovering the panel's own contents
+        // still counts as hovering the pill
+        HoverHandler {
+            id: shellHover
+        }
+
+        // a passive grab, so the panel's buttons and drags keep working. On an
+        // item stacked over the contents, not on the shell: a handler on a parent
+        // never hears a press a child MouseArea already took (a right-click on a
+        // tray item, say), and the panel folded away under the tray's menu
+        Item {
+            anchors.fill: parent
+            z: 1000
+
+            PointHandler {
+                enabled: pill.hoverOpen
+                acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+                onActiveChanged: {
+                    if (active)
+                        pill.hoverOpen = false;
+
+                }
+            }
+
+        }
 
         Behavior on x {
             enabled: pill.popupMode
 
             NumberAnimation {
-                duration: pill.popupExpanding ? pill.morphDuration : Theme.barDurExit
+                duration: pill.popupMorphDuration
                 easing.type: Easing.Bezier
-                easing.bezierCurve: pill.popupExpanding ? Theme.easeEmphasizedDecel : Theme.easeEmphasizedAccel
+                easing.bezierCurve: pill.popupMorphCurve
             }
 
         }
@@ -265,9 +432,9 @@ Item {
             enabled: pill.popupMode
 
             NumberAnimation {
-                duration: pill.popupExpanding ? pill.morphDuration : Theme.barDurExit
+                duration: pill.popupMorphDuration
                 easing.type: Easing.Bezier
-                easing.bezierCurve: pill.popupExpanding ? Theme.easeEmphasizedDecel : Theme.easeEmphasizedAccel
+                easing.bezierCurve: pill.popupMorphCurve
             }
 
         }
@@ -276,9 +443,9 @@ Item {
             enabled: pill.popupMode
 
             NumberAnimation {
-                duration: pill.popupExpanding ? pill.morphDuration : Theme.barDurExit
+                duration: pill.popupMorphDuration
                 easing.type: Easing.Bezier
-                easing.bezierCurve: pill.popupExpanding ? Theme.easeEmphasizedDecel : Theme.easeEmphasizedAccel
+                easing.bezierCurve: pill.popupMorphCurve
             }
 
         }
@@ -287,9 +454,9 @@ Item {
             enabled: pill.popupMode
 
             NumberAnimation {
-                duration: pill.popupExpanding ? pill.morphDuration : Theme.barDurExit
+                duration: pill.popupMorphDuration
                 easing.type: Easing.Bezier
-                easing.bezierCurve: pill.popupExpanding ? Theme.easeEmphasizedDecel : Theme.easeEmphasizedAccel
+                easing.bezierCurve: pill.popupMorphCurve
             }
 
         }
@@ -311,6 +478,60 @@ Item {
             scale: pill.popupMode || !pill.anyOpen ? 1 : pill.compactCollapseScale
             visible: opacity > 0.01
 
+            // on the full bar, hover lifts the module's own island out of the strip
+            Rectangle {
+                readonly property real inset: Theme.dp(4)
+
+                y: inset
+                width: parent.width
+                height: parent.height - inset * 2
+                visible: Prefs.barFull && opacity > 0
+                radius: height / 2
+                color: Theme.alpha(Theme.surfaceHigh, Theme.bg.a)
+                opacity: pill.compactHovered && !pill.anyOpen ? 1 : 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: pill.hoverGrowDuration
+                        easing.type: Easing.OutCubic
+                    }
+
+                }
+
+            }
+
+            // a joined pill doesn't grow on hover, so its stretch of the group lights up
+            Rectangle {
+                anchors.fill: parent
+                visible: pill.joined && opacity > 0
+                color: Theme.text
+                opacity: pill.compactHovered && !pill.anyOpen ? Theme.stateHover : 0
+                topLeftRadius: compactFace.parent ? compactFace.parent.topLeftRadius : 0
+                topRightRadius: compactFace.parent ? compactFace.parent.topRightRadius : 0
+                bottomLeftRadius: compactFace.parent ? compactFace.parent.bottomLeftRadius : 0
+                bottomRightRadius: compactFace.parent ? compactFace.parent.bottomRightRadius : 0
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Theme.barMs(150)
+                        easing.type: Easing.OutCubic
+                    }
+
+                }
+
+            }
+
+            // the seam between two joined modules, drawn by the right-hand one
+            Rectangle {
+                visible: pill.joinLeft && Prefs.barJoinDividers
+                x: 0
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.max(1, Theme.dp(1))
+                height: Math.round(parent.height * 0.42)
+                radius: width / 2
+                color: Theme.alpha(Theme.text, 0.14)
+            }
+
             MouseArea {
                 anchors.fill: parent
                 enabled: pill.compactInteractive
@@ -328,6 +549,12 @@ Item {
 
                         return ;
                     }
+                    // a second click shuts a clicked-open pop-up; a hover-opened one stays, now clicked open
+                    if (pill.popupMode && pill.expanded && !pill.hoverOpen) {
+                        pill.expanded = false;
+                        return ;
+                    }
+                    pill.hoverOpen = false;
                     pill.compactClicked();
                     pill.expanded = true;
                 }
@@ -392,7 +619,7 @@ Item {
             visible: opacity > 0.01
 
             HyprlandFocusGrab {
-                active: pill.expanded && pill.focusGrabs
+                active: pill.expanded && pill.focusGrabs && !pill.hoverOpen
                 windows: pill.hostWindow ? [pill.hostWindow] : []
                 onCleared: pill.expanded = false
             }

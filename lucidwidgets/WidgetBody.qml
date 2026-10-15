@@ -11,6 +11,8 @@ Item {
     // a body with nothing worth showing right now: the frame fades the whole card
     // out and it drops out of the input mask, so it stops catching clicks too
     property bool hidden: false
+    // the card drawn as a full pill rather than a rounded rectangle
+    property bool pill: false
 
     readonly property string variant: body.host ? body.host.wvariant : ""
     readonly property string uid: body.host ? body.host.uid : ""

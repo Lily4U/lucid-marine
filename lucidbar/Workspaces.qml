@@ -1069,12 +1069,29 @@ Item {
     }
     readonly property bool popupMode: Prefs.barPopupMode
     readonly property bool compactHovered: root.rowHovered
-    readonly property int topRadius: Prefs.barNotch && !root.popupMode ? 0 : root.cornerRadius
-    readonly property int pillTopRadius: Prefs.barNotch ? 0 : Prefs.barPillRadius
+    // joined to a neighbour in Settings > Bar, as BarPill does it. while the
+    // overview is up the module has left its slot, so the bar parts it anyway
+    readonly property bool joinLeft: !!root.hostWindow && !!root.hostWindow.joinedLeftOf && root.hostWindow.joinedLeftOf("workspaces")
+    readonly property bool joinRight: !!root.hostWindow && !!root.hostWindow.joinedRightOf && root.hostWindow.joinedRightOf("workspaces")
+    // the bar caps these when a panel hangs from this island
+    readonly property var hangCorners: root.hostWindow && root.hostWindow.hangPlan ? (root.hostWindow.hangPlan.corners["workspaces"] || null) : null
+
+    function capped(corner, v) {
+        return root.hangCorners && root.hangCorners[corner] !== undefined ? Math.max(0, Math.min(v, root.hangCorners[corner])) : v;
+    }
+    readonly property int topRadius: Prefs.barFlush && !root.popupMode ? 0 : root.cornerRadius
+    readonly property int pillTopRadius: Prefs.barFlush ? 0 : Prefs.barPillRadius
+    // on the full bar the strip behind already paints the resting pill
+    readonly property color restingColor: Prefs.barFull ? Theme.alpha(Theme.bg, 0) : Theme.bg
     readonly property bool popupExpanding: root.popupMode && root.expanded
     readonly property bool popupOpen: root.shown && root.popupMode && shell.y > 0.5
     readonly property int barRadius: root.popupMode ? Prefs.barPillRadius : root.cornerRadius
     readonly property int barTopRadius: root.popupMode ? root.pillTopRadius : root.topRadius
+    // the corners ModuleRegion's mask and blur follow
+    readonly property real barTopLeftRadius: root.popupMode ? pillRect.topLeftRadius : shell.topLeftRadius
+    readonly property real barTopRightRadius: root.popupMode ? pillRect.topRightRadius : shell.topRightRadius
+    readonly property real barBottomLeftRadius: root.popupMode ? pillRect.bottomLeftRadius : shell.bottomLeftRadius
+    readonly property real barBottomRightRadius: root.popupMode ? pillRect.bottomRightRadius : shell.bottomRightRadius
     readonly property Item popupItem: shell
 
     implicitWidth: root.shown ? root.compactWidth : 0
@@ -1204,7 +1221,7 @@ Item {
         visible: root.popupMode
         width: root.compactWidth
         height: root.compactHeight
-        color: Theme.bg
+        color: root.restingColor
 
         Behavior on color {
             enabled: root.hostWindow ? root.hostWindow.laidOut : false
@@ -1218,8 +1235,34 @@ Item {
 
         clip: true
         radius: Prefs.barPillRadius
-        topLeftRadius: root.pillTopRadius
-        topRightRadius: root.pillTopRadius
+        topLeftRadius: root.joinLeft ? 0 : root.pillTopRadius
+        topRightRadius: root.joinRight ? 0 : root.pillTopRadius
+        bottomLeftRadius: root.capped("bl", root.joinLeft ? 0 : Prefs.barPillRadius)
+        bottomRightRadius: root.capped("br", root.joinRight ? 0 : Prefs.barPillRadius)
+    }
+
+    // on the full bar, hover lifts the module's own island out of the strip
+    Rectangle {
+        readonly property real inset: Theme.dp(4)
+
+        // under both faces: the pop-up keeps the dots in pillRect
+        z: -1
+        y: inset
+        width: root.popupMode ? root.compactWidth : root.width
+        height: (root.popupMode ? root.compactHeight : root.height) - inset * 2
+        visible: Prefs.barFull && opacity > 0
+        radius: height / 2
+        color: Theme.alpha(Theme.surfaceHigh, Theme.bg.a)
+        opacity: root.compactHovered && !root.expanded ? 1 : 0
+
+        Behavior on opacity {
+            NumberAnimation {
+                duration: Theme.barMs(root.compactHovered ? 150 : 220)
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
     }
 
     Rectangle {
@@ -1233,10 +1276,12 @@ Item {
         x: root.popupMode && root.expanded ? shell.cardX - root.x : 0
         y: root.popupMode && root.expanded ? shell.cardY - root.y : 0
         visible: !root.popupMode || shell.y > 0.5
-        color: Theme.bg
+        color: (root.popupMode || root.expanded) ? Theme.bg : root.restingColor
         radius: root.cornerRadius
-        topLeftRadius: root.topRadius
-        topRightRadius: root.topRadius
+        topLeftRadius: root.joinLeft && !root.popupMode ? 0 : root.topRadius
+        topRightRadius: root.joinRight && !root.popupMode ? 0 : root.topRadius
+        bottomLeftRadius: root.joinLeft && !root.popupMode ? 0 : (root.popupMode || root.expanded ? root.cornerRadius : root.capped("bl", root.cornerRadius))
+        bottomRightRadius: root.joinRight && !root.popupMode ? 0 : (root.popupMode || root.expanded ? root.cornerRadius : root.capped("br", root.cornerRadius))
         clip: !root.dragging
 
         Behavior on x {
@@ -1615,7 +1660,8 @@ Item {
                                     if (dot.isFocused && root.shownSpecial !== "")
                                         root.hideSpecial();
                                     else if (dot.isFocused)
-                                        root.expanded = true;
+                                        // a pop-up leaves the dots showing under it, so a second click shuts it
+                                        root.expanded = !(root.popupMode && root.expanded);
                                     else
                                         root.focusWorkspace(dot.wsId);
                                 }
@@ -2666,6 +2712,18 @@ Item {
 
         }
 
+    }
+
+    // the seam with a joined neighbour on the left, as BarPill draws it
+    Rectangle {
+        visible: root.joinLeft && Prefs.barJoinDividers && !root.expanded
+        x: 0
+        y: Math.round((root.compactHeight - height) / 2)
+        z: 5
+        width: Math.max(1, Theme.dp(1))
+        height: Math.round(root.compactHeight * 0.42)
+        radius: width / 2
+        color: Theme.alpha(Theme.text, 0.14)
     }
 
     states: State {

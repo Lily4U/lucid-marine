@@ -8,10 +8,24 @@ import qs.lucidui
 Item {
     id: face
 
-    // "apps" | "commands" | "web" | "run" | "emoji" | "theme" | "wallpaper" | "clipboard"
+    // "apps" | "commands" | "web" | "run" | "emoji" | "theme" | "wallpaper" | "live" | "clipboard"
     property string mode: "apps"
     property var model: null
     property var wallpaperModel: null
+    // Settings -> Theme picks the style; unknown names fall back to the strip
+    readonly property var pickerFiles: ({
+        "strip": "WallpaperStrip.qml",
+        "pills": "WallpaperPills.qml",
+        "tiles": "WallpaperTiles.qml",
+        "bento": "WallpaperBento.qml"
+    })
+    property int pickerIndex: -1
+    readonly property bool pickerGrid: face.pickerStyle === "tiles"
+    readonly property bool pickerUpDown: Prefs.wallpaperPickerKeys === "updown"
+    property bool pickerSettling: false
+    // set by hand, never bound: see the Connections on Prefs below for why
+    property string pickerStyle: "strip"
+    readonly property var wallStrip: pickerLoader.item
     property string appliedWallpaper: ""
     property int wallHeroW: Theme.dp(340)
     property int wallHeroH: Theme.dp(211)
@@ -19,6 +33,8 @@ Item {
     property int wallMidH: Theme.dp(148)
     property int wallSmallW: Theme.dp(150)
     property int wallSmallH: Theme.dp(93)
+    property int wallTinyW: Theme.dp(100)
+    property int wallTinyH: Theme.dp(62)
     property int wallCardGap: Theme.dp(10)
     property alias searchText: searchInput.text
     property string highlightQuery: ""
@@ -31,12 +47,14 @@ Item {
         "emoji": "Find an emoji",
         "commands": "Search commands",
         "theme": "Search themes",
-        "wallpaper": "Search wallpapers"
+        "wallpaper": "Search wallpapers",
+        "live": "Search live wallpapers"
     })[face.displayMode] || "Search apps and settings"
     readonly property string modeIcon: ({
         "commands": "keyboard_command_key",
         "clipboard": "content_paste",
         "wallpaper": "wallpaper",
+        "live": "movie",
         "theme": "palette",
         "web": "travel_explore",
         "run": "terminal_2",
@@ -44,7 +62,7 @@ Item {
     })[face.displayMode] || "search"
     // the head's trailing readout: what the panel is holding right now
     readonly property string countLabel: {
-        if (face.displayMode === "wallpaper" || face.resultCount === 0)
+        if (face.pickerMode || face.resultCount === 0)
             return "";
 
         if (face.displayMode === "apps" && face.highlightQuery === "")
@@ -98,7 +116,11 @@ Item {
     // what the empty state needs, so the dock never sizes the panel under it
     readonly property real emptyHeight: resultList.emptyExtent
     property string displayMode: "apps"
-    readonly property bool listVisible: face.displayMode !== "wallpaper"
+    // the Pictures / Live switch beside the picker, as wide as the dock makes room for
+    property int kindRailWidth: 0
+    // pictures and videos share the picker, a tab each
+    readonly property bool pickerMode: face.displayMode === "wallpaper" || face.displayMode === "live"
+    readonly property bool listVisible: !face.pickerMode
     // clipboard: the first Ctrl+Shift+Del arms clearing everything, a second within 3 s does it
     property bool clearArmed: false
     // bumped whenever the dock rewrites the results, so the preview re-reads the selected row
@@ -119,6 +141,8 @@ Item {
 
     signal activated(int index)
     signal closeRequested()
+    // "wallpaper" or "live", from the switch beside the picker
+    signal pickerKindRequested(string kind)
     signal wallpaperChosen(string path)
     signal wallpaperPreviewed(string path)
     signal backRequested()
@@ -127,8 +151,18 @@ Item {
     signal hideRequested(int index)
     signal clearRequested()
 
+    Component.onCompleted: face.pickerStyle = Prefs.wallpaperPickerStyle
+
     function setWallpaperIndex(i) {
-        wallStrip.setIndexImmediate(i);
+        face.pickerIndex = i;
+        if (wallStrip)
+            wallStrip.setIndexImmediate(i);
+    }
+
+    // a picker that was just swapped in (the style changed) starts where the last one was
+    function restorePickerIndex() {
+        if (wallStrip && face.pickerIndex >= 0)
+            wallStrip.setIndexImmediate(face.pickerIndex);
     }
 
     function resetSelection() {
@@ -185,9 +219,11 @@ Item {
     }
 
     function submit() {
-        if (face.displayMode === "wallpaper")
-            wallStrip.activateCurrent();
-        else
+        if (face.pickerMode) {
+            if (wallStrip)
+                wallStrip.activateCurrent();
+
+        } else
             resultList.activateCurrent();
     }
 
@@ -263,7 +299,8 @@ Item {
         height: face.headHeight
         visible: face.headOn
         modes: face.modes
-        current: face.displayMode
+        // the Live tab is the wallpaper picker too
+        current: face.displayMode === "live" ? "wallpaper" : face.displayMode
         countLabel: face.countLabel
         onChosen: (key) => {
             face.modeRequested(key);
@@ -368,27 +405,163 @@ Item {
             clearArmed: face.clearArmed
         }
 
-        WallpaperStrip {
-            id: wallStrip
+        // Pictures and Live, tall enough to be seen as the two halves of the picker
+        Column {
+            id: kindRail
+
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: Math.max(0, face.kindRailWidth - Theme.dp(12))
+            spacing: Theme.dp(8)
+            visible: face.pickerMode && face.kindRailWidth > 0
+
+            Repeater {
+                model: [{
+                    "key": "wallpaper",
+                    "label": "Pictures",
+                    "icon": "wallpaper"
+                }, {
+                    "key": "live",
+                    "label": "Live",
+                    "icon": "movie"
+                }]
+
+                Item {
+                    id: kind
+
+                    required property var modelData
+                    readonly property bool on: face.displayMode === kind.modelData.key
+                    readonly property color content: kind.on ? Theme.fgAccent : Theme.subtext
+
+                    width: kindRail.width
+                    height: (kindRail.height - kindRail.spacing) / 2
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.shapeXl
+                        color: kind.on ? Theme.accent : Theme.withBlur(Theme.surfaceHigh)
+
+                        Behavior on color {
+                            ColorAnimation {
+                                duration: Theme.durDefaultEffects
+                            }
+
+                        }
+
+                        StateLayer {
+                            radius: Theme.shapeXl
+                            tint: kind.content
+                            onClicked: {
+                                face.pickerKindRequested(kind.modelData.key);
+                                searchInput.forceActiveFocus();
+                            }
+                        }
+
+                    }
+
+                    Column {
+                        anchors.centerIn: parent
+                        spacing: Theme.dp(6)
+
+                        Icon {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            name: kind.modelData.icon
+                            size: Theme.dp(26)
+                            fill: kind.on ? 1 : 0
+                            color: kind.content
+                        }
+
+                        LText {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            role: "labelLarge"
+                            text: kind.modelData.label
+                            color: kind.content
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        Loader {
+            id: pickerLoader
 
             anchors.fill: parent
-            visible: face.displayMode === "wallpaper"
-            model: face.wallpaperModel
-            heroW: face.wallHeroW
-            heroH: face.wallHeroH
-            midW: face.wallMidW
-            midH: face.wallMidH
-            smallW: face.wallSmallW
-            smallH: face.wallSmallH
-            itemGap: face.wallCardGap
-            appliedPath: face.appliedWallpaper
-            stableHeight: face.stableContentHeight
-            onChosen: (path) => {
-                return face.wallpaperChosen(path);
+            anchors.leftMargin: kindRail.visible ? face.kindRailWidth : 0
+            visible: face.pickerMode
+            source: face.pickerFiles[face.pickerStyle] || face.pickerFiles.strip
+            onLoaded: pickerRestore.restart()
+        }
+
+        // A style change is taken in this order on purpose: the old picker reports
+        // index 0 as it is torn down, and the new one does the same while its model
+        // arrives, neither of which is the user moving. So the index is read first,
+        // moves in the middle are ignored, and the new picker is put back where it was.
+        Connections {
+            function onWallpaperPickerStyleChanged() {
+                if (wallStrip)
+                    face.pickerIndex = wallStrip.currentIndex;
+
+                face.pickerSettling = true;
+                face.pickerStyle = Prefs.wallpaperPickerStyle;
+                pickerRestore.restart();
             }
-            onPreviewed: (path) => {
-                return face.wallpaperPreviewed(path);
+
+            target: Prefs
+        }
+
+        Timer {
+            id: pickerRestore
+
+            interval: 60
+            onTriggered: {
+                face.restorePickerIndex();
+                pickerSettle.restart();
             }
+        }
+
+        Timer {
+            id: pickerSettle
+
+            interval: 300
+            onTriggered: face.pickerSettling = false
+        }
+
+        // the picker styles share one interface; these hand it the panel's numbers
+        Binding { target: pickerLoader.item; property: "model"; value: face.wallpaperModel; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "heroW"; value: face.wallHeroW; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "heroH"; value: face.wallHeroH; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "midW"; value: face.wallMidW; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "midH"; value: face.wallMidH; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "smallW"; value: face.wallSmallW; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "smallH"; value: face.wallSmallH; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "tinyW"; value: face.wallTinyW; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "tinyH"; value: face.wallTinyH; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "itemGap"; value: face.wallCardGap; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "appliedPath"; value: face.appliedWallpaper; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "live"; value: face.displayMode === "live"; when: pickerLoader.item !== null }
+        Binding { target: pickerLoader.item; property: "stableHeight"; value: face.stableContentHeight; when: pickerLoader.item !== null }
+
+        Connections {
+            function onChosen(path) {
+                face.wallpaperChosen(path);
+            }
+
+            function onPreviewed(path) {
+                face.wallpaperPreviewed(path);
+            }
+
+            function onCurrentIndexChanged() {
+                if (pickerLoader.item && !face.pickerSettling)
+                    face.pickerIndex = pickerLoader.item.currentIndex;
+            }
+
+            target: pickerLoader.item
+            ignoreUnknownSignals: true
         }
 
     }
@@ -481,27 +654,39 @@ Item {
             selectionColor: Theme.alpha(Theme.accent, 0.35)
             selectedTextColor: Theme.text
             onTextChanged: face.resetSelection()
+            // the picker takes one pair of arrows (Settings -> Theme -> Arrow keys)
+            // and the search field keeps the other; Tiles is a grid and takes all four
             Keys.onUpPressed: {
                 if (face.listVisible)
                     resultList.step(-1);
+                else if (face.pickerMode && wallStrip && face.pickerGrid)
+                    wallStrip.stepVertical(-1);
+                else if (face.pickerMode && wallStrip && face.pickerUpDown)
+                    wallStrip.step(-1);
 
             }
             Keys.onDownPressed: {
                 if (face.listVisible)
                     resultList.step(1);
+                else if (face.pickerMode && wallStrip && face.pickerGrid)
+                    wallStrip.stepVertical(1);
+                else if (face.pickerMode && wallStrip && face.pickerUpDown)
+                    wallStrip.step(1);
 
             }
             Keys.onLeftPressed: (event) => {
-                if (face.displayMode === "wallpaper") {
-                    wallStrip.currentIndex = Math.max(0, wallStrip.currentIndex - 1);
+                if (face.pickerMode && (face.pickerGrid || !face.pickerUpDown)) {
+                    if (wallStrip)
+                        wallStrip.step(-1);
                     event.accepted = true;
                 } else {
                     event.accepted = false;
                 }
             }
             Keys.onRightPressed: (event) => {
-                if (face.displayMode === "wallpaper" && face.wallpaperModel) {
-                    wallStrip.currentIndex = Math.min(face.wallpaperModel.count - 1, wallStrip.currentIndex + 1);
+                if (face.pickerMode && (face.pickerGrid || !face.pickerUpDown) && face.wallpaperModel) {
+                    if (wallStrip)
+                        wallStrip.step(1);
                     event.accepted = true;
                 } else {
                     event.accepted = false;

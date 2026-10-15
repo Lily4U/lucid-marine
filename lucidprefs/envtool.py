@@ -257,6 +257,29 @@ def dirs_with(sub):
 
 
 NOSHADOW = "-noshadow"
+XCURSOR_MARK = "# written by lucid settings > environment\n"
+
+
+def inherits_of(theme):
+    """Every theme any copy of this one's index.theme names, read as chromium reads it."""
+    out = []
+    for d in ICON_DIRS:
+        for ln in read_lines(os.path.join(d, theme, "index.theme")) or []:
+            key, sep, val = ln.partition("=")
+            if sep and key.strip() == "Inherits":
+                out += [t.strip() for t in re.split(r"[,;]", val) if t.strip()]
+    return out
+
+
+def loops_back(theme, path=("default",)):
+    """True when the default theme inheriting this one would come back round.
+
+    chromium (steam's window) and older libxcursor follow Inherits= with no cycle
+    check, so a loop recurses until the stack runs out and the client crashes.
+    """
+    if theme in path or len(path) > 32:
+        return True
+    return any(loops_back(t, path + (theme,)) for t in inherits_of(theme))
 
 
 def cursor_themes():
@@ -551,24 +574,31 @@ def apply(cfg):
         }):
             touched.append("gtk2")
 
-    # what xwayland and plain qt clients read
+    # what xwayland and plain qt clients read. a theme whose chain leads back to
+    # default (a machine set to "default" adopts exactly that) is never written,
+    # and one an earlier version wrote is taken back so the system default shows
     if cursor:
         try:
-            os.makedirs(os.path.dirname(XCURSOR), exist_ok=True)
-            body = ("# written by lucid settings > environment\n"
-                    "[Icon Theme]\nName=Default\n"
-                    "Comment=Default Cursor Theme\n"
-                    f"Inherits={cursor}\n")
             old = ""
             try:
                 with open(XCURSOR, encoding="utf-8") as f:
                     old = f.read()
             except OSError:
                 pass
-            if old != body:
-                with open(XCURSOR, "w", encoding="utf-8") as f:
-                    f.write(body)
-                touched.append("xcursor")
+            if loops_back(cursor):
+                if old.startswith(XCURSOR_MARK):
+                    os.remove(XCURSOR)
+                    touched.append("xcursor")
+            else:
+                body = (XCURSOR_MARK +
+                        "[Icon Theme]\nName=Default\n"
+                        "Comment=Default Cursor Theme\n"
+                        f"Inherits={cursor}\n")
+                if old != body:
+                    os.makedirs(os.path.dirname(XCURSOR), exist_ok=True)
+                    with open(XCURSOR, "w", encoding="utf-8") as f:
+                        f.write(body)
+                    touched.append("xcursor")
         except OSError:
             pass
 

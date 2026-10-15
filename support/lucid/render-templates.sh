@@ -16,6 +16,9 @@
 #     Settings to show, and a template that failed says so in a toast
 #   - hyprland is reloaded when a template wrote into its config: it only
 #     reads its colours on a reload
+#   - running gtk4 apps repaint when a template wrote into ~/.config/gtk-4.0
+#   - in light mode every template but the shell's gets the surfaces the shell
+#     draws, not the near-white ones in the scheme (app-palette.py)
 #   - --skip leaves out the template that writes a given file, for files the
 #     caller writes itself
 #   - the colours are kept in ~/.cache/lucid/colours.json, so --again renders
@@ -118,6 +121,16 @@ trap 'rm -rf "$WORK"' EXIT
 : > "$WORK/list"
 : > "$WORK/results"
 
+# a light palette reaches the apps with the shell's own surfaces, walked off
+# white and tinted (app-palette.py). the shell's palette stays as it is: Theme.qml
+# does that itself, and twice would be too dark
+SHELL_OUT="$HOME/.cache/quickshell/matugen.json"
+APPS="$COLOURS"
+if [[ "$MODE" == light ]] &&
+    python3 "$HOME/.config/lucid/app-palette.py" --scheme "$COLOURS" > "$WORK/apps.json" 2>/dev/null; then
+    APPS="$WORK/apps.json"
+fi
+
 # split the config into what every template shares and one file per template;
 # [templates.x.y] belongs to x. the list gets index, name, input and output,
 # split by \037: a tab is whitespace to read, so an empty field would vanish
@@ -185,6 +198,7 @@ explain() {
 
 FAILED=()
 HYPR=0
+GTK=0
 while IFS=$'\037' read -r i name input output; do
     [[ -n "$ONLY" && "$name" != "$ONLY" ]] && continue
     out=$(resolve "$output")
@@ -205,8 +219,11 @@ while IFS=$'\037' read -r i name input output; do
         # beside the real config, so relative paths in it resolve the same
         one=$(mktemp "$CFG_DIR/.lucid-template-XXXXXX.toml")
         cat "$WORK/common" "$WORK/t$i" > "$one"
-        if report=$(matugen -c "$one" json "$COLOURS" -m "$MODE" 2>&1); then
+        src="$APPS"
+        [[ "$out" == "$SHELL_OUT" ]] && src="$COLOURS"
+        if report=$(matugen -c "$one" json "$src" -m "$MODE" 2>&1); then
             [[ "$out" == "$HOME/.config/hypr/"* ]] && HYPR=1
+            [[ "$out" == "$HOME/.config/gtk-4.0/"* ]] && GTK=1
         else
             state=failed
             error=$(explain <<< "$report")
@@ -248,6 +265,15 @@ else
 fi
 
 (( HYPR )) && { hyprctl reload &>/dev/null || true; }
+
+# gtk4 and libadwaita reread ~/.config/gtk-4.0/gtk.css when the colour scheme
+# changes, so flip it and back (apply-theme.sh does the same for its own write)
+if (( GTK )) && scheme=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null); then
+    scheme=${scheme//\'/}
+    [[ "$scheme" == prefer-light ]] && other=prefer-dark || other=prefer-light
+    gsettings set org.gnome.desktop.interface color-scheme "$other" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface color-scheme "$scheme" 2>/dev/null || true
+fi
 
 if (( ${#FAILED[@]} )); then
     echo "warning: matugen templates that did not render: ${FAILED[*]} (see $STATE)" >&2

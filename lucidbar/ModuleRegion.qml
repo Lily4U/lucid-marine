@@ -14,6 +14,17 @@ Region {
     readonly property real bh: reg.mod ? (reg.mod.surfaceHeight !== undefined ? reg.mod.surfaceHeight : reg.mod.height) : 0
     readonly property int rad: reg.mod ? reg.mod.barRadius : 0
 
+    // a module with per-corner radii names them; others fall back to barRadius
+    function corner(name, fallback) {
+        const v = reg.mod ? reg.mod[name] : undefined;
+        return Math.max(0, v !== undefined ? v : fallback);
+    }
+
+    readonly property real tlr: reg.corner("barTopLeftRadius", reg.mod ? reg.mod.barTopRadius : 0)
+    readonly property real trr: reg.corner("barTopRightRadius", reg.mod ? reg.mod.barTopRadius : 0)
+    readonly property real blr: reg.corner("barBottomLeftRadius", reg.rad)
+    readonly property real brr: reg.corner("barBottomRightRadius", reg.rad)
+
     function lo(v) {
         return Math.ceil(v - 0.002);
     }
@@ -28,22 +39,30 @@ Region {
         width: Math.max(0, reg.hi(reg.bx + reg.bw - reg.inset) - reg.lo(reg.bx + reg.inset))
         height: Math.max(0, reg.hi(reg.by + reg.bh - reg.inset) - reg.lo(reg.by + reg.inset))
         radius: Math.max(0, reg.rad - reg.inset)
-        topLeftRadius: (reg.mod && reg.mod.barTopRadius > 0) ? reg.mod.barTopRadius - reg.inset : 0
-        topRightRadius: (reg.mod && reg.mod.barTopRadius > 0) ? reg.mod.barTopRadius - reg.inset : 0
+        topLeftRadius: Math.max(0, reg.tlr - reg.inset)
+        topRightRadius: Math.max(0, reg.trr - reg.inset)
+        bottomLeftRadius: Math.max(0, reg.blr - reg.inset)
+        bottomRightRadius: Math.max(0, reg.brr - reg.inset)
     }
 
+    // bands put the flat edges back, stopping short of the rounder corner
+    readonly property real leftIn: Math.max(reg.tlr, reg.blr)
+    readonly property real rightIn: Math.max(reg.trr, reg.brr)
+    readonly property real topIn: Math.max(reg.tlr, reg.trr)
+    readonly property real bottomIn: Math.max(reg.blr, reg.brr)
+
     Region {
-        x: reg.lo(reg.bx + reg.rad)
+        x: reg.lo(reg.bx + reg.leftIn)
         y: reg.lo(reg.by)
-        width: reg.blur ? Math.max(0, reg.hi(reg.bx + reg.bw - reg.rad) - reg.lo(reg.bx + reg.rad)) : 0
+        width: reg.blur ? Math.max(0, reg.hi(reg.bx + reg.bw - reg.rightIn) - reg.lo(reg.bx + reg.leftIn)) : 0
         height: Math.max(0, reg.hi(reg.by + reg.bh) - reg.lo(reg.by))
     }
 
     Region {
         x: reg.lo(reg.bx)
-        y: reg.lo(reg.by + reg.rad)
+        y: reg.lo(reg.by + reg.topIn)
         width: reg.blur ? Math.max(0, reg.hi(reg.bx + reg.bw) - reg.lo(reg.bx)) : 0
-        height: Math.max(0, reg.hi(reg.by + reg.bh - reg.rad) - reg.lo(reg.by + reg.rad))
+        height: Math.max(0, reg.hi(reg.by + reg.bh - reg.bottomIn) - reg.lo(reg.by + reg.topIn))
     }
 
     // a module with several overlay parts hands them over as rects; anything else
@@ -116,8 +135,8 @@ Region {
         width: reg.pop ? Math.max(0, reg.hi(reg.px + reg.pop.width) - reg.lo(reg.px)) : 0
         height: reg.pop ? Math.max(0, reg.hi(reg.py + reg.pop.height) - reg.lo(reg.py)) : 0
         radius: reg.mod ? reg.mod.cornerRadius : 0
-        topLeftRadius: reg.mod ? reg.mod.topRadius : 0
-        topRightRadius: reg.mod ? reg.mod.topRadius : 0
+        topLeftRadius: reg.mod ? (reg.mod.popupTopLeftRadius !== undefined ? reg.mod.popupTopLeftRadius : reg.mod.topRadius) : 0
+        topRightRadius: reg.mod ? (reg.mod.popupTopRightRadius !== undefined ? reg.mod.popupTopRightRadius : reg.mod.topRadius) : 0
     }
 
 }

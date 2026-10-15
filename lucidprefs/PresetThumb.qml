@@ -116,7 +116,8 @@ ClippingRectangle {
             height: Math.max(Theme.dp(3), (Theme.dp(Prefs.dockIconSize) + Theme.dp(20)) * thumb.fit)
             radius: height * 0.3
             color: Theme.bgOpaque
-            visible: Prefs.dockEnabled && !Prefs.dockAutoHide
+            // a dynamic dock is up whenever the desktop is
+            visible: Prefs.dockEnabled && (!Prefs.dockAutoHide || Prefs.dockDynamicHide)
         }
 
     }

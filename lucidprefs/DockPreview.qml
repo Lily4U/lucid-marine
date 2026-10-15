@@ -98,7 +98,7 @@ Rectangle {
         anchors.rightMargin: Theme.dp(16)
         anchors.top: parent.top
         anchors.topMargin: Theme.dp(10)
-        text: (Prefs.dockNotch ? "Notch" : "Island") + (Prefs.dockAutoHide ? " · auto-hide" : "")
+        text: (Prefs.dockNotch ? "Notch" : "Island") + (Prefs.dockAutoHide ? (Prefs.dockDynamicHide ? " · dynamic hiding" : " · auto-hide") : "")
         color: Theme.subtextDim
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontLabel

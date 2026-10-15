@@ -403,3 +403,61 @@ def read_lucid_palette(path):
         return None
     mode = "light" if data.get("mode") == "light" else "dark"
     return {"name": str(data.get("name") or "").strip(), "mode": mode, "palette": pal}
+
+
+# ---- the shell's light surfaces, for apps ----
+# Theme.qml never draws a light palette as it comes: surface() walks the ladder
+# off white and tints it toward the accent. apps read the palette raw, so they
+# get the same surfaces from here or they sit beside the bars as flat paper.
+# the constants are Theme.qml's _tintLift and _tintTarget
+TINT_LIFT = 10
+TINT_TARGET = 0.13
+TINT_AUTO = 0.7
+SURFACE_ROLES = ("background", "surface", "surface_dim", "surface_bright", "surface_variant",
+                 "surface_container_lowest", "surface_container_low", "surface_container",
+                 "surface_container_high", "surface_container_highest")
+
+
+def light_tint():
+    """Settings -> General -> Accent tint, as Theme.qml reads it for a light palette."""
+    try:
+        with open(os.path.expanduser("~/.config/quickshell/lucidprefs/prefs.json"), encoding="utf-8") as f:
+            k = json.load(f).get("surfaceTint", -1)
+    except (OSError, ValueError, AttributeError):
+        k = -1
+    return float(k) if isinstance(k, (int, float)) and k >= 0 else TINT_AUTO
+
+
+def _tint(c, k, primary):
+    """Theme.qml's tint(): pull a neutral toward the accent's hue, then pin it
+    back on its own tone so the ladder keeps its spacing."""
+    if k <= 0 or max(primary) == min(primary):
+        return c
+    h, _, s = colorsys.rgb_to_hls(*primary)
+    t = tone(c)
+    pure = at_tone(colorsys.hls_to_rgb(h, 0.55, max(0.55, min(1, s))), t)
+    head = max(pure) - min(pure)
+    if head <= 0.001:
+        return c
+    f = min(1, k * TINT_TARGET / head)
+    return at_tone(tuple(a * (1 - f) + b * f for a, b in zip(c, pure)), t)
+
+
+def app_surfaces(pal, k=None):
+    """{role: hex} -> the same palette with every surface role where the shell
+    draws it. a dark palette, or a tint of 0, comes back unchanged."""
+    k = light_tint() if k is None else k
+    surface, primary = pal.get("surface"), pal.get("primary")
+    if not surface or not primary or tone(surface) <= 50 or k <= 0:
+        return dict(pal)
+    lowest = pal.get("surface_container_lowest") or surface
+    shift = max(0, tone(lowest) - (100 - k * TINT_LIFT))
+    out = dict(pal)
+    for role in SURFACE_ROLES:
+        v = pal.get(role)
+        if isinstance(v, str) and re.fullmatch(r"#[0-9a-fA-F]{6}", v):
+            c = P(v)
+            if shift:
+                c = at_tone(c, tone(c) - shift)
+            out[role] = hx(_tint(c, k, P(primary)))
+    return out

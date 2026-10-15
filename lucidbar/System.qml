@@ -1914,7 +1914,7 @@ BarPill {
                                     value: root.cpuPercent / 100
                                     center: root.cpuHistory.length > 0 ? Math.round(root.cpuPercent) + "" : "—"
                                     label: "CPU"
-                                    detail: root.cpuTemp > 0 ? Math.round(root.cpuTemp) + " °C" : ""
+                                    detail: root.cpuTemp > 0 ? Units.degUnit(root.cpuTemp) : ""
                                     tone: root.cpuTemp >= 85 ? Theme.error : Theme.accent
                                 }
 
@@ -2109,6 +2109,7 @@ BarPill {
                         width: subScroll.width
                         active: root.expanded && root.view === "bluetooth"
                         visible: root.view === "bluetooth"
+                        onCloseRequested: root.expanded = false
                     }
 
                     NightLightPanel {

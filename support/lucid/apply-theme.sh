@@ -72,7 +72,23 @@ if [[ "$STAGE" == shell ]]; then
     exit 0
 fi
 
-c() { jq -r --arg k "$1" '.[$k] // empty' "$PALETTE"; }
+STARTED=$(date +%s)
+
+# the files written below get a light palette's surfaces as the shell draws them,
+# walked off white and tinted (app-palette.py). the templates take the raw one,
+# render-templates.sh does the same to them, and so does the login screen
+APP_PALETTE="$PALETTE"
+if [[ "$MODE" == light ]]; then
+    APPS=$(mktemp)
+    trap 'rm -f "$APPS"' EXIT
+    if python3 "$HOME/.config/lucid/app-palette.py" "$PALETTE" > "$APPS" 2>/dev/null; then
+        APP_PALETTE="$APPS"
+    else
+        echo "warning: could not build the apps' light surfaces" >&2
+    fi
+fi
+
+c() { jq -r --arg k "$1" '.[$k] // empty' "$APP_PALETTE"; }
 strip() { echo "${1#\#}"; }
 
 PRIMARY=$(c primary)
@@ -304,15 +320,18 @@ for gtkdir in "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"; do
 EOF
 done
 
-# gtk apps only repaint when the theme name changes, so toggle it off and back
-if [[ "$(gsettings get org.gnome.desktop.interface gtk-theme 2>/dev/null)" != "" ]]; then
-    GTK_THEME_NAME=$(gsettings get org.gnome.desktop.interface gtk-theme)
-    gsettings set org.gnome.desktop.interface gtk-theme "" 2>/dev/null || true
-    gsettings set org.gnome.desktop.interface gtk-theme "${GTK_THEME_NAME//\'/}" 2>/dev/null || true
+# gtk4 and libadwaita reread ~/.config/gtk-4.0/gtk.css when the colour scheme
+# changes, so flip it and back. a gtk-theme toggle reloads only the theme's own
+# css, and gtk3 reads its gtk.css once at startup: those apps need a reopen
+if SCHEME=$(gsettings get org.gnome.desktop.interface color-scheme 2>/dev/null); then
+    SCHEME=${SCHEME//\'/}
+    [[ "$SCHEME" == prefer-light ]] && OTHER=prefer-dark || OTHER=prefer-light
+    gsettings set org.gnome.desktop.interface color-scheme "$OTHER" 2>/dev/null || true
+    gsettings set org.gnome.desktop.interface color-scheme "$SCHEME" 2>/dev/null || true
 fi
 
 # starship — only its palette table is repainted, the prompt stays the user's
-"$HOME/.config/lucid/sync-starship.sh" "$PALETTE" || echo "warning: could not repaint starship" >&2
+"$HOME/.config/lucid/sync-starship.sh" "$APP_PALETTE" || echo "warning: could not repaint starship" >&2
 
 # every other app with a matugen template. matugen only renders its templates
 # from a wallpaper, so here they get this theme's colours instead: a scheme
@@ -354,9 +373,19 @@ render_templates() {
 }
 render_templates || true
 
-# steam — millennium's material theme has its own matugen config
-if command -v matugen &>/dev/null && [[ -f "$HOME/.config/matugen-steam/config.toml" ]]; then
-    matugen -c "$HOME/.config/matugen-steam/config.toml" color hex "$PRIMARY" -m "$MODE" &>/dev/null &
+# steam — an older setup gave millennium's material theme a matugen config of its
+# own. the installer registers it as an ordinary template now, and once the
+# templates above have written that file this would only overwrite it, late, with
+# colours built from the accent alone
+STEAM_CFG="$HOME/.config/matugen-steam/config.toml"
+if command -v matugen &>/dev/null && [[ -f "$STEAM_CFG" ]]; then
+    STEAM_OUT=$(sed -n "s/^[[:space:]]*output_path[[:space:]]*=[[:space:]]*['\"]\([^'\"]*\)['\"].*/\1/p" "$STEAM_CFG" | head -n1)
+    STEAM_OUT="${STEAM_OUT/#\~/$HOME}"
+    if ! jq -e --arg o "$STEAM_OUT" --argjson since "$STARTED" \
+            '.time >= $since and any(.templates[]; .output == $o and .state == "ok")' \
+            "$HOME/.cache/lucid/templates.json" &>/dev/null; then
+        matugen -c "$STEAM_CFG" color hex "$PRIMARY" -m "$MODE" &>/dev/null &
+    fi
 fi
 
 # sddm — the login screen cannot read a per-user palette, so paint the theme.

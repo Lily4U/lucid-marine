@@ -624,6 +624,8 @@ BarPill {
                     root.skip(1);
                 else if (mouse.button === Qt.RightButton)
                     root.skip(-1);
+                else if (root.popupMode && root.expanded)
+                    root.expanded = false;
                 else
                     root.openPanel("player");
             }

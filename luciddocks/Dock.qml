@@ -18,11 +18,17 @@ PanelWindow {
     readonly property bool dockBusy: dockWindow.menuOpen || dockWindow.dragging || (dockWindow.morphing && !dockWindow.launcherFromHidden && !dockWindow.closingFromHidden)
     property bool slidingAway: false
     readonly property bool heldByPointer: revealArea.containsMouse || (shellHover.hovered && !dockWindow.slidingAway)
-    readonly property bool dockRevealed: !Prefs.dockAutoHide || dockWindow.dockBusy || dockWindow.heldByPointer
+    // on screen in its own right; a disabled dock never is
+    readonly property bool dockShown: Prefs.dockEnabled && (!dockWindow.hides || dockWindow.heldByPointer)
+    // dynamic hiding only tucks the dock away while the workspace has windows
+    readonly property bool hides: Prefs.dockAutoHide && (!Prefs.dockDynamicHide || dockWindow.dynamicHidden)
+    readonly property bool dockRevealed: dockWindow.dockShown || dockWindow.dockBusy
     property bool launcherFromHidden: false
     readonly property bool renderAsNotch: Prefs.dockNotch || dockWindow.launcherFromHidden
     readonly property int placementMargin: dockWindow.launcherFromHidden ? 0 : Prefs.effectiveDockBottomMargin
     readonly property real hiddenOffset: dockWindow.dockRevealed ? 0 : -(shell.implicitHeight + dockWindow.placementMargin - 1)
+    // a disabled dock's panel exists only while the launcher is up or shrinking away
+    readonly property bool shellShown: Prefs.dockEnabled || dockWindow.menuOpen || dockWindow.morphing
 
     onDockRevealedChanged: {
         if (dockWindow.dockRevealed) {
@@ -41,6 +47,95 @@ PanelWindow {
         onTriggered: dockWindow.slidingAway = false
     }
 
+    // the monitor the dock sits on
+    readonly property var dockMonitor: Hyprland.monitorFor(dockWindow.screen) || Hyprland.focusedMonitor
+    // quickshell never marks a special workspace active, so this comes from the monitor
+    readonly property string shownSpecial: {
+        const o = dockWindow.dockMonitor ? dockWindow.dockMonitor.lastIpcObject : null;
+        return o && o.specialWorkspace && o.specialWorkspace.name ? o.specialWorkspace.name : "";
+    }
+    // where the dock rests, down to the screen edge, in hyprland's coordinates
+    readonly property rect dockFootprint: {
+        const s = dockWindow.screen;
+        if (!s)
+            return Qt.rect(0, 0, 0, 0);
+
+        const h = shell.implicitHeight + Prefs.effectiveDockBottomMargin;
+        return Qt.rect(s.x + (s.width - shell.implicitWidth) / 2, s.y + s.height - h, shell.implicitWidth, h);
+    }
+    // the windows on screen: the monitor's workspace, plus a special one open over it
+    readonly property var windowsOnScreen: {
+        const out = {
+            "inTheWay": false,
+            "floating": false
+        };
+        const spaces = [dockWindow.dockMonitor ? dockWindow.dockMonitor.activeWorkspace : null];
+        if (dockWindow.shownSpecial !== "") {
+            for (const w of Hyprland.workspaces.values) {
+                if (w.name === dockWindow.shownSpecial)
+                    spaces.push(w);
+
+            }
+        }
+        for (const ws of spaces) {
+            if (!ws || !ws.toplevels)
+                continue;
+
+            for (const t of ws.toplevels.values) {
+                const o = t.lastIpcObject;
+                // no ipc data until the refresh an open event triggers
+                if (!o || !o.at || !o.size || o.hidden)
+                    continue;
+
+                if (o.floating && !o.fullscreen)
+                    out.floating = true;
+
+                if (dockWindow.inTheWay(o))
+                    out.inTheWay = true;
+
+            }
+        }
+        return out;
+    }
+    readonly property bool workspaceBusy: dockWindow.windowsOnScreen.inTheWay
+    readonly property bool dynamicWanted: Prefs.dockDynamicHide && dockWindow.workspaceBusy
+
+    // a tiled window always counts; a floating one only where it touches the dock
+    function inTheWay(o) {
+        if (!o.floating || o.fullscreen)
+            return true;
+
+        const r = dockWindow.dockFootprint;
+        return o.at[0] < r.x + r.width && o.at[0] + o.size[0] > r.x && o.at[1] < r.y + r.height && o.at[1] + o.size[1] > r.y;
+    }
+    // trails dynamicWanted, so a window flashing by or a quick run through
+    // workspaces never moves the dock
+    property bool dynamicHidden: false
+    readonly property int dynamicHideDelay: 350
+    readonly property int dynamicShowDelay: 500
+
+    onDynamicWantedChanged: {
+        if (dockWindow.dynamicHidden === dockWindow.dynamicWanted) {
+            dynamicDelay.stop();
+            return ;
+        }
+        dynamicDelay.interval = dockWindow.dynamicWanted ? dockWindow.dynamicHideDelay : dockWindow.dynamicShowDelay;
+        dynamicDelay.restart();
+    }
+
+    Timer {
+        id: dynamicDelay
+
+        onTriggered: dockWindow.dynamicHidden = dockWindow.dynamicWanted
+    }
+
+    Timer {
+        id: monitorRefresh
+
+        interval: 8
+        onTriggered: Hyprland.refreshMonitors()
+    }
+
     property int shellResizeMs: Theme.ms(60)
     readonly property var morphCurve: [0.4, 0, 0.2, 1, 1, 1]
 
@@ -48,7 +143,23 @@ PanelWindow {
     // own search prefixes, so callers pass the prefix they want
     function openLauncher(query) {
         dockWindow.setSearchText(query);
+        dockWindow.aimLauncher();
         dockWindow.menuOpen = true;
+    }
+
+    // with the dock off the launcher belongs to no display, so it opens on the
+    // one being worked on; with the dock on it grows out of the dock and stays
+    // there. shell.qml moves the window, so this runs before menuOpen flips
+    property var launcherScreen: null
+    // dropped once the dock is back on, or once that display is unplugged:
+    // a surface sent to a dead display is never drawn
+    readonly property var launcherPlacement: !Prefs.dockEnabled && dockWindow.launcherScreen && Quickshell.screens.indexOf(dockWindow.launcherScreen) >= 0 ? dockWindow.launcherScreen : null
+
+    function aimLauncher() {
+        if (dockWindow.menuOpen)
+            return ;
+
+        dockWindow.launcherScreen = Prefs.dockEnabled ? null : Monitors.focusedScreen;
     }
 
     function pulseMorph() {
@@ -66,7 +177,12 @@ PanelWindow {
 
     // every write to the search field goes through here, so the face is built
     // before anything tries to set text on it
-    function setSearchText(text) {
+    // the wallpaper picker opens on the tab of what is on the desktop: Live for a
+    // video. exact is the Pictures / Live switch asking for one tab in particular
+    function setSearchText(text, exact) {
+        if (text === ">wallpaper" && !exact && Prefs.liveWallpapers && LiveWall.isVideo(dockWindow.appliedWallpaper))
+            text = ">live";
+
         dockWindow.launcherBuilt = true;
         if (launcherLoader.item)
             launcherLoader.item.searchText = text;
@@ -85,7 +201,8 @@ PanelWindow {
             toplevelRefresh.restart();
 
         if (dockWindow.menuOpen) {
-            dockWindow.launcherFromHidden = Prefs.dockAutoHide && !dockWindow.heldByPointer;
+            // no dock on screen means it was opened from elsewhere, so it notches
+            dockWindow.launcherFromHidden = !dockWindow.dockShown;
             dockWindow.closingFromHidden = false;
             dockWindow.snapPlacement = true;
             snapClear.restart();
@@ -131,9 +248,16 @@ PanelWindow {
     property var scannedApps: []
     readonly property string currentTheme: Prefs.currentTheme
     property string pendingWallpaper: ""
+    property point pendingOrigin: Qt.point(-1, -1)
     property string appliedWallpaper: ""
+    // what the picker asked set-wallpaper.sh for since the desktop last caught up
+    property var requestedWallpapers: ({})
     property bool wallpaperArmed: false
-    readonly property bool dragging: pinnedRow.dragging || runningRow.dragging
+    // a pin on its way to the desktop keeps the dock up, or the drag would lose its source
+    readonly property bool dragging: pinnedRow.dragging || pinnedRow.sending || runningRow.dragging
+    // an in-dock drag takes the whole window for input; a pin in the air to the desktop must
+    // not, or the window (most of the screen's lower part) takes the drop instead of the desktop
+    readonly property bool maskWhole: (pinnedRow.dragging && !pinnedRow.sending) || runningRow.dragging
 
     readonly property var clientsData: {
         var out = [];
@@ -172,6 +296,20 @@ PanelWindow {
             case "movewindowv2":
                 toplevelRefresh.restart();
                 break;
+            case "activespecial":
+            case "activespecialv2":
+                if (Prefs.dockDynamicHide)
+                    monitorRefresh.restart();
+
+                break;
+            // fresh floating geometry for dynamic hiding
+            case "changefloatingmode":
+            case "fullscreen":
+            case "workspacev2":
+                if (Prefs.dockDynamicHide)
+                    toplevelRefresh.restart();
+
+                break;
             }
         }
     }
@@ -179,7 +317,8 @@ PanelWindow {
     // safety net for anything the events above miss
     Timer {
         interval: 4000
-        running: dockWindow.visible && (dockWindow.menuOpen || dockWindow.dockRevealed)
+        // floating windows move without an event, so dynamic hiding keeps checking
+        running: dockWindow.visible && (dockWindow.menuOpen || dockWindow.dockRevealed || (Prefs.dockDynamicHide && dockWindow.windowsOnScreen.floating))
         repeat: true
         onTriggered: Hyprland.refreshToplevels()
     }
@@ -260,6 +399,9 @@ PanelWindow {
         if (q.indexOf(">clip") === 0)
             return "clipboard";
 
+        if (q.indexOf(">live") === 0)
+            return "live";
+
         if (q.indexOf(">") === 0)
             return "commands";
 
@@ -286,6 +428,9 @@ PanelWindow {
         if (mode === "clipboard")
             return ">clip";
 
+        if (mode === "live")
+            return ">live";
+
         if (mode === "commands")
             return ">";
 
@@ -306,6 +451,9 @@ PanelWindow {
     }
 
     readonly property string mode: dockWindow.modeFor(dockWindow.rawQuery)
+    // pictures and videos share the picker: one tab each
+    readonly property bool pickerMode: dockWindow.mode === "wallpaper" || dockWindow.mode === "live"
+    readonly property var pickerModel: dockWindow.pickerModelFor(dockWindow.mode)
     readonly property string filterQuery: dockWindow.queryFor(dockWindow.rawQuery)
 
     onRawQueryChanged: {
@@ -317,11 +465,14 @@ PanelWindow {
         if (launcherLoader.item)
             launcherLoader.item.resetSelection();
     }
+    // onModeChanged reads the mode itself: pickerMode and pickerModel may not
+    // have caught up with it yet when the handler runs
     onModeChanged: {
-        if (dockWindow.mode === "wallpaper") {
+        if (dockWindow.mode === "wallpaper" || dockWindow.mode === "live") {
             // the cards outlive the menu, so the strip is on the current picture
-            // from the first frame rather than once the rescan lands
-            dockWindow.syncStripToCurrent();
+            // from the first frame rather than once the rescan lands; on the
+            // other tab (Pictures while a video plays) it starts at the first
+            dockWindow.syncStripToCurrent(true);
             wallpaperScanner.scan();
             dockWindow.wallpaperArmed = false;
             wallpaperArmTimer.restart();
@@ -430,16 +581,68 @@ PanelWindow {
     readonly property int wallCardGap: Theme.dp(10)
     readonly property int wallHeroW: Math.max(Theme.dp(280), Math.min(Theme.dp(420), Math.round(dockWindow.maxDockWidth * 0.177)))
     readonly property int wallHeroH: Math.round(dockWindow.wallHeroW * 0.62)
-    readonly property int wallMidW: Math.round(dockWindow.wallHeroW * 0.70)
+    // Settings -> Theme -> Strip: how fast the neighbours shrink (mid and small as shares of the hero)
+    readonly property var wallSteps: ({
+        "soft": [0.82, 0.64],
+        "normal": [0.70, 0.44],
+        "steep": [0.56, 0.30]
+    })[Prefs.wallpaperStripSteps] || [0.70, 0.44]
+    readonly property int wallMidW: Math.round(dockWindow.wallHeroW * dockWindow.wallSteps[0])
     readonly property int wallMidH: Math.round(dockWindow.wallMidW * 0.62)
-    readonly property int wallSmallW: Math.round(dockWindow.wallHeroW * 0.44)
+    readonly property int wallSmallW: Math.round(dockWindow.wallHeroW * dockWindow.wallSteps[1])
     readonly property int wallSmallH: Math.round(dockWindow.wallSmallW * 0.62)
-    readonly property int wallStripWidth: dockWindow.wallHeroW + 2 * (dockWindow.wallMidW + dockWindow.wallCardGap) + 2 * (dockWindow.wallSmallW + dockWindow.wallCardGap)
+    // a fourth, tiny tier when the strip shows three neighbours on each side
+    readonly property int wallTinyW: Math.round(dockWindow.wallSmallW * 0.68)
+    readonly property int wallTinyH: Math.round(dockWindow.wallTinyW * 0.62)
+    // the panel's width for the other styles, which lay themselves out in whatever
+    // they are given: what the strip takes with its default look, so that a wide
+    // strip (soft steps, three neighbours) does not widen the panel for them too
+    readonly property int wallBaseWidth: dockWindow.wallHeroW + 2 * (Math.round(dockWindow.wallHeroW * 0.70) + dockWindow.wallCardGap) + 2 * (Math.round(dockWindow.wallHeroW * 0.44) + dockWindow.wallCardGap)
+    readonly property int wallStripWidth: dockWindow.wallHeroW + 2 * (dockWindow.wallMidW + dockWindow.wallCardGap) + 2 * (dockWindow.wallSmallW + dockWindow.wallCardGap) + (Prefs.wallpaperStripSides === 3 ? 2 * (dockWindow.wallTinyW + dockWindow.wallCardGap) : 0)
     readonly property int wallHoverRoom: Theme.dp(12)
+    // Tiles: the panel is cut to its grid. More rows make it taller and fewer
+    // wallpapers narrower, instead of the tiles shrinking to fit a fixed panel
+    readonly property bool wallIsTiles: Prefs.wallpaperPickerStyle === "tiles"
+    readonly property int wallTilesRows: Math.max(2, Math.min(5, Math.round(Prefs.wallpaperTilesRows) || 2))
+    readonly property int wallTilesBase: Math.round(dockWindow.wallHeroH * 0.5)
+    // what the grid leaves around itself: a margin above, the caption and one below
+    readonly property int wallTilesChrome: Theme.dp(56)
+    // a grid may stand taller than the other panels (it grows with its rows) but not
+    // past this; only then do the tiles shrink, and the width follows the real size
+    readonly property real wallTilesContentMax: Math.max(dockWindow.menuContentMax, Math.round((dockWindow.screen ? dockWindow.screen.height : 1080) * 0.62))
+    readonly property int wallTilesTile: Math.max(Theme.dp(40), Math.min(dockWindow.wallTilesBase, Math.floor((dockWindow.wallTilesContentMax - dockWindow.wallTilesChrome) / dockWindow.wallTilesRows)))
+    readonly property int wallTilesCellW: Prefs.wallpaperTilesAspect === "wide" ? Math.round(dockWindow.wallTilesTile * 16 / 9) : dockWindow.wallTilesTile
+    // the Pictures / Live switch beside the picker, and the gap after it; only once
+    // the folder holds a video, so a folder of pictures keeps the plain picker
+    readonly property bool wallHasVideos: liveModel.count > 0 || LiveWall.isVideo(dockWindow.appliedWallpaper)
+    readonly property int wallKindRailWidth: Prefs.liveWallpapers && dockWindow.wallHasVideos ? Theme.dp(108) : 0
+    readonly property int wallTilesWidth: Math.ceil(dockWindow.pickerModel.count / dockWindow.wallTilesRows) * dockWindow.wallTilesCellW + Theme.dp(24)
+    // Pills: the row with every wallpaper in it, when that is narrower than the
+    // panel, so a short folder doesn't leave the panel wider than its pills
+    // (from WallpaperPills.qml's pillW, fullPillMax and openW)
+    readonly property int wallPillsWidth: {
+        var slims = Math.max(0, dockWindow.pickerModel.count - 1);
+        var gap = dockWindow.wallCardGap;
+        var row;
+        if (Prefs.wallpaperPillsShape === "full")
+            row = Math.max(dockWindow.wallHeroW + slims * (64 + gap), Math.ceil(slims * (64 + gap) / 0.6));
+        else if (Prefs.wallpaperPillsShape === "wave")
+            row = Math.round(dockWindow.wallHeroW * 0.9) + slims * (40 + gap);
+        else
+            row = dockWindow.wallHeroW + slims * (52 + gap);
+        return Math.min(dockWindow.wallBaseWidth + dockWindow.wallHoverRoom, row);
+    }
 
     readonly property real menuWidth: {
-        if (dockWindow.mode === "wallpaper")
-            return dockWindow.wallStripWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom;
+        if (dockWindow.pickerMode) {
+            if (dockWindow.wallIsTiles)
+                return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallTilesWidth + dockWindow.wallKindRailWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom), dockWindow.maxDockWidth - 48);
+
+            if (Prefs.wallpaperPickerStyle === "pills")
+                return Math.min(Math.max(Prefs.launcherPanelWidth, dockWindow.wallPillsWidth + dockWindow.wallKindRailWidth + dockWindow.panelPadding), dockWindow.maxDockWidth - 48);
+
+            return Math.min((Prefs.wallpaperPickerStyle === "strip" ? dockWindow.wallStripWidth : dockWindow.wallBaseWidth) + dockWindow.wallKindRailWidth + dockWindow.panelPadding + dockWindow.wallHoverRoom, dockWindow.maxDockWidth - 48);
+        }
 
         // the list plus its preview pane
         if (dockWindow.mode === "clipboard")
@@ -454,8 +657,8 @@ PanelWindow {
     readonly property real menuContentMin: dockWindow.resultsHeight > 0 || !launcherLoader.item ? Theme.dp(70) : Math.max(Theme.dp(70), launcherLoader.item.emptyHeight)
     readonly property real menuHeight: {
         var content;
-        if (dockWindow.mode === "wallpaper")
-            content = dockWindow.wallHeroH + 70;
+        if (dockWindow.pickerMode)
+            content = dockWindow.wallIsTiles ? dockWindow.wallTilesRows * dockWindow.wallTilesTile + dockWindow.wallTilesChrome : dockWindow.wallHeroH + Theme.dp(70);
         // fixed, so deleting entries doesn't shrink the preview under the cursor
         else if (dockWindow.mode === "clipboard")
             content = dockWindow.menuContentMax;
@@ -1327,9 +1530,15 @@ PanelWindow {
         dockWindow.rebuildResults();
     }
 
+    // a live wallpaper is the video, not the frame set-wallpaper.sh puts under it
     function currentWallpaperPath() {
         try {
-            return currentWallFile.text().trim();
+            var p = currentWallFile.text().trim();
+            if (p.indexOf("/lucid/live-frames/") === -1)
+                return p;
+
+            var live = LiveWall.video !== "" ? LiveWall.video : currentLiveFile.text().split("\n")[0].trim();
+            return live !== "" ? live : p;
         } catch (e) {
             return "";
         }
@@ -1340,27 +1549,83 @@ PanelWindow {
             return;
 
         dockWindow.pendingWallpaper = path;
+        // where the card being previewed sits, for transitions that grow from it
+        var picker = launcherLoader.item ? launcherLoader.item.wallStrip : null;
+        dockWindow.pendingOrigin = picker ? Qt.point(picker.originX, picker.originY) : Qt.point(-1, -1);
         wallpaperDebounce.restart();
     }
 
-    function applyWallpaper(path) {
+    // a point given as fractions of this window, as fractions of the screen it is on:
+    // the window is as wide as the panel, centred, and sits on the bottom edge
+    function screenFraction(o) {
+        if (!o || o.x < 0 || o.x > 1 || o.y < 0 || o.y > 1 || !dockWindow.screen || dockWindow.screen.width <= 0 || dockWindow.screen.height <= 0)
+            return null;
+
+        var sx = ((dockWindow.screen.width - dockWindow.width) / 2 + o.x * dockWindow.width) / dockWindow.screen.width;
+        var sy = (dockWindow.screen.height - dockWindow.height + o.y * dockWindow.height) / dockWindow.screen.height;
+        if (sx < 0 || sx > 1 || sy < 0 || sy > 1)
+            return null;
+
+        return Qt.point(sx, sy);
+    }
+
+    // origin: where the picked card sits, as fractions of the window (or nothing);
+    // with Settings -> Theme -> Origin on "chosen card" the transition grows from there.
+    // WALL_POS counts y from the bottom, set-wallpaper.sh ignores it for other types
+    function applyWallpaper(path, origin) {
         if (path === "")
             return;
 
         dockWindow.appliedWallpaper = path;
         wallpaperState.current = path;
-        Quickshell.execDetached([Quickshell.env("HOME") + "/.config/hypr/scripts/wallpaper/set-wallpaper.sh", path]);
+        dockWindow.requestedWallpapers[path] = true;
+        var cmd = [Quickshell.env("HOME") + "/.config/hypr/scripts/wallpaper/set-wallpaper.sh", path];
+        var pos = dockWindow.screenFraction(origin);
+        if (Prefs.wallTransOrigin === "card" && pos)
+            cmd = ["env", "WALL_POS=" + pos.x.toFixed(3) + "," + (1 - pos.y).toFixed(3)].concat(cmd);
+
+        Quickshell.execDetached(cmd);
     }
 
-    function syncStripToCurrent() {
-        for (var i = 0; i < wallpapersModel.count; i++) {
-            if (wallpapersModel.get(i).path === wallpaperState.current) {
+    // the wallpaper on the desktop changed. One the picker asked for earlier can
+    // land late (a video's first frame takes ffmpeg a while) while the selection
+    // has moved on: that is not news, and following it would pull the selection
+    // back. Anything else (a keybind, another tool) moves the picker to it.
+    function desktopWallpaperChanged() {
+        var p = dockWindow.currentWallpaperPath();
+        if (p === "")
+            return;
+
+        if (p === dockWindow.appliedWallpaper) {
+            dockWindow.requestedWallpapers = {};
+            return;
+        }
+        if (dockWindow.requestedWallpapers[p] === true)
+            return;
+
+        dockWindow.requestedWallpapers = {};
+        dockWindow.appliedWallpaper = p;
+        wallpaperState.current = p;
+        dockWindow.syncStripToCurrent();
+    }
+
+    function pickerModelFor(mode) {
+        return mode === "live" ? liveModel : wallpapersModel;
+    }
+
+    function syncStripToCurrent(orFirst) {
+        var model = dockWindow.pickerModelFor(dockWindow.mode);
+        for (var i = 0; i < model.count; i++) {
+            if (model.get(i).path === wallpaperState.current) {
                 if (launcherLoader.item)
                     launcherLoader.item.setWallpaperIndex(i);
 
                 return;
             }
         }
+        // not in this tab: the index left from the other one may not even exist here
+        if (orFirst && launcherLoader.item)
+            launcherLoader.item.setWallpaperIndex(0);
     }
 
     function switchTheme(id) {
@@ -1706,6 +1971,15 @@ PanelWindow {
             wallpaperScanner.scan(false);
         }
 
+        // the videos are only listed while live wallpapers are on, and the Live
+        // tab goes with them
+        function onLiveWallpapersChanged() {
+            wallpaperScanner.scan(false);
+            if (!Prefs.liveWallpapers && dockWindow.mode === "live")
+                dockWindow.setSearchText(">wallpaper", true);
+
+        }
+
         // the strip's cards and thumbnails are ready before it first opens
         function onLoadedChanged() {
             if (Prefs.loaded)
@@ -1745,6 +2019,7 @@ PanelWindow {
             if (!dockWindow.menuOpen)
                 dockWindow.setSearchText("");
 
+            dockWindow.aimLauncher();
             dockWindow.menuOpen = !dockWindow.menuOpen;
         }
 
@@ -1782,6 +2057,10 @@ PanelWindow {
             dockWindow.openLauncher(">wallpaper");
         }
 
+        function live(): void {
+            dockWindow.openLauncher(">live");
+        }
+
         function theme(): void {
             dockWindow.openLauncher(">theme");
         }
@@ -1811,6 +2090,7 @@ PanelWindow {
 
         function command(): void {
             dockWindow.setSearchText(">");
+            dockWindow.aimLauncher();
             dockWindow.menuOpen = true;
         }
 
@@ -1820,6 +2100,7 @@ PanelWindow {
 
         function search(q: string): void {
             dockWindow.setSearchText(q);
+            dockWindow.aimLauncher();
             dockWindow.menuOpen = true;
         }
 
@@ -1862,8 +2143,8 @@ PanelWindow {
         height: dockWindow.dockRevealed ? dockWindow.placementMargin + Theme.dp(3) : Theme.dp(3)
         hoverEnabled: true
         acceptedButtons: Qt.NoButton
-        enabled: Prefs.dockAutoHide
-        visible: Prefs.dockAutoHide
+        enabled: Prefs.dockEnabled && Prefs.dockAutoHide
+        visible: Prefs.dockEnabled && Prefs.dockAutoHide
     }
 
     // both dock popups live in one layer window of their own: hyprland frosts
@@ -1957,6 +2238,11 @@ PanelWindow {
         id: wallpapersModel
     }
 
+    // the videos in the same folder, with Settings -> Theme -> Live wallpapers on
+    ListModel {
+        id: liveModel
+    }
+
     // the strip rescan rides on wallpaperDir, which follows the theme
     onCurrentThemeChanged: dockWindow.rebuildResults()
 
@@ -1988,6 +2274,25 @@ PanelWindow {
         }
     }
 
+    // read once at start, before LiveWall has loaded it
+    FileView {
+        id: currentLiveFile
+
+        path: Quickshell.env("HOME") + "/.cache/current_live_wallpaper"
+        blockLoading: true
+        printErrors: false
+    }
+
+    // the frame under a video lands in current_wallpaper either side of the video
+    // itself, so the video is taken from LiveWall as well
+    Connections {
+        function onVideoChanged() {
+            dockWindow.desktopWallpaperChanged();
+        }
+
+        target: LiveWall
+    }
+
     FileView {
         id: currentWallFile
 
@@ -1996,13 +2301,7 @@ PanelWindow {
         watchChanges: true
         onFileChanged: reload()
         onLoaded: {
-            var p = text().trim();
-            if (p === "" || p === dockWindow.appliedWallpaper)
-                return;
-
-            dockWindow.appliedWallpaper = p;
-            wallpaperState.current = p;
-            dockWindow.syncStripToCurrent();
+            dockWindow.desktopWallpaperChanged();
         }
     }
 
@@ -2161,7 +2460,7 @@ PanelWindow {
         id: wallpaperDebounce
 
         interval: 250
-        onTriggered: dockWindow.applyWallpaper(dockWindow.pendingWallpaper)
+        onTriggered: dockWindow.applyWallpaper(dockWindow.pendingWallpaper, dockWindow.pendingOrigin)
     }
 
     Timer {
@@ -2236,63 +2535,100 @@ PanelWindow {
         property bool applyFallbackIfEmpty: true
         readonly property string script: Qt.resolvedUrl("./wallpaper-thumbs.sh").toString().replace("file://", "")
 
+        // a scan asked for while one runs waits for it: stopping one cut its
+        // output short, which read as an empty folder and put up the fallback
+        property bool again: false
+
         function scan(applyFallback) {
             wallpaperScanner.applyFallbackIfEmpty = applyFallback !== false;
-            wallpaperScanner.running = false;
-            wallpaperScanner.command = [wallpaperScanner.script, Prefs.wallpaperDir];
+            if (wallpaperScanner.running) {
+                wallpaperScanner.again = true;
+                return ;
+            }
+            wallpaperScanner.command = [wallpaperScanner.script, Prefs.wallpaperDir].concat(Prefs.liveWallpapers ? ["live"] : []);
             wallpaperScanner.running = true;
+        }
+
+        onExited: {
+            if (!wallpaperScanner.again)
+                return ;
+
+            wallpaperScanner.again = false;
+            wallpaperScanner.scan(wallpaperScanner.applyFallbackIfEmpty);
+        }
+
+        // the same files keep their cards, and with them their decoded images:
+        // a rebuild decoded every one again on each open
+        function fill(model, rows) {
+            var same = rows.length === model.count;
+            for (var j = 0; same && j < rows.length; j++) {
+                same = model.get(j).path === rows[j].path;
+            }
+            if (same) {
+                for (var m = 0; m < rows.length; m++) {
+                    if (model.get(m).thumb !== rows[m].thumb)
+                        model.setProperty(m, "thumb", rows[m].thumb);
+
+                }
+                return false;
+            }
+            model.clear();
+            for (var r = 0; r < rows.length; r++) {
+                var base = rows[r].path.substring(rows[r].path.lastIndexOf("/") + 1);
+                var dot = base.lastIndexOf(".");
+                model.append({
+                    "path": rows[r].path,
+                    "name": dot > 0 ? base.substring(0, dot) : base,
+                    "thumb": rows[r].thumb
+                });
+            }
+            return true;
         }
 
         stdout: StdioCollector {
             onStreamFinished: {
-                // path, then the small copy the strip decodes, or "" until it exists
-                var rows = [];
+                // path, the small copy the strip decodes ("" until it exists), and
+                // "video" for a live wallpaper
+                var pictures = [];
+                var videos = [];
                 var lines = text.split("\n");
                 for (var i = 0; i < lines.length; i++) {
                     var cols = lines[i].split("\t");
                     var p = cols[0].trim();
                     if (p !== "")
-                        rows.push({
+                        (cols.length > 2 && cols[2].trim() === "video" ? videos : pictures).push({
                         "path": p,
                         "thumb": cols.length > 1 ? cols[1].trim() : ""
                     });
 
                 }
-                // the same pictures keep their cards, and with them their decoded
-                // images: a rebuild decoded every one again on each open
-                var same = rows.length > 0 && rows.length === wallpapersModel.count;
-                for (var j = 0; same && j < rows.length; j++) {
-                    same = wallpapersModel.get(j).path === rows[j].path;
+                var changed = wallpaperScanner.fill(wallpapersModel, pictures);
+                changed = wallpaperScanner.fill(liveModel, videos) || changed;
+                // a picture without its thumbnail shows the original, a video shows
+                // nothing: look again while the thumbnails are being cut
+                if (videos.some((v) => {
+                    return v.thumb === "";
+                }) && thumbRetry.tries < 10) {
+                    thumbRetry.tries++;
+                    thumbRetry.restart();
+                } else {
+                    thumbRetry.tries = 0;
                 }
-                if (same) {
-                    for (var m = 0; m < rows.length; m++) {
-                        if (wallpapersModel.get(m).thumb !== rows[m].thumb)
-                            wallpapersModel.setProperty(m, "thumb", rows[m].thumb);
-
-                    }
-                    // the open already put the strip on the current picture
-                    return;
-                }
-                wallpapersModel.clear();
-                for (var r = 0; r < rows.length; r++) {
-                    var base = rows[r].path.substring(rows[r].path.lastIndexOf("/") + 1);
-                    var dot = base.lastIndexOf(".");
-                    wallpapersModel.append({
-                        "path": rows[r].path,
-                        "name": dot > 0 ? base.substring(0, dot) : base,
-                        "thumb": rows[r].thumb
-                    });
-                }
-                if (wallpapersModel.count === 0) {
+                if (wallpapersModel.count === 0 && liveModel.count === 0) {
                     if (wallpaperScanner.applyFallbackIfEmpty && dockWindow.appliedWallpaper !== dockWindow.fallbackWallpaper)
                         dockWindow.applyWallpaper(dockWindow.fallbackWallpaper);
 
                     return;
                 }
+                // the open already put the strip on the current picture
+                if (!changed)
+                    return;
+
+                var model = dockWindow.pickerModel;
                 var want = wallpaperState.current;
                 var idx = 0;
-                for (var k = 0; k < wallpapersModel.count; k++) {
-                    if (wallpapersModel.get(k).path === want) {
+                for (var k = 0; k < model.count; k++) {
+                    if (model.get(k).path === want) {
                         idx = k;
                         break;
                     }
@@ -2302,6 +2638,15 @@ PanelWindow {
             }
         }
 
+    }
+
+    Timer {
+        id: thumbRetry
+
+        property int tries: 0
+
+        interval: 1500
+        onTriggered: wallpaperScanner.scan(false)
     }
 
     Process {
@@ -2334,7 +2679,7 @@ PanelWindow {
         running: true
         repeat: true
         onTriggered: {
-            if (dockWindow.mode === "wallpaper")
+            if (dockWindow.pickerMode)
                 return;
 
             wallpaperWatch.command = ["sh", "-c", "d=\"" + Prefs.wallpaperDir + "\"; " + "cur=\"$1\"; " + "if [ -n \"$cur\" ] && [ ! -f \"$cur\" ]; then echo MISSING; fi; " + "if [ -d \"$d\" ]; then " + "f=$(find \"$d\" -maxdepth 1 -type f \\( -iname '*.jpg' -o -iname '*.jpeg' -o -iname '*.png' -o -iname '*.webp' \\) | sort | head -n1); " + "if [ -n \"$f\" ]; then echo \"FIRST:$f\"; fi; " + "fi; exit 0", "sh", dockWindow.appliedWallpaper];
@@ -2405,7 +2750,7 @@ PanelWindow {
         property bool dropActive: false
         property bool shellReady: false
 
-        visible: Prefs.dockEnabled || dockWindow.menuOpen
+        visible: dockWindow.shellShown
         clip: dockWindow.menuOpen || dockWindow.morphing
         anchors.bottom: parent.bottom
         anchors.bottomMargin: dockWindow.hiddenOffset + dockWindow.placementMargin
@@ -2542,6 +2887,7 @@ PanelWindow {
                         if (!dockWindow.menuOpen)
                             dockWindow.setSearchText("");
 
+                        dockWindow.aimLauncher();
                         dockWindow.menuOpen = !dockWindow.menuOpen;
                     }
                 }
@@ -2557,6 +2903,8 @@ PanelWindow {
                     id: pinnedRow
 
                     dragMode: "reorder"
+                    // with desktop icons on, a pin pulled off lands there instead of unpinning
+                    desktopDrop: DesktopIcons.live
                     model: appListModel
                     clients: dockWindow.clientsData
                     activeWorkspaceId: dockWindow.activeWorkspaceId
@@ -2633,13 +2981,17 @@ PanelWindow {
                 mode: dockWindow.mode
                 model: resultsModel
                 resultCount: dockWindow.resultCount
-                wallpaperModel: wallpapersModel
+                wallpaperModel: dockWindow.pickerModel
+                kindRailWidth: dockWindow.wallKindRailWidth
+                onPickerKindRequested: (kind) => dockWindow.setSearchText(kind === "live" ? ">live" : ">wallpaper", true)
                 wallHeroW: dockWindow.wallHeroW
                 wallHeroH: dockWindow.wallHeroH
                 wallMidW: dockWindow.wallMidW
                 wallMidH: dockWindow.wallMidH
                 wallSmallW: dockWindow.wallSmallW
                 wallSmallH: dockWindow.wallSmallH
+                wallTinyW: dockWindow.wallTinyW
+                wallTinyH: dockWindow.wallTinyH
                 wallCardGap: dockWindow.wallCardGap
                 appliedWallpaper: dockWindow.appliedWallpaper
                 highlightQuery: dockWindow.filterQuery
@@ -2667,7 +3019,8 @@ PanelWindow {
                 onClearRequested: Clip.wipe()
                 onWallpaperPreviewed: (path) => dockWindow.requestWallpaper(path)
                 onWallpaperChosen: (path) => {
-                    dockWindow.applyWallpaper(path);
+                    var picker = launcherLoader.item ? launcherLoader.item.wallStrip : null;
+                    dockWindow.applyWallpaper(path, picker ? Qt.point(picker.originX, picker.originY) : Qt.point(-1, -1));
                     dockWindow.menuOpen = false;
                 }
             }
@@ -2736,13 +3089,13 @@ PanelWindow {
     }
 
     mask: Region {
-        x: dockWindow.dragging ? 0 : shell.x
-        y: dockWindow.dragging ? 0 : shell.y
-        width: dockWindow.dragging ? dockWindow.width : shell.width
-        height: dockWindow.dragging ? dockWindow.height : shell.height
+        x: dockWindow.maskWhole ? 0 : shell.x
+        y: dockWindow.maskWhole ? 0 : shell.y
+        width: dockWindow.maskWhole ? dockWindow.width : (dockWindow.shellShown ? shell.width : 0)
+        height: dockWindow.maskWhole ? dockWindow.height : (dockWindow.shellShown ? shell.height : 0)
 
         Region {
-            item: Prefs.dockAutoHide ? revealArea : null
+            item: revealArea.enabled ? revealArea : null
         }
 
     }
@@ -2766,7 +3119,7 @@ PanelWindow {
     }
 
 
-    BackgroundEffect.blurRegion: (Theme.blurAmount > 0 && shell.shellReady) ? dockBlurRegion : null
+    BackgroundEffect.blurRegion: (Theme.blurAmount > 0 && shell.shellReady && dockWindow.shellShown) ? dockBlurRegion : null
 
     Region {
         id: dockBlurRegion

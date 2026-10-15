@@ -2,6 +2,240 @@
 
 All notable changes to Lucid are recorded here, newest first.
 
+## v1.20.1 — 2026-10-15
+
+A point release on top of Lucid 2: icons on the desktop, bar modules that join
+into one island, live wallpapers and three new ways to pick a wallpaper, five
+new widgets, files over Bluetooth, a Startup page, fingerprint unlock, and the
+fix for Steam opening and closing in a loop. Much of it is once again the work
+of **Ciro Rivera**, fifteen pull requests of it.
+
+### Fixed
+
+- **Steam no longer opens and closes in a loop.** *Settings → Environment*
+  writes the cursor theme into `~/.icons/default/index.theme`, the file that
+  says what the default cursor theme is, and on first start it takes the name
+  the machine already uses. On a machine where that name was `default`, the
+  default theme ended up inheriting itself. Steam's window, a Chromium inside,
+  follows that chain with no end and crashed each time it needed a cursor, so
+  it flashed up and vanished over and over (#55, #57). Lucid never writes such
+  a chain now and takes back one it wrote before, so the next start repairs it
+  with nothing to do. Thanks to @xherqs, who found the file.
+- **Steam gets the right graphics driver.** The installer left Steam's Vulkan
+  drivers to pacman, which picks NVIDIA's whenever no 32-bit driver is
+  installed yet. On an AMD or Intel machine that left Steam and every 32-bit
+  game without Vulkan. It now installs the drivers for the graphics cards the
+  machine has, and a re-run adds the one an earlier install left out.
+- **A second click on a bar module closes its pop-up**, as a click anywhere
+  else already did (#70).
+
+### From Ciro Rivera
+
+Fifteen pull requests, some reworked on the way in. Thank you, Ciro.
+
+#### Desktop icons
+
+<!-- picture: <img src="assets/whatsnew/1.20.1/desktop-icons.webp" alt="Folders, files and the Trash on the desktop beside the widgets"> -->
+
+- **Icons on the desktop.** Your `~/Desktop` folder on the wallpaper of the main
+  display, the way Windows, macOS and GNOME have it, turned on in *Settings →
+  General → Desktop icons*. Folders, files and apps are drawn by the icon theme
+  picked on the Environment page; pictures, videos, music with cover art and
+  documents show thumbnails; the Trash fills up, and USB sticks and phones
+  appear while they are mounted. Widgets keep their space: an icon under one
+  steps aside, live while the widget is dragged. In #64.
+- **It works like a real desktop.** Click, Ctrl- or Shift-click, or draw a box;
+  drag into a folder, onto the Trash or a drive, or out to a file manager or a
+  browser. Space opens a quick look, F2 renames, and the right-click menu
+  cascades into submenus: *New Item* from `~/Templates`, *Open With*, compress
+  and extract, tags, *Get Info*, undo, and *Send to* your folders, a phone over
+  KDE Connect or a device over Bluetooth (#66).
+- **Pins make shortcuts.** Pull a pinned app up off the dock and drop it on the
+  desktop for a launcher there; the pin stays on the dock.
+
+#### Bar
+
+<!-- picture: <img src="assets/whatsnew/1.20.1/bar-islands.webp" alt="Bar modules joined into islands, one with its panel open"> -->
+
+- **Modules that join into one island.** In *Settings → Bar → Arrangement* a
+  link sits between every two neighbours. Tap it and they sit flush as one
+  island, or one notch with its fillets only at the ends, with a faint line
+  where they meet (*Lines between joined modules*). A module opened in place
+  hangs its panel from its own stretch of the group, its corners curving into
+  the neighbours. In #67.
+- **Notched pop-ups**, off by default in *Settings → Bar*: in pop-up mode the
+  pop-up grows straight down out of its module or group, its corners blending
+  into the bar the way the notch's do.
+- **A full bar.** A third shape beside islands and notches: one strip across the
+  whole top edge with every module on it, hanging into the screen's corners
+  (*Screen corners* sizes them). Hovering a module lifts its own island out of
+  the strip, and an open panel curves into the strip where it meets it. In #16.
+- **Open on hover and auto-hide**, both off by default. A module can unfold
+  under the pointer without taking the keyboard from the window you are typing
+  in, and a click makes it an ordinary open panel. Auto-hide slides the bar up
+  out of sight and hands its space to the windows, and it comes back when the
+  pointer touches the top of the screen or a panel is open. In #16.
+
+#### Wallpapers
+
+<!-- picture: <img src="assets/whatsnew/1.20.1/wallpaper-picker.webp" alt="The wallpaper picker in its Tiles style, with the Pictures and Live switch beside it"> -->
+
+- **Four picker styles**, each with a live thumbnail in *Settings → Theme →
+  Wallpaper picker*: *Strip* (the carousel), *Pills*, *Tiles* and *Bento*.
+  *Arrow keys* on the same page moves the wallpaper with ← → or ↑ ↓, so the
+  arrows can stay with the search field. In #65.
+- **The transition is yours.** Presets (Soft, Circle, Sweep, Wave, Instant,
+  Random) or your own, saved and named: the effect, its length, angle and
+  curve, and whether it grows from the centre, the picked card or the cursor.
+  *Try transition* runs it on the wallpaper you have.
+- **Live wallpapers.** Videos in the wallpaper folder (mp4, webm, mkv, mov) get
+  a side of the picker of their own, and `>live` goes straight to them. A video
+  plays behind the desktop's icons and widgets, the colours come from its
+  first frame, and it holds still under windows, behind the lock screen and,
+  if you like, in game mode. *Settings → Theme → Live wallpapers* turns it off
+  and picks the decoder; on a hybrid laptop *Automatic* keeps the graphics card
+  asleep, and the same page lists the videos beside the pictures. In #73.
+
+#### Bluetooth
+
+- **Files, both ways.** A phone or laptop sending something brings a
+  notification with Accept and Decline, which then follows the transfer and
+  opens what arrived; *Settings → Bluetooth* picks the folder and whether paired
+  devices skip the question. *Send files* on a paired phone or computer, in the
+  control centre and in Settings, sends one file after another, with one
+  notification following it all. In #60.
+- **A pairing agent.** Nothing answered Bluetooth's pairing questions before, so
+  AirPods could come up connected with no sound and a phone that confirms a code
+  could not pair. The code now arrives as a notification with Pair and Decline.
+  *Answer pairing questions* turns it off where another app already does.
+
+#### Windows and displays
+
+- **Pinned windows stand out** with a border of their own from the palette and a
+  tab with a pin in a corner, which unpins the window on a click. **A window
+  asking for attention** gets a tab with a ringing bell once you are on its
+  workspace. Both are on *Settings → Windows*. In #61.
+- **The display map** lands a dragged display against a neighbour when it is let
+  go, never on top of one, and the arrow keys move a picked one. Pointing at a
+  box shows its number on the real screen. Resolution, refresh rate, scale,
+  rotation and mirroring now ask *Keep these display settings?* and go back by
+  themselves after 15 seconds. In #62.
+- **The launcher and the OSD** open on the display you are working on, unless
+  *Settings → Displays* pins the shell to one. In #63.
+
+#### Widgets and apps
+
+- **A GitHub widget**: your contributions as your profile draws them, as many
+  weeks as you drag it wide, or your streak. It needs only your username, no
+  token. In #69.
+- **The battery widget** no longer shows days of time left while plugged in and
+  full, and a battery held below a charge limit reads *Plugged in*, not
+  *Charging*. In #74.
+- **Qt and KDE apps follow the theme.** Prism Launcher, Dolphin, Kate and the
+  rest came up in light colours whatever the theme. With qt6ct installed, the
+  installer now gives Qt and KDE apps a colour scheme made from the theme; one
+  you picked yourself stays. In #68.
+- **Open GTK4 and libadwaita apps repaint** when the theme or the wallpaper
+  changes, instead of on their next start. In #75.
+
+#### Startup
+
+- **A Startup page.** *Settings → Startup* opens apps at login, sets environment
+  variables, and starts what apps put in `~/.config/autostart` when the session
+  does not (the plain Hyprland session never did, so an app's own *Start at
+  login* switch did nothing). It is kept in `~/.config/hypr/lucid-startup.lua`,
+  which an update never overwrites, unlike lines added by hand to
+  `modules/autostart.lua` and `modules/env.lua`. The page lists those lines too
+  and moves them over with one button, and variables that no longer help, such
+  as `MOZ_ENABLE_WAYLAND`, come with a note saying why. In #77.
+
+### New widgets
+
+<!-- picture: <img src="assets/whatsnew/1.20.1/widgets.webp" alt="The Expressive preset: shaped quick toggles and shortcuts, the sun and the day's progress"> -->
+
+- **Five new widgets, in Material You's shapes.** *Progress* shows how much of
+  the day, the week, the month and the year has gone, as a wavy ring, a bar
+  each, or the whole year as dots. *Quick toggles* puts Wi-Fi, Bluetooth, Do not
+  disturb and more on the desktop, as switches that turn into shapes when they
+  come on, a pill of buttons or Quick Settings tiles. *Shortcuts* sets your
+  dock's apps on shapes of their own, in a pill that blooms under the pointer,
+  or as a folder like a phone's. *Search* keeps the launcher's search on the
+  desktop, as a phone's search bar or over the launcher's modes. *Sun* works
+  out sunrise, sunset and the daylight left where you are.
+- **New faces.** The clock gains *Oval*, the time on a band across a round face,
+  and *Dial*, bold hands on a scalloped face with the seconds as a dot. The
+  weather gains *Details*. What is playing gets four that are not square:
+  *Pill*, *Orbit*, *Capsule*, and *Shape*, the cover cut to a shape of its own
+  that morphs with every track.
+- **An *Expressive* preset** lays the new ones out together.
+
+### Also new
+
+- **A dock that hides only when it is in the way.** *Settings → Dock →
+  Auto-hide → Dynamic* tucks it away while a tiled window is open on the
+  workspace, or a floating one overlaps it, and leaves it up on a clear desktop.
+- **A notched launcher.** With the dock hidden or turned off, the launcher opens
+  as a notch from the bottom edge.
+- **The Caps Lock and Num Lock cards can be turned off**, in *Settings → General
+  → On-screen display* (#59).
+- **Metric or imperial**, in *Settings → Date & Time → Units*: the weather in
+  the bar, on the lock screen and in the widgets, and the temperatures of the
+  processor, graphics card and drives, in °C and km/h or °F and mph, all at
+  once. It takes over from the °C or °F the weather widgets each had (#76).
+- **Apps match the shell in light mode.** Lucid's light bars and panels are
+  tinted toward the accent rather than plain white, but the apps it themes
+  (VSCodium, GTK and Qt apps, kitty and the rest) were given the raw,
+  near-white palette. They now get the same tinted surfaces. Dark mode is
+  unchanged.
+- **A new prompt and terminal.** The starship prompt shows how long the last
+  command took, then the folder and the git branch, with the prompt on a line of
+  its own. kitty draws a block cursor that leaves a short trail as it jumps and
+  stays a block at the prompt.
+
+### Contributed
+
+- **Fingerprint unlock.** With `fprintd` installed and a finger enrolled, the
+  lock screen takes a fingerprint at the same time as the password, whichever
+  comes first; a machine without a reader behaves as before. By @SKetU-l in #78.
+  The login screen takes one as well: press Enter on an empty field, then touch
+  the sensor.
+
+### Installer
+
+- New packages: `bluez-obex` (Bluetooth files), and `ffmpegthumbnailer` with
+  `gvfs` (the desktop icons' thumbnails, drives and Trash). Installing Steam
+  brings the Vulkan drivers for the machine's own graphics cards.
+- **The new `starship.toml` and `kitty.conf`** replace the copies an earlier
+  release installed, keeping a backup. One you have changed is left alone; the
+  new ones are in `support/look/`.
+- Where the desktop icons sit carries over a reinstall.
+- **The login screen's fingerprint** is asked about when `fprintd` is installed,
+  since it adds two marked lines to `/etc/pam.d/sddm` (backed up first, a typed
+  password still checked before the reader).
+  `sudo support/sddm/install-theme.sh --no-fingerprint` takes them out.
+- A Hyprland config of your own gets `require("modules.startup")` appended, so
+  the Startup page works there too.
+
+### Upgrading
+
+```sh
+git pull
+./install.sh
+```
+
+- **Steam still looping before you update?** Delete
+  `~/.icons/default/index.theme` and start it again. After the update Lucid
+  takes that file back by itself.
+- **Steam on an AMD or Intel machine** that came in with an earlier install gets
+  its missing 32-bit Vulkan driver from the installer.
+- **Bluetooth file transfer** needs `bluez-obex`, and the Qt and KDE colours
+  need `qt6ct`: the installer adds the first and sets up the second when qt6ct
+  is there.
+- **Fingerprint unlock** needs `fprintd` and an enrolled finger:
+  `sudo pacman -S fprintd`, then `fprintd-enroll`. Run `./install.sh` after
+  that for the login screen, and a fingerprint login leaves GNOME Keyring
+  locked until you next type the password.
+
 ## v1.20 — 2026-10-08
 
 Lucid 2. Every surface is redrawn in Material You Expressive on one shared kit

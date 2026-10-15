@@ -124,11 +124,21 @@ if grep -q '^Theme-Id=lucid$' "$DIR/metadata.desktop" 2>/dev/null; then
         return 0
     }
     trap cleanup EXIT
+    # the greeter offers a fingerprint only to an account with one enrolled.
+    # fprintd-list lists them as " - #0: right-index-finger"
+    FINGER=false
+    if command -v fprintd-list &>/dev/null; then
+        ENROLLED=$(timeout 5 fprintd-list "$ME" 2>/dev/null || true)
+        FINGER_RE='#[0-9]+:'
+        [[ $ENROLLED =~ $FINGER_RE ]] && FINGER=true
+    fi
+
     TMPC=$(mktemp "$OUT/.theme.conf.XXXXXX")
     {
         echo "[General]"
         echo "# written by sync-sddm.sh from $ME's running shell. edits are overwritten."
         echo "background=background.jpg"
+        echo "fingerprint=$FINGER"
         echo
         python3 - "$TOKENS" <<'PY'
 import json, sys

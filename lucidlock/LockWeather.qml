@@ -36,7 +36,7 @@ Item {
 
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                text: wx.report ? wx.report.tempC + "°" : "—"
+                text: wx.report ? Units.deg(wx.report.tempC, wx.report.tempF) : "—"
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontHeadlineMd
@@ -68,7 +68,7 @@ Item {
                         if (!wx.report || !wx.report.days || wx.report.days.length === 0)
                             return Loc.place;
 
-                        return "H " + wx.report.days[0].maxC + "°  L " + wx.report.days[0].minC + "°  ·  feels " + wx.report.feelsC + "°";
+                        return "H " + Units.deg(wx.report.days[0].maxC, wx.report.days[0].maxF) + "  L " + Units.deg(wx.report.days[0].minC, wx.report.days[0].minF) + "  ·  feels " + Units.deg(wx.report.feelsC, wx.report.feelsF);
                     }
                     color: Theme.subtextDim
                     font.family: Theme.fontFamily

@@ -116,6 +116,7 @@ Item {
         "media": "music song player spotify mpris audio album",
         "visualiser": "visualizer audio music sound cava spectrum bars",
         "games": "steam play gaming library",
+        "github": "git contributions commits code streak heatmap",
         "weather": "forecast temperature rain sun",
         "notes": "sticky memo text note write",
         "todo": "tasks checklist list reminders",
@@ -124,7 +125,12 @@ Item {
         "timer": "pomodoro stopwatch countdown alarm focus",
         "glance": "summary date weather next",
         "photo": "pictures images gallery slideshow frame",
-        "fetch": "neofetch fastfetch system info terminal"
+        "fetch": "neofetch fastfetch system info terminal",
+        "progress": "day week month year percent time left remaining countdown",
+        "toggles": "quick settings switches wifi bluetooth do not disturb dnd dark mode night light caffeine keep awake mute microphone",
+        "shortcuts": "apps launcher favourites favorites pinned dock icons open",
+        "search": "launcher find search bar web emoji clipboard wallpapers commands",
+        "sun": "sunrise sunset daylight dawn dusk day length"
     })
 
     // every word has to turn up somewhere in the widget's names, blurbs and keywords

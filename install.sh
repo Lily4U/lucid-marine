@@ -124,7 +124,7 @@ PKG_REQUIRED=(quickshell qt6-5compat qt6-declarative qt6-multimedia)
 # each of these backs one feature; missing ones degrade that feature only
 PKG_FEATURES=(
     matugen jq imagemagick
-    networkmanager qrencode bluez bluez-utils
+    networkmanager qrencode bluez bluez-utils bluez-obex
     kdeconnect sshfs python-gobject
     libpulse wireplumber brightnessctl upower hypridle hyprsunset
     grim wf-recorder ffmpeg wl-clipboard wtype cliphist
@@ -150,6 +150,8 @@ PKG_FEATURES=(
     pipewire-audio sound-theme-freedesktop
     # the Storage page: a drive's health, and mounting or ejecting one
     smartmontools udisks2
+    # the desktop icons: video and music thumbnails, and the drives and trash they show
+    ffmpegthumbnailer gvfs
 )
 # invoked by the shipped Hyprland binds and the Lucid look. without these the
 # config installs fine but its keys do nothing and the prompt renders as boxes
@@ -207,6 +209,39 @@ have_pkg() {
     return 1
 }
 
+# the vulkan drivers, 64 and 32-bit, for the gpus this machine actually has.
+# steam's are virtual dependencies, and --noconfirm settles each one with its
+# first provider: nvidia-utils and lib32-nvidia-utils. on an intel or amd box
+# with no 32-bit driver yet, that leaves the client and every 32-bit game
+# without vulkan, and nvidia's userspace on a machine with no nvidia card
+steam_drivers() {
+    local card vendor out="" seen=" " known=0
+    for card in /sys/class/drm/card*; do
+        [[ ${card##*/} =~ ^card[0-9]+$ && -r $card/device/vendor ]] || continue
+        vendor=$(< "$card/device/vendor")
+        [[ $seen == *" $vendor "* ]] && continue
+        seen+="$vendor "
+        case $vendor in
+            0x1002) out+=" vulkan-radeon lib32-vulkan-radeon" ;;
+            0x8086) out+=" vulkan-intel lib32-vulkan-intel" ;;
+            0x1af4) out+=" vulkan-virtio lib32-vulkan-virtio" ;;
+            # the 32-bit half has to match nvidia-utils, so it is named only
+            # beside that exact package; a legacy branch keeps its own, and
+            # with no proprietary driver at all the card runs nouveau
+            0x10de)
+                known=1
+                if pacman -Qq nvidia-utils &>/dev/null; then
+                    out+=" lib32-nvidia-utils"
+                elif [[ ! -r /proc/driver/nvidia/version ]]; then
+                    out+=" vulkan-nouveau lib32-vulkan-nouveau"
+                fi ;;
+        esac
+    done
+    # a vm or anything unrecognised gets the software driver, never nvidia's
+    [[ -n $out || $known -eq 1 ]] || out=" vulkan-swrast lib32-vulkan-swrast"
+    printf '%s\n' "${out# }"
+}
+
 missing=()
 DEPS_OK=1
 
@@ -237,6 +272,13 @@ if [[ $WITH_APPS -eq 1 ]]; then
         fi
         WANTED+=("$p")
     done
+fi
+
+# named in the same transaction as steam, so pacman never has to pick. a re-run
+# adds what an earlier install left out (its only 32-bit driver nvidia's)
+if [[ " ${WANTED[*]} " == *" steam "* ]]; then
+    read -ra STEAM_DRIVERS <<< "$(steam_drivers)"
+    WANTED+=("${STEAM_DRIVERS[@]}")
 fi
 
 for p in "${WANTED[@]}"; do
@@ -333,6 +375,7 @@ else
         --exclude='./lucidmoji/state.json' \
         --exclude='./lucidkeys/state.json' \
         --exclude='./lucidwidgets/widgets.json' \
+        --exclude='./luciddesktop/icons.json' \
         . | tar -C "$SHELL_DIR" -xf -
     say "  shell files -> $SHELL_DIR"
 fi
@@ -468,6 +511,12 @@ seed moji-config.json      lucidmoji/config.json
 seed moji-state.json       lucidmoji/state.json
 seed keys-state.json       lucidkeys/state.json
 seed widgets.json          lucidwidgets/widgets.json
+# where the desktop icons sit has no shipped default: only carried over
+if [[ ! -s "$SHELL_DIR/luciddesktop/icons.json" && -n "$BACKUP" && -s "$BACKUP/luciddesktop/icons.json" ]]; then
+    mkdir -p "$SHELL_DIR/luciddesktop"
+    cp "$BACKUP/luciddesktop/icons.json" "$SHELL_DIR/luciddesktop/icons.json"
+    say "  carried over luciddesktop/icons.json"
+fi
 
 # the media visualiser runs `cava -p ~/.config/cava/quickshell.conf`. without
 # that file cava falls back to its own defaults, which emit ncurses output
@@ -795,6 +844,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     install -m755 "$SRC/support/lucid/scheme-gallery.py"   "$LUCID_DIR/scheme-gallery.py"
     install -m755 "$SRC/support/lucid/palette-edit.py"     "$LUCID_DIR/palette-edit.py"
     install -m755 "$SRC/support/lucid/gen-light-palette.py" "$LUCID_DIR/gen-light-palette.py"
+    install -m755 "$SRC/support/lucid/app-palette.py"      "$LUCID_DIR/app-palette.py"
     install -m755 "$SRC/support/lucid/set-mode.sh"         "$LUCID_DIR/set-mode.sh"
     install -m755 "$SRC/support/lucid/sync-sddm.sh"        "$LUCID_DIR/sync-sddm.sh"
     install -m755 "$SRC/support/lucid/sync-starship.sh"    "$LUCID_DIR/sync-starship.sh"
@@ -808,7 +858,17 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     # theme; every account paints its own corner of it without a password
     if [[ -d /usr/share/sddm/themes ]]; then
         SDDM_THEME_DIR=/usr/share/sddm/themes/lucid
-        if sudo bash "$SRC/support/sddm/install-theme.sh" "$SDDM_THEME_DIR"; then
+        # a fingerprint at the login screen needs two lines in sddm's pam
+        # service, so it is asked for once and then kept on every re-run
+        SDDM_FINGER=()
+        if [[ -e /usr/lib/security/pam_fprintd.so ]]; then
+            if grep -q '^# >>> lucid: fingerprint login' /etc/pam.d/sddm 2>/dev/null; then
+                SDDM_FINGER=(--fingerprint)
+            elif ask "  Let the login screen take a fingerprint too? (two lines in /etc/pam.d/sddm, backed up first)"; then
+                SDDM_FINGER=(--fingerprint)
+            fi
+        fi
+        if sudo bash "$SRC/support/sddm/install-theme.sh" "$SDDM_THEME_DIR" "${SDDM_FINGER[@]}"; then
             say "  sddm theme      -> $SDDM_THEME_DIR"
             # the theme no longer carries a shared wallpaper, so paint this
             # account's corner now rather than at its next login. it reads
@@ -896,6 +956,13 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     add_template pywalfox       "$TPL/pywalfox-colors.json"    '~/.cache/wal/colors.json'      "cmd:pywalfox" 'pywalfox update'
     add_template steam-material "$TPL/steam-material.css"      '~/.local/share/Steam/millennium/themes/Material-Theme/css/main/colors/matugen.css' \
                                 "dir:$HOME/.local/share/Steam/millennium/themes/Material-Theme"
+    # Qt widget apps take their palette from qt6ct, the platform theme
+    # modules/env.lua sets. KDE apps then lay a KDE colour scheme over it, so
+    # they get one too - both are pointed at below. qt6ct watches its own
+    # folder but not colors/, so the hook touches qt6ct.conf for open apps
+    add_template qt6ct          "$TPL/qt6ct-colors.conf"       '~/.config/qt6ct/colors/lucid.conf' "cmd:qt6ct" \
+                                'touch -c ~/.config/qt6ct/qt6ct.conf'
+    add_template kde            "$TPL/kde-colors.colors"       '~/.local/share/color-schemes/Lucid.colors' "cmd:qt6ct"
 
     # firefox and zen keep their chrome css inside a generated profile dir, so
     # the path has to be discovered rather than assumed
@@ -915,6 +982,50 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     (( ${#MG_ADDED[@]} ))   && say "  matugen added:   ${MG_ADDED[*]}"                                || true
     (( ${#MG_KEPT[@]} ))    && say "  ${dim}matugen kept:    ${MG_KEPT[*]}${r}"                       || true
     (( ${#MG_SKIPPED[@]} )) && say "  ${dim}matugen skipped: ${MG_SKIPPED[*]} (not installed)${r}"    || true
+
+    # put keys under [section] of an ini file, creating the section - or the
+    # file - when it isn't there
+    ini_add_keys() {
+        local file=$1 section=$2 keys=$3
+        mkdir -p "$(dirname "$file")"
+        if [[ ! -f "$file" ]]; then
+            printf '[%s]\n%s\n' "$section" "$keys" > "$file"
+        elif grep -qxF "[$section]" "$file"; then
+            awk -v s="[$section]" -v k="$keys" '{ print } $0 == s { print k }' "$file" > "$file.lucid-tmp" \
+                && cat "$file.lucid-tmp" > "$file"
+            rm -f "$file.lucid-tmp"
+        else
+            printf '\n[%s]\n%s\n' "$section" "$keys" >> "$file"
+        fi
+    }
+
+    # with no palette chosen in qt6ct, Qt apps (Prism Launcher, qt6ct itself...)
+    # get Qt's stock light one whatever the theme. a palette already picked
+    # there is the user's and stays
+    QT6CT_CFG="$HOME/.config/qt6ct/qt6ct.conf"
+    if command -v qt6ct &>/dev/null && grep -q '^\[templates\.qt6ct\]' "$MATUGEN_CFG"; then
+        if grep -qE '^(custom_palette|color_scheme_path)=' "$QT6CT_CFG" 2>/dev/null; then
+            say "  ${dim}qt6ct already has a palette${r}"
+        else
+            ini_add_keys "$QT6CT_CFG" Appearance \
+                "color_scheme_path=$HOME/.config/qt6ct/colors/lucid.conf"$'\n'"custom_palette=true"
+            say "  qt6ct now uses the theme's palette"
+        fi
+    fi
+
+    # outside Plasma, a KDE app (Dolphin, Kate, Okular...) with no colour scheme
+    # named in kdeglobals swaps the qt6ct palette for Breeze Light or Dark as it
+    # starts, so name Lucid's. one already named - by Plasma under [General] or
+    # by the user - stays
+    KDEGLOBALS="$HOME/.config/kdeglobals"
+    if command -v qt6ct &>/dev/null && grep -q '^\[templates\.kde\]' "$MATUGEN_CFG"; then
+        if grep -q '^ColorScheme=' "$KDEGLOBALS" 2>/dev/null; then
+            say "  ${dim}kdeglobals already names a colour scheme${r}"
+        else
+            ini_add_keys "$KDEGLOBALS" UiSettings "ColorScheme=Lucid"
+            say "  KDE apps now use the theme's colour scheme"
+        fi
+    fi
 
     # GTK apps - Nautilus included - only read colors.css if gtk.css imports it
     for gtkver in 3.0 4.0; do
@@ -1021,6 +1132,24 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         # kitty - the include is what makes matugen's colours apply at all
         KITTY_CFG="$HOME/.config/kitty/kitty.conf"
         KITTY_EXISTED=0; [[ -f "$KITTY_CFG" ]] && KITTY_EXISTED=1
+
+        # a kitty.conf an earlier install shipped, with nothing of the user's
+        # in it: every setting is one Lucid wrote, then or now. that copy is
+        # swapped for the current one; any other is theirs and only gets the
+        # includes below
+        kitty_is_lucids() {
+            [[ $(head -n1 "$1") == "# Lucid — kitty" ]] || return 1
+            local ours extra
+            ours=$(grep -vE '^[[:space:]]*(#|$)' "$SRC/support/look/kitty.conf"; printf '%s\n' "background_opacity 0.7")
+            extra=$(grep -vE '^[[:space:]]*(#|$)' "$1" | grep -vxF -e "$ours" || true)
+            [[ -z $extra ]]
+        }
+        if [[ -f "$KITTY_CFG" ]] && ! cmp -s "$KITTY_CFG" "$SRC/support/look/kitty.conf" && kitty_is_lucids "$KITTY_CFG"; then
+            cp "$KITTY_CFG" "$KITTY_CFG.backup-$STAMP"
+            cp "$SRC/support/look/kitty.conf" "$KITTY_CFG"
+            say "  kitty.conf -> the current Lucid one (the old copy: kitty.conf.backup-$STAMP)"
+        fi
+
         if [[ -f "$HOME/.config/kitty/kitty.conf" ]]; then
             if grep -q "matugen-colors.conf" "$HOME/.config/kitty/kitty.conf"; then
                 say "  ${dim}kitty.conf already includes matugen-colors.conf${r}"
@@ -1113,13 +1242,30 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         # only its [palettes.colors] block on every theme change, so this
         # file is what makes the prompt look like Lucid's
         STARSHIP_CFG="$HOME/.config/starship.toml"
+        # the prompt without its colour table, which every theme repaints.
+        # the older ones are the prompts earlier releases shipped
+        starship_shape() { awk '/^\[/ { skip = ($0 == "[palettes.colors]") } !skip' "$1" | md5sum | cut -c1-32; }
+        STARSHIP_OLD_SHAPES="45f0cc0634e505763613a1c4b8bbdbc5 fc6cc84e525ac275570158a41d7dfc66"
         if [[ ! -f "$STARSHIP_CFG" ]]; then
             cp "$SRC/support/look/starship.toml" "$STARSHIP_CFG"
             say "  starship.toml -> ~/.config/starship.toml"
         elif grep -q '^\[palettes.colors\]' "$STARSHIP_CFG"; then
-            # already the Lucid prompt. its colours are whatever the current
-            # theme painted, so re-copying would only reset them to the seed
-            say "  ${dim}keeping your starship.toml (already the Lucid prompt)${r}"
+            shape=$(starship_shape "$STARSHIP_CFG")
+            if [[ $shape == "$(starship_shape "$SRC/support/look/starship.toml")" ]]; then
+                # its colours are whatever the current theme painted, so
+                # re-copying would only reset them to the seed
+                say "  ${dim}keeping your starship.toml (already the Lucid prompt)${r}"
+            elif [[ " $STARSHIP_OLD_SHAPES " == *" $shape "* ]]; then
+                # an earlier release's prompt, untouched: the new one goes in
+                # and takes the current theme's colours straight away
+                cp "$STARSHIP_CFG" "$STARSHIP_CFG.backup-$STAMP"
+                cp "$SRC/support/look/starship.toml" "$STARSHIP_CFG"
+                [[ -x "$LUCID_DIR/sync-starship.sh" ]] && "$LUCID_DIR/sync-starship.sh" &>/dev/null || true
+                say "  starship.toml -> the new Lucid prompt (the old one: starship.toml.backup-$STAMP)"
+            else
+                # a Lucid prompt someone has made their own
+                say "  ${dim}keeping your starship.toml; the new Lucid prompt is support/look/starship.toml${r}"
+            fi
         else
             cp "$STARSHIP_CFG" "$STARSHIP_CFG.backup-$STAMP"
             cp "$SRC/support/look/starship.toml" "$STARSHIP_CFG"
@@ -1177,6 +1323,8 @@ TRAPWINCH() { zle && { zle reset-prompt; zle -R } }'    zsh
             cp "$SRC/support/hypr/modules/glass.lua" "$HYPR_DIR/modules/glass.lua"
             # and so do the options Settings > Windows sets, in lucid-settings.lua
             cp "$SRC/support/hypr/modules/settings.lua" "$HYPR_DIR/modules/settings.lua"
+            # and the apps and variables Settings > Startup keeps, in lucid-startup.lua
+            cp "$SRC/support/hypr/modules/startup.lua" "$HYPR_DIR/modules/startup.lua"
             if grep -q 'require("modules.lucid-look")' "$HYPR_DIR/hyprland.lua"; then
                 say "  ${dim}hyprland.lua already requires modules.lucid-look${r}"
             else
@@ -1199,6 +1347,14 @@ TRAPWINCH() { zle && { zle reset-prompt; zle -R } }'    zsh
                     || cp "$HYPR_DIR/hyprland.lua" "$HYPR_DIR/hyprland.lua.backup-$STAMP"
                 printf '\nrequire("modules.settings")\n' >> "$HYPR_DIR/hyprland.lua"
                 say "  hyprland.lua now requires modules.settings"
+            fi
+            if grep -q 'require("modules.startup")' "$HYPR_DIR/hyprland.lua"; then
+                say "  ${dim}hyprland.lua already requires modules.startup${r}"
+            else
+                [[ -f "$HYPR_DIR/hyprland.lua.backup-$STAMP" ]] \
+                    || cp "$HYPR_DIR/hyprland.lua" "$HYPR_DIR/hyprland.lua.backup-$STAMP"
+                printf '\nrequire("modules.startup")\n' >> "$HYPR_DIR/hyprland.lua"
+                say "  hyprland.lua now requires modules.startup"
             fi
         elif [[ -f "$HYPR_DIR/hyprland.conf" ]]; then
             cp "$SRC/support/look/lucid-look.conf" "$HYPR_DIR/lucid-look.conf"

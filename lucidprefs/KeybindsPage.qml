@@ -17,6 +17,14 @@ Column {
         });
     })
     readonly property int failedCount: Object.keys(Keybinds.failed).length
+    // the desktop icons' own keys, the one being recorded, and those the search keeps
+    property string deskRecording: ""
+    readonly property var shownDeskKeys: {
+        var q = page.query.trim().toLowerCase();
+        return DesktopIcons.keyActions.filter((a) => {
+            return q === "" || "desktop".indexOf(q) >= 0 || a.label.toLowerCase().indexOf(q) >= 0 || DesktopIcons.keysFor(a.id).toLowerCase().indexOf(q) >= 0;
+        });
+    }
     readonly property string problems: {
         var out = [];
         if (Keybinds.parseError !== "")
@@ -147,6 +155,56 @@ Column {
                     bind: modelData
                 }
 
+            }
+
+        }
+
+    }
+
+    // a capture that timed out ends the recording too
+    Connections {
+        function onCapturingChanged() {
+            if (!Keybinds.capturing && page.deskRecording !== "")
+                page.deskRecording = "";
+
+        }
+
+        target: Keybinds
+    }
+
+    SettingCard {
+        title: "DESKTOP ICONS"
+        visible: page.shownDeskKeys.length > 0
+
+        SettingRow {
+            title: "Desktop shortcuts"
+            description: "The keys the desktop icons answer to while the desktop has the keyboard: click an empty spot or an icon first. Apps never see them, and they never fire inside an app, so the usual Ctrl+C and Ctrl+V are safe here." + (Prefs.desktopIcons ? "" : " Desktop icons are off in General.")
+
+            M3Button {
+                text: "Reset all"
+                variant: "text"
+                enabled: Object.keys(DesktopIcons.keyOverrides).length > 0
+                onClicked: Prefs.desktopKeys = "{}"
+            }
+
+        }
+
+        Repeater {
+            model: page.shownDeskKeys
+
+            DesktopKeyRow {
+                required property var modelData
+
+                action: modelData
+                recordingId: page.deskRecording
+                onStartRecording: (id) => {
+                    page.deskRecording = id;
+                    Keybinds.startCapture();
+                }
+                onStopRecording: {
+                    page.deskRecording = "";
+                    Keybinds.stopCapture();
+                }
             }
 
         }

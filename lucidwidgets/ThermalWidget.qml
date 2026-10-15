@@ -37,9 +37,9 @@ WidgetBody {
     readonly property color fanTint: Theme.hasTonalContainers ? Theme.cSecondary : Theme.subtext
     readonly property string headText: {
         if (w.hasGpu)
-            return (w.gpuAwake && w.gpuTemp >= 0) ? Math.round(w.gpuTemp) + "°" : "—";
+            return (w.gpuAwake && w.gpuTemp >= 0) ? Units.deg(w.gpuTemp) : "—";
 
-        return w.cpuTemp >= 0 ? Math.round(w.cpuTemp) + "°" : "—";
+        return w.cpuTemp >= 0 ? Units.deg(w.cpuTemp) : "—";
     }
     readonly property var gpuStats: {
         var out = [{
@@ -59,7 +59,7 @@ WidgetBody {
         if (w.cpuTemp >= 0)
             out.push({
                 "label": "CPU",
-                "value": Math.round(w.cpuTemp) + "°",
+                "value": Units.deg(w.cpuTemp),
                 "level": w.cpuTemp / 100,
                 "tint": w.tempTint(w.cpuTemp)
             });
@@ -80,7 +80,7 @@ WidgetBody {
             out.push({
                 "short": "GPU",
                 "value": w.gpuTemp >= 0 ? w.gpuTemp / 100 : 0,
-                "text": w.gpuAwake && w.gpuTemp >= 0 ? Math.round(w.gpuTemp) + "°" : "—",
+                "text": w.gpuAwake && w.gpuTemp >= 0 ? Units.deg(w.gpuTemp) : "—",
                 "tint": w.tempTint(w.gpuTemp)
             });
             out.push({
@@ -94,7 +94,7 @@ WidgetBody {
             out.push({
                 "short": "CPU",
                 "value": w.cpuTemp / 100,
-                "text": Math.round(w.cpuTemp) + "°",
+                "text": Units.deg(w.cpuTemp),
                 "tint": w.tempTint(w.cpuTemp)
             });
 
@@ -113,14 +113,14 @@ WidgetBody {
         if (w.hasGpu)
             out.push({
                 "short": "GPU",
-                "text": w.gpuAwake && w.gpuTemp >= 0 ? Math.round(w.gpuTemp) + "°" : "—",
+                "text": w.gpuAwake && w.gpuTemp >= 0 ? Units.deg(w.gpuTemp) : "—",
                 "tint": w.tempTint(w.gpuTemp)
             });
 
         if (w.cpuTemp >= 0)
             out.push({
                 "short": "CPU",
-                "text": Math.round(w.cpuTemp) + "°",
+                "text": Units.deg(w.cpuTemp),
                 "tint": w.tempTint(w.cpuTemp)
             });
 

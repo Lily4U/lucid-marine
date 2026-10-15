@@ -61,6 +61,14 @@ WidgetBody {
     // fetched once into the cache and read from there. every card fetches into
     // its own part file, since two cards on one track race for the same cover
     readonly property bool remoteArt: /^https?:/.test(w.artUrl)
+    // the shapes a cover is cut to; a track always gets the same one
+    readonly property var coverShapes: ["cookie9", "clover4", "sunny", "flower", "pentagon", "softBurst", "cookie12", "clover8"]
+    readonly property string trackShape: {
+        var key = w.title + "\u0001" + w.artist;
+        var h = 5381;
+        for (var i = 0; i < key.length; i++) h = ((h * 33) ^ key.charCodeAt(i)) >>> 0
+        return w.coverShapes[h % w.coverShapes.length];
+    }
     readonly property string artFile: {
         if (!w.remoteArt)
             return "";
@@ -87,6 +95,14 @@ WidgetBody {
             w.player.previous();
     }
 
+    // the player's own window, or play and pause when it has none to show
+    function raisePlayer() {
+        if (w.has && w.player.canRaise)
+            w.player.raise();
+        else
+            w.toggle();
+    }
+
     function seekTo(sec) {
         if (!w.canSeek)
             return ;
@@ -99,6 +115,8 @@ WidgetBody {
         w.livePos = target;
     }
 
+    bare: w.variant === "orbit" || w.variant === "shape"
+    pill: w.variant === "pill" || w.variant === "capsule"
     ownInk: w.artTint
     fill: w.artTint ? Theme.withBlur(Theme.atTone(w.seedVivid, Theme.isLight ? 90 : 22)) : w.toneFill
     ink: w.artTint ? Theme.atTone(w.seedVivid, Theme.isLight ? 12 : 94) : w.toneInk
@@ -300,6 +318,136 @@ WidgetBody {
             tintOverride: w.ink
             disabled: !(w.has && w.player.canGoNext)
             onClicked: w.skip(1)
+        }
+
+    }
+
+    // play and pause on a shape: round while it waits, squared off while it plays
+    component PlayShape: Item {
+        id: ps
+
+        property real size: Theme.dp(56)
+
+        width: ps.size
+        height: ps.size
+        opacity: w.has ? 1 : 0.4
+
+        MaterialShape {
+            anchors.fill: parent
+            shape: "circle"
+            to: "square"
+            morph: w.playing ? 1 : 0
+            color: w.inkAccent
+            scale: psArea.pressed ? 0.92 : (psArea.containsMouse ? 1.06 : 1)
+
+            Behavior on morph {
+                NumberAnimation {
+                    duration: Theme.durDefaultSpatial
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: Theme.curveStandard
+                }
+
+            }
+
+            Behavior on scale {
+                NumberAnimation {
+                    duration: Theme.durFastSpatial
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: Theme.curveFastSpatial
+                }
+
+            }
+
+        }
+
+        Icon {
+            anchors.centerIn: parent
+            name: w.playing ? "pause" : "play_arrow"
+            size: Math.round(ps.size * 0.46)
+            fill: 1
+            color: w.fgInkAccent
+        }
+
+        MouseArea {
+            id: psArea
+
+            anchors.fill: parent
+            enabled: w.has
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: w.toggle()
+        }
+
+    }
+
+    // a skip on a small circle that blooms into a cookie under the pointer
+    component SkipShape: Item {
+        id: sk
+
+        property int dir: 1
+        property real size: Theme.dp(40)
+        property color fillColor: Theme.alpha(w.inkAccent, 0.16)
+        property color inkColor: w.inkAccent
+        readonly property bool able: w.has && (sk.dir > 0 ? w.player.canGoNext : w.player.canGoPrevious)
+
+        width: sk.size
+        height: sk.size
+        opacity: sk.able ? 1 : 0.4
+
+        MaterialShape {
+            anchors.fill: parent
+            shape: "circle"
+            to: "cookie9"
+            morph: skArea.containsMouse ? 1 : 0
+            color: sk.fillColor
+            rotation: skArea.containsMouse ? 20 : 0
+            scale: skArea.pressed ? 0.9 : 1
+
+            Behavior on morph {
+                NumberAnimation {
+                    duration: Theme.durDefaultSpatial
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: Theme.curveStandard
+                }
+
+            }
+
+            Behavior on rotation {
+                NumberAnimation {
+                    duration: Theme.durSlowSpatial
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: Theme.curveSlowSpatial
+                }
+
+            }
+
+            Behavior on scale {
+                NumberAnimation {
+                    duration: Theme.durFastSpatial
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: Theme.curveFastSpatial
+                }
+
+            }
+
+        }
+
+        Icon {
+            anchors.centerIn: parent
+            name: sk.dir > 0 ? "skip_next" : "skip_previous"
+            size: Math.round(sk.size * 0.5)
+            fill: 1
+            color: sk.inkColor
+        }
+
+        MouseArea {
+            id: skArea
+
+            anchors.fill: parent
+            enabled: sk.able
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: w.skip(sk.dir)
         }
 
     }
@@ -659,6 +807,464 @@ WidgetBody {
                 onClicked: w.toggle()
             }
 
+        }
+
+    }
+
+    // pill: a capsule, the cover round at one end with the track's progress circling it
+    Item {
+        visible: w.variant === "pill"
+        anchors.fill: parent
+
+        CircularProgress {
+            id: pillRing
+
+            x: Theme.dp(8)
+            anchors.verticalCenter: parent.verticalCenter
+            width: parent.height - Theme.dp(16)
+            height: width
+            visible: w.showProgress && w.has
+            thickness: Theme.dp(3)
+            value: w.progress
+            animated: false
+            wavy: false
+            color: w.inkAccent
+            trackColor: Theme.alpha(w.ink, 0.14)
+        }
+
+        ShapedImage {
+            id: pillArt
+
+            anchors.centerIn: pillRing
+            width: pillRing.width - Theme.dp(12)
+            height: width
+            shape: "circle"
+            source: w.artUrl
+            fallbackColor: Theme.alpha(w.ink, 0.1)
+
+            Icon {
+                anchors.centerIn: parent
+                name: "music_note"
+                size: Math.round(pillArt.width * 0.4)
+                fill: 1
+                color: w.inkFaint
+            }
+
+        }
+
+        WidgetTap {
+            anchors.fill: pillArt
+            widget: w
+            onTapped: w.raisePlayer()
+        }
+
+        Column {
+            anchors.left: pillRing.right
+            anchors.leftMargin: Theme.dp(12)
+            anchors.right: pillPlay.left
+            anchors.rightMargin: Theme.dp(10)
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 0
+
+            Marquee {
+                width: parent.width
+                role: "titleSmall"
+                weight: 600
+                color: w.ink
+                text: w.title
+                scrolling: w.scroll
+            }
+
+            LText {
+                width: parent.width
+                role: "bodySmall"
+                color: w.inkDim
+                text: w.artist
+                elide: Text.ElideRight
+            }
+
+        }
+
+        PlayShape {
+            id: pillPlay
+
+            anchors.right: pillNext.left
+            anchors.rightMargin: Theme.dp(6)
+            anchors.verticalCenter: parent.verticalCenter
+            size: Theme.dp(56)
+        }
+
+        SkipShape {
+            id: pillNext
+
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.dp(16)
+            anchors.verticalCenter: parent.verticalCenter
+            dir: 1
+            size: Theme.dp(40)
+        }
+
+    }
+
+    // orbit: a round face, the cover at its heart, the track a wavy ring and the controls along its foot
+    Item {
+        id: orbit
+
+        readonly property real d: Math.min(width, height)
+
+        visible: w.variant === "orbit"
+        anchors.fill: parent
+
+        MaterialShape {
+            anchors.centerIn: parent
+            width: orbit.d
+            height: orbit.d
+            shape: "circle"
+            color: Theme.alpha(w.fill, 1)
+        }
+
+        CircularProgress {
+            anchors.centerIn: parent
+            width: orbit.d - Math.round(orbit.d * 0.05)
+            height: width
+            visible: w.showProgress && w.has
+            thickness: Math.round(orbit.d * 0.034)
+            value: w.progress
+            animated: false
+            color: w.inkAccent
+            trackColor: Theme.alpha(w.ink, 0.14)
+        }
+
+        Rectangle {
+            readonly property real maxW: Math.round(orbit.d * 0.46)
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Math.round(orbit.height / 2 - orbit.d * 0.32 - height / 2)
+            width: Math.min(Math.ceil(orbitMetrics.advanceWidth) + Theme.dp(20), maxW)
+            height: Theme.dp(24)
+            radius: height / 2
+            color: Theme.alpha(w.inkAccent, 0.16)
+
+            TextMetrics {
+                id: orbitMetrics
+
+                font: orbitTitle.font
+                text: orbitTitle.text
+            }
+
+            LText {
+                id: orbitTitle
+
+                anchors.centerIn: parent
+                width: parent.width - Theme.dp(20)
+                horizontalAlignment: Text.AlignHCenter
+                elide: Text.ElideRight
+                role: "labelMedium"
+                weight: 600
+                color: w.ink
+                text: w.title
+            }
+
+        }
+
+        ShapedImage {
+            id: orbitArt
+
+            x: Math.round((orbit.width - width) / 2)
+            y: Math.round(orbit.height / 2 - orbit.d * 0.233)
+            width: Math.round(orbit.d * 0.5)
+            height: width
+            shape: "circle"
+            source: w.artUrl
+            decode: Theme.dp(256)
+            fallbackColor: Theme.alpha(w.ink, 0.1)
+
+            Icon {
+                anchors.centerIn: parent
+                name: "music_note"
+                size: Math.round(orbitArt.width * 0.36)
+                fill: 1
+                color: w.inkFaint
+            }
+
+        }
+
+        WidgetTap {
+            anchors.fill: orbitArt
+            widget: w
+            onTapped: w.raisePlayer()
+        }
+
+        PlayShape {
+            x: Math.round(orbit.width / 2 - width / 2)
+            y: Math.round(orbitArt.y + orbitArt.height - height / 2)
+            size: Math.round(orbit.d * 0.22)
+        }
+
+        SkipShape {
+            x: Math.round(orbit.width / 2 - orbit.d * 0.242 - width / 2)
+            y: Math.round(orbit.height / 2 + orbit.d * 0.25 - height / 2)
+            dir: -1
+            size: Math.round(orbit.d * 0.158)
+        }
+
+        SkipShape {
+            x: Math.round(orbit.width / 2 + orbit.d * 0.242 - width / 2)
+            y: Math.round(orbit.height / 2 + orbit.d * 0.25 - height / 2)
+            dir: 1
+            size: Math.round(orbit.d * 0.158)
+        }
+
+    }
+
+    // shape: the cover cut to a shape of its own, a new one easing in with every track
+    Item {
+        id: blobFace
+
+        visible: w.variant === "shape"
+        anchors.fill: parent
+
+        ShapedImage {
+            id: blob
+
+            // the shape on show; the track's own eases in over it, then takes its place
+            property string shown: "cookie9"
+
+            x: Theme.dp(8)
+            y: Theme.dp(4)
+            width: blobFace.width - Theme.dp(16)
+            height: width
+            shape: blob.shown
+            to: w.trackShape
+            source: w.artUrl
+            decode: Theme.dp(384)
+            fallbackColor: Theme.alpha(w.fill, 1)
+            Component.onCompleted: blob.shown = w.trackShape
+
+            Icon {
+                anchors.centerIn: parent
+                name: "music_note"
+                size: Math.round(blob.width * 0.32)
+                fill: 1
+                color: w.inkFaint
+            }
+
+        }
+
+        NumberAnimation {
+            id: blobMorph
+
+            target: blob
+            property: "morph"
+            from: 0
+            to: 1
+            duration: Theme.durSlowSpatial
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.curveStandard
+            onFinished: {
+                blob.shown = w.trackShape;
+                blob.morph = 0;
+            }
+        }
+
+        Connections {
+            function onTrackShapeChanged() {
+                if (blob.shown === w.trackShape)
+                    return ;
+
+                if (blobFace.visible)
+                    blobMorph.restart();
+                else
+                    blob.shown = w.trackShape;
+            }
+
+            target: w
+        }
+
+        WidgetTap {
+            anchors.fill: blob
+            widget: w
+            onTapped: w.raisePlayer()
+        }
+
+        PlayShape {
+            x: Math.round(blob.x + blob.width * 0.8 - width / 2)
+            y: Math.round(blob.y + blob.height * 0.8 - height / 2)
+            size: Theme.dp(64)
+        }
+
+        Column {
+            anchors.left: parent.left
+            anchors.leftMargin: Theme.dp(12)
+            anchors.right: blobSkips.left
+            anchors.rightMargin: Theme.dp(8)
+            y: blob.y + blob.height + Theme.dp(10)
+            spacing: Theme.dp(2)
+
+            ShadowText {
+                width: parent.width
+                elide: Text.ElideRight
+                shadow: true
+                pixelSize: Theme.dp(17)
+                weight: 600
+                color: "white"
+                text: w.title
+            }
+
+            ShadowText {
+                width: parent.width
+                elide: Text.ElideRight
+                shadow: true
+                pixelSize: Theme.dp(13)
+                weight: 480
+                color: Qt.rgba(1, 1, 1, 0.82)
+                text: w.artist
+            }
+
+            LinearProgress {
+                visible: w.showProgress && w.has
+                width: parent.width
+                value: w.progress
+                wavy: true
+                flowing: w.playing
+                valueAnimated: false
+                thickness: Theme.dp(3)
+                amplitude: Theme.dp(2)
+                wavelength: Theme.dp(18)
+                color: "white"
+                trackColor: Qt.rgba(1, 1, 1, 0.28)
+            }
+
+        }
+
+        Row {
+            id: blobSkips
+
+            anchors.right: parent.right
+            anchors.rightMargin: Theme.dp(10)
+            y: blob.y + blob.height + Theme.dp(10)
+            spacing: Theme.dp(6)
+
+            SkipShape {
+                dir: -1
+                size: Theme.dp(38)
+                fillColor: Theme.alpha(w.fill, 1)
+                inkColor: w.ink
+            }
+
+            SkipShape {
+                dir: 1
+                size: Theme.dp(38)
+                fillColor: Theme.alpha(w.fill, 1)
+                inkColor: w.ink
+            }
+
+        }
+
+    }
+
+    // capsule: a tall pill, the cover round at the top and the track turned on its side
+    Item {
+        id: capsule
+
+        visible: w.variant === "capsule"
+        anchors.fill: parent
+
+        ShapedImage {
+            id: capArt
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            y: Theme.dp(12)
+            width: capsule.width - Theme.dp(24)
+            height: width
+            shape: "circle"
+            source: w.artUrl
+            fallbackColor: Theme.alpha(w.ink, 0.1)
+
+            Icon {
+                anchors.centerIn: parent
+                name: "music_note"
+                size: Math.round(capArt.width * 0.4)
+                fill: 1
+                color: w.inkFaint
+            }
+
+        }
+
+        WidgetTap {
+            anchors.fill: capArt
+            widget: w
+            onTapped: w.raisePlayer()
+        }
+
+        // read upward, the progress running beside the words
+        Item {
+            readonly property real spanFrom: capArt.y + capArt.height + Theme.dp(14)
+            readonly property real spanTo: capNext.y - Theme.dp(14)
+
+            x: Math.round(capsule.width / 2 - width / 2)
+            y: Math.round((spanFrom + spanTo) / 2 - height / 2)
+            width: Math.max(0, spanTo - spanFrom)
+            height: Theme.dp(58)
+            rotation: -90
+
+            Column {
+                anchors.verticalCenter: parent.verticalCenter
+                width: parent.width
+                spacing: Theme.dp(2)
+
+                Marquee {
+                    width: parent.width
+                    role: "titleSmall"
+                    weight: 600
+                    color: w.ink
+                    text: w.title
+                    scrolling: w.scroll
+                }
+
+                LText {
+                    width: parent.width
+                    role: "bodySmall"
+                    color: w.inkDim
+                    text: w.artist
+                    elide: Text.ElideRight
+                }
+
+                LinearProgress {
+                    visible: w.showProgress && w.has
+                    width: parent.width
+                    value: w.progress
+                    wavy: true
+                    flowing: w.playing
+                    valueAnimated: false
+                    thickness: Theme.dp(3)
+                    amplitude: Theme.dp(2)
+                    wavelength: Theme.dp(18)
+                    color: w.inkAccent
+                    trackColor: Theme.alpha(w.ink, 0.14)
+                }
+
+            }
+
+        }
+
+        SkipShape {
+            id: capNext
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: capPlay.top
+            anchors.bottomMargin: Theme.dp(8)
+            dir: 1
+            size: Theme.dp(44)
+        }
+
+        PlayShape {
+            id: capPlay
+
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: Theme.dp(14)
+            size: capsule.width - Theme.dp(28)
         }
 
     }

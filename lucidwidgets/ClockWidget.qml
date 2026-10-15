@@ -35,7 +35,7 @@ WidgetBody {
         return w.use24 ? "" : (d.getHours() < 12 ? "AM" : "PM");
     }
 
-    bare: w.variant === "minimal"
+    bare: w.variant === "minimal" || w.variant === "oval" || w.variant === "dial"
     onZonesChanged: Zones.watch(w.zones)
     Component.onCompleted: Zones.watch(w.zones)
 
@@ -337,6 +337,190 @@ WidgetBody {
                 role: "labelLarge"
                 color: Theme.alpha(w.fgInkAccent, 0.8)
                 text: w.now.toLocaleDateString(Qt.locale(), "ddd d MMM")
+            }
+
+        }
+
+    }
+
+    // oval: the time on a band across a round face, the day over it and the date under it
+    Item {
+        id: oval
+
+        readonly property real d: Math.min(width, height)
+
+        visible: w.variant === "oval"
+        anchors.fill: parent
+
+        MaterialShape {
+            anchors.centerIn: parent
+            width: oval.d
+            height: oval.d
+            shape: "circle"
+            color: Theme.alpha(w.fill, 1)
+        }
+
+        Rectangle {
+            id: band
+
+            anchors.centerIn: parent
+            width: Math.round(oval.d * 0.84)
+            height: Math.round(oval.d * 0.38)
+            radius: height / 2
+            color: w.inkAccent
+
+            LText {
+                anchors.centerIn: parent
+                size: Math.round(oval.d * 0.2)
+                weight: 640
+                rounded: 100
+                tabular: true
+                color: w.fgInkAccent
+                text: w.hourOf(w.now) + ":" + w.two(w.now.getMinutes())
+            }
+
+        }
+
+        LText {
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.bottom: band.top
+            anchors.bottomMargin: Math.round(oval.d * 0.05)
+            role: "titleSmall"
+            weight: 600
+            color: w.ink
+            text: w.now.toLocaleDateString(Qt.locale(), "dddd")
+        }
+
+        LText {
+            visible: w.showDate
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: band.bottom
+            anchors.topMargin: Math.round(oval.d * 0.05)
+            role: "titleSmall"
+            weight: 600
+            color: w.ink
+            text: w.now.toLocaleDateString(Qt.locale(), "d MMMM")
+        }
+
+        // the seconds as a dot running round the rim
+        Rectangle {
+            readonly property real a: w.now.getSeconds() / 60 * 2 * Math.PI
+            readonly property real r: oval.d / 2 - Theme.dp(10)
+
+            visible: w.seconds
+            x: oval.width / 2 + Math.sin(a) * r - width / 2
+            y: oval.height / 2 - Math.cos(a) * r - height / 2
+            width: Theme.dp(8)
+            height: Theme.dp(8)
+            radius: Theme.dp(4)
+            color: w.inkAccent
+        }
+
+    }
+
+    // dial: two bold hands on a scalloped face, the seconds as a dot
+    Item {
+        id: dial
+
+        readonly property real d: Math.min(width, height)
+        readonly property real r: dial.d / 2
+        readonly property real hand: Math.round(dial.r * 0.16)
+        // the card's own colours; the minute hand sits a step off the accent so the two hands part
+        readonly property color face: Theme.alpha(w.fill, 1)
+        readonly property color minuteInk: Theme.atTone(w.inkAccent, Theme.isLight ? 48 : 72)
+        readonly property color hourInk: w.ink
+        readonly property color dotInk: Theme.atTone(w.tone === "tertiary" ? Theme.primary : Theme.tertiary, Theme.isLight ? 58 : 78)
+
+        visible: w.variant === "dial"
+        anchors.fill: parent
+
+        MaterialShape {
+            anchors.centerIn: parent
+            width: dial.d
+            height: dial.d
+            shape: "cookie12"
+            color: dial.face
+        }
+
+        Item {
+            anchors.centerIn: parent
+            width: dial.d
+            height: dial.d
+            rotation: w.now.getMinutes() * 6
+
+            Behavior on rotation {
+                RotationAnimation {
+                    duration: Theme.durFastSpatial
+                    direction: RotationAnimation.Clockwise
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: Theme.curveFastSpatial
+                }
+
+            }
+
+            Rectangle {
+                x: dial.r - width / 2
+                y: dial.r - height + width / 2
+                width: dial.hand
+                height: Math.round(dial.r * 0.68 + width / 2)
+                radius: width / 2
+                color: dial.minuteInk
+                antialiasing: true
+            }
+
+        }
+
+        Item {
+            anchors.centerIn: parent
+            width: dial.d
+            height: dial.d
+            rotation: (w.now.getHours() % 12 + w.now.getMinutes() / 60) * 30
+
+            Behavior on rotation {
+                RotationAnimation {
+                    duration: Theme.durFastSpatial
+                    direction: RotationAnimation.Clockwise
+                    easing.type: Easing.Bezier
+                    easing.bezierCurve: Theme.curveFastSpatial
+                }
+
+            }
+
+            Rectangle {
+                x: dial.r - width / 2
+                y: dial.r - height + width / 2
+                width: dial.hand
+                height: Math.round(dial.r * 0.42 + width / 2)
+                radius: width / 2
+                color: dial.hourInk
+                antialiasing: true
+            }
+
+        }
+
+        Item {
+            visible: w.opt("dot") !== false
+            anchors.centerIn: parent
+            width: dial.d
+            height: dial.d
+            rotation: w.now.getSeconds() * 6
+
+            Behavior on rotation {
+                RotationAnimation {
+                    duration: Theme.durShort
+                    direction: RotationAnimation.Clockwise
+                    easing.type: Easing.OutCubic
+                }
+
+            }
+
+            Rectangle {
+                x: dial.r - width / 2
+                y: dial.r - dial.r * 0.72 - width / 2
+                width: Math.round(dial.r * 0.17)
+                height: width
+                radius: width / 2
+                color: dial.dotInk
             }
 
         }

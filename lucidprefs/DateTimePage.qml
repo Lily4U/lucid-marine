@@ -286,6 +286,33 @@ Column {
     }
 
     SettingCard {
+        title: "UNITS"
+
+        SettingRow {
+            title: "Measurement system"
+            resetKey: "units"
+            description: "°C and km/h, or °F and mph. For the weather in the bar, on the lock screen and in the widgets, and for the heat of the processor, graphics card and drives."
+
+            M3Segmented {
+                width: Theme.dp(200)
+                options: [{
+                    "key": "metric",
+                    "label": "Metric"
+                }, {
+                    "key": "imperial",
+                    "label": "Imperial"
+                }]
+                current: Prefs.units
+                onChosen: (k) => {
+                    return Prefs.units = k;
+                }
+            }
+
+        }
+
+    }
+
+    SettingCard {
         title: "POMODORO"
 
         SettingRow {

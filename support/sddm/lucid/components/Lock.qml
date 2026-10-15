@@ -109,6 +109,14 @@ QtObject {
     property int attempts: 0
     property string message: ""
 
+    // the login screen's pam takes a fingerprint (install-theme.sh) and this
+    // account has a finger enrolled (sync-sddm.sh): an empty field asks for it
+    readonly property bool fingerprint: !root.manual && root.needsPassword && Theme.conf("fingerprintLogin", "false") === "true" && Theme.conf("fingerprint", "false") === "true"
+    // the attempt in flight was the empty field's, so its verdict is the finger's
+    property bool byFinger: false
+    // pam_fprintd's own words while it waits on the reader
+    property string fingerText: ""
+
     readonly property bool busy: root.phase === "checking"
     readonly property bool granted: root.phase === "granted"
     readonly property bool acceptsInput: !root.busy && !root.granted
@@ -120,6 +128,7 @@ QtObject {
     function reset() {
         root.phase = "idle";
         root.message = "";
+        root.fingerText = "";
     }
 
     function submit(text) {
@@ -128,6 +137,8 @@ QtObject {
 
         root.closeSheet();
         root.message = "";
+        root.fingerText = "";
+        root.byFinger = text === "" && root.fingerprint;
         root.phase = "checking";
         sddm.login(root.userName, text, root.sessionIndex);
     }
@@ -165,12 +176,18 @@ QtObject {
         if (root.granted)
             return "Welcome back";
 
-        if (root.phase === "checking")
-            return "Checking…";
+        if (root.phase === "checking") {
+            if (root.fingerText !== "")
+                return root.fingerText;
 
+            return root.byFinger ? "Touch the fingerprint sensor" : "Checking…";
+        }
         if (root.phase === "failed") {
             if (root.message !== "")
                 return root.message;
+
+            if (root.byFinger)
+                return "Fingerprint not recognised";
 
             if (root.manual)
                 return "Unknown account or wrong password";
@@ -295,6 +312,13 @@ QtObject {
 
         function onLoginSucceeded() {
             root.phase = "granted";
+        }
+
+        // pam's info lines, which is how the reader asks for a finger
+        function onInformationMessage(message) {
+            if (root.phase === "checking")
+                root.fingerText = message;
+
         }
     }
 

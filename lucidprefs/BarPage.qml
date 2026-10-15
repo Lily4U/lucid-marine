@@ -6,6 +6,8 @@ Column {
     id: page
 
     readonly property var moduleList: Prefs.barModules
+    // whether any corner on the bar blends into something
+    readonly property bool blendsAnything: Prefs.barNotch || (Prefs.barPopupMode && Prefs.barPopupNotched) || Object.keys(Prefs.barJoinSet).length > 0
     // the module whose card shows: the one a right click on the bar asked for,
     // or the first
     property string selectedModule: ""
@@ -71,8 +73,36 @@ Column {
         title: "OPENING BEHAVIOUR"
 
         SettingRow {
+            title: "Auto-hide"
+            resetKey: "barAutoHide"
+            description: "The bar slides off the top of the screen and comes back when the pointer reaches the edge, or while one of its panels is open. Windows use the space it leaves."
+
+            M3Switch {
+                checked: Prefs.barAutoHide
+                onToggled: (v) => {
+                    return Prefs.barAutoHide = v;
+                }
+            }
+
+        }
+
+        SettingRow {
+            title: "Open on hover"
+            resetKey: "barHoverOpen"
+            description: "Rest the pointer on a module and its panel opens by itself, no click needed; move away and it closes again. A panel opened this way leaves the keyboard with whatever window had it - click the panel to take focus, exactly as a clicked-open one does. The workspace overview still needs a click."
+
+            M3Switch {
+                checked: Prefs.barHoverOpen
+                onToggled: (v) => {
+                    return Prefs.barHoverOpen = v;
+                }
+            }
+
+        }
+
+        SettingRow {
             title: "Pop-up mode"
-            description: "Modules stop morphing their own pill into a panel. The pill stays put in the bar and the panel appears below it as a detached pop-up."
+            description: "Modules stop morphing their own pill into a panel. The pill stays put in the bar and the panel appears below it as a pop-up."
 
             M3Switch {
                 checked: Prefs.barPopupMode
@@ -84,17 +114,34 @@ Column {
         }
 
         SettingRow {
+            title: "Notched pop-ups"
+            resetKey: "barPopupNotched"
+            description: "A pop-up grows straight down out of its module, or out of the group the module is joined into, and their corners curve into each other the way a notch meets the top of the screen. Off, it floats below with a gap."
+            enabled: Prefs.barPopupMode
+            disabledReason: "Only applies in pop-up mode."
+
+            M3Switch {
+                enabled: Prefs.barPopupMode
+                checked: Prefs.barPopupNotched
+                onToggled: (v) => {
+                    return Prefs.barPopupNotched = v;
+                }
+            }
+
+        }
+
+        SettingRow {
             title: "Pop-up distance"
             resetKey: "barPopupGap"
             description: "The gap between a module's pill and the panel it opens."
-            enabled: Prefs.barPopupMode
-            disabledReason: "Only applies in pop-up mode."
+            enabled: Prefs.barPopupMode && !Prefs.barPopupNotched
+            disabledReason: Prefs.barPopupMode ? "A notched pop-up hangs flush from its module - switch Notched pop-ups off to float it." : "Only applies in pop-up mode."
             showDivider: false
             stacked: true
 
             M3Slider {
                 width: parent.width
-                enabled: Prefs.barPopupMode
+                enabled: Prefs.barPopupMode && !Prefs.barPopupNotched
                 from: 0
                 to: 24
                 stepSize: 1
@@ -136,13 +183,13 @@ Column {
             title: "Distance from top"
             resetKey: "barTopMargin"
             description: "How far the bar floats below the top edge of the screen."
-            enabled: !Prefs.barNotch
-            disabledReason: "Notches sit flush against the screen edge by definition - switch back to islands on the General page to float the bar."
+            enabled: !Prefs.barFlush
+            disabledReason: "Notches and the full bar sit flush against the screen edge by definition - switch back to islands on the General page to float the bar."
             stacked: true
 
             M3Slider {
                 width: parent.width
-                enabled: !Prefs.barNotch
+                enabled: !Prefs.barFlush
                 from: 0
                 to: 48
                 stepSize: 1
@@ -178,14 +225,14 @@ Column {
         SettingRow {
             title: "Edge blend"
             resetKey: "barNotchFlare"
-            description: "How far a notched module's upper corners sweep out into the top of the screen. Only drawn where there is room for it - modules packed close together keep their square corners rather than leaving a spike of wallpaper between them."
-            enabled: Prefs.barNotch
-            disabledReason: "Islands float clear of the screen edge, so there is nothing to blend into - switch the bar to Notches on the General page."
+            description: "How far notched corners sweep out: a notched module's upper corners into the top of the screen, and a panel's into the bar it hangs from. Only drawn where there is room for it - modules packed close together keep their square corners rather than leaving a spike of wallpaper between them."
+            enabled: page.blendsAnything
+            disabledReason: "Nothing on the bar is notched - switch it to Notches on the General page, turn on notched pop-ups, or join two modules."
             stacked: true
 
             M3Slider {
                 width: parent.width
-                enabled: Prefs.barNotch
+                enabled: page.blendsAnything
                 from: 0
                 to: 32
                 stepSize: 1
@@ -193,6 +240,29 @@ Column {
                 value: Prefs.barNotchFlare
                 onMoved: (v) => {
                     return Prefs.barNotchFlare = v;
+                }
+            }
+
+        }
+
+        SettingRow {
+            title: "Screen corners"
+            resetKey: "barFullCorner"
+            description: "How far the full bar's strip curves down into the left and right screen edges, and into the sides of a panel that opens from it."
+            enabled: Prefs.barFull
+            disabledReason: "Only the full bar meets the screen edges - switch the bar to Full bar on the General page."
+            stacked: true
+
+            M3Slider {
+                width: parent.width
+                enabled: Prefs.barFull
+                from: 0
+                to: 40
+                stepSize: 1
+                suffix: " px"
+                value: Prefs.barFullCorner
+                onMoved: (v) => {
+                    return Prefs.barFullCorner = v;
                 }
             }
 
@@ -268,7 +338,7 @@ Column {
         SettingRow {
             title: "Arrangement"
             resetKey: "barLayout"
-            description: "Tap a module to set it up below, or drag it along its group or into another one. Left and right sit against the screen's edges and the centre stays in the middle; a module switched off keeps its place, and an outlined one is on but has nothing to show right now."
+            description: "Tap a module to set it up below, or drag it along its group or into another one. Left and right sit against the screen's edges and the centre stays in the middle; a module switched off keeps its place, and an outlined one is on but has nothing to show right now. The link between two neighbours joins them: on the bar they share one island (or one notch), and a panel opens from its own stretch of it."
             enabled: Prefs.barEnabled
             disabledReason: "The bar is switched off, so there is nothing to arrange."
             stacked: true
@@ -279,6 +349,21 @@ Column {
                 selected: page.selectedModule
                 onChosen: (id) => {
                     return page.selectedModule = id;
+                }
+            }
+
+        }
+
+        SettingRow {
+            title: "Lines between joined modules"
+            resetKey: "barJoinDividers"
+            description: "A faint line where two joined modules meet. Off, a group reads as one piece."
+            enabled: Prefs.barEnabled
+
+            M3Switch {
+                checked: Prefs.barJoinDividers
+                onToggled: (v) => {
+                    Prefs.barJoinDividers = v;
                 }
             }
 

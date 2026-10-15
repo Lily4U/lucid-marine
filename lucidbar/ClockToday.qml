@@ -237,7 +237,7 @@ Item {
                             role: "displaySmall"
                             weight: 600
                             rounded: 100
-                            text: page.wx ? page.wx.tempC + "°" : ""
+                            text: page.wx ? Units.deg(page.wx.tempC, page.wx.tempF) : ""
                         }
 
                     }
@@ -245,7 +245,7 @@ Item {
                     LText {
                         role: "bodyMedium"
                         color: Theme.subtext
-                        text: page.wx ? WeatherSource.descFor(page.wx.code) + (page.wx.days && page.wx.days.length ? "  ·  " + page.wx.days[0].maxC + "° / " + page.wx.days[0].minC + "°" : "") : ""
+                        text: page.wx ? WeatherSource.descFor(page.wx.code) + (page.wx.days && page.wx.days.length ? "  ·  " + Units.deg(page.wx.days[0].maxC, page.wx.days[0].maxF) + " / " + Units.deg(page.wx.days[0].minC, page.wx.days[0].minF) : "") : ""
                     }
 
                 }
@@ -272,7 +272,7 @@ Item {
                 spacing: Theme.dp(6)
 
                 Repeater {
-                    model: page.wx ? [["thermostat", "Feels " + page.wx.feelsC + "°"], ["water_drop", page.wx.humidity + "%"], ["air", page.wx.windKmph + " km/h " + (page.wx.windDir || "")], ["umbrella", (page.wx.pop || 0) + "%"], ["light_mode", "UV " + page.wx.uv]] : []
+                    model: page.wx ? [["thermostat", "Feels " + Units.deg(page.wx.feelsC, page.wx.feelsF)], ["water_drop", page.wx.humidity + "%"], ["air", Units.wind(page.wx.windKmph, page.wx.windMph) + " " + (page.wx.windDir || "")], ["umbrella", (page.wx.pop || 0) + "%"], ["light_mode", "UV " + page.wx.uv]] : []
 
                     Rectangle {
                         required property var modelData
@@ -347,7 +347,7 @@ Item {
                             anchors.horizontalCenter: parent.horizontalCenter
                             role: "labelLarge"
                             rounded: 100
-                            text: modelData.tempC + "°"
+                            text: Units.deg(modelData.tempC, modelData.tempF)
                         }
 
                     }
@@ -393,7 +393,7 @@ Item {
                             LText {
                                 role: "labelSmall"
                                 color: Theme.subtext
-                                text: modelData.maxC + "° " + modelData.minC + "°"
+                                text: Units.deg(modelData.maxC, modelData.maxF) + " " + Units.deg(modelData.minC, modelData.minF)
                             }
 
                         }

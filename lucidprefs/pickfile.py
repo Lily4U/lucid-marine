@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """pickfile.py - asks the desktop's own file chooser for one path.
 
-usage: pickfile.py [--save] [--title T] [--filter "Label=pat,pat"] [--file PATH]
+usage: pickfile.py [--save | --directory] [--title T] [--filter "Label=pat,pat"] [--file PATH]
 
 prints the chosen path and nothing else, and nothing at all when the dialog is
 cancelled. the xdg portal comes first, so the chooser is whichever one the
 desktop is set to use; zenity and then kdialog stand in when no portal answers.
 a filter entry with a "/" in it is a mime type, anything else a glob.
+--directory asks for a folder, starting in --file when given.
 
 the dialog has no parent window to hang off, so hyprland would tile it.
 float-lucid-choosers in hypr/modules/windowrules.lua floats it by title, so a
@@ -98,6 +99,10 @@ def portal(args):
         folder, name = os.path.split(os.path.abspath(args.file))
         opts["current_name"] = GLib.Variant("s", name)
         opts["current_folder"] = GLib.Variant("ay", os.fsencode(folder) + b"\0")
+    if args.directory:
+        opts["directory"] = GLib.Variant("b", True)
+        if args.file:
+            opts["current_folder"] = GLib.Variant("ay", os.fsencode(os.path.abspath(args.file)) + b"\0")
 
     method = "SaveFile" if args.save else "OpenFile"
     try:
@@ -131,6 +136,10 @@ def portal(args):
 
 def zenity(args):
     cmd = ["zenity", "--file-selection", "--title=" + args.title]
+    if args.directory:
+        cmd.append("--directory")
+        if args.file:
+            cmd.append("--filename=" + args.file.rstrip("/") + "/")
     if args.save:
         cmd.append("--save")
         if args.file:
@@ -147,8 +156,8 @@ def zenity(args):
 
 def kdialog(args):
     start = args.file or os.path.expanduser("~")
-    cmd = ["kdialog", "--title", args.title,
-           "--getsavefilename" if args.save else "--getopenfilename", start]
+    mode = "--getexistingdirectory" if args.directory else ("--getsavefilename" if args.save else "--getopenfilename")
+    cmd = ["kdialog", "--title", args.title, mode, start]
     flt = filters(args.filter)
     if flt:
         cmd.append(" ".join(p for _, p in flt[1]))
@@ -158,6 +167,7 @@ def kdialog(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--save", action="store_true")
+    ap.add_argument("--directory", action="store_true")
     ap.add_argument("--title", default="Choose a file")
     ap.add_argument("--filter", default="")
     ap.add_argument("--file", default="")

@@ -25,6 +25,10 @@ Singleton {
     // uid of the card currently held by the pointer, and of the one showing its menu
     property string dragUid: ""
     property string menuUid: ""
+    // the card under a drag or a resize and where it is this moment, before the
+    // store hears of it: the desktop icons step out of its way as it goes
+    property string liveUid: ""
+    property rect liveRect: Qt.rect(0, 0, 0, 0)
     // the desktop's selection box while it is out, {screen, x, y, w, h} in board coords
     property var marquee: null
     // uid -> true for every card the box caught; they drag as one
@@ -57,7 +61,8 @@ Singleton {
     // the dock on purpose. a freshly spawned one should still land clear of them:
     // these mirror the two windows' own exclusive zones
     readonly property real spawnTop: Prefs.barEnabled ? Prefs.effectiveBarTopMargin + Theme.dp(Prefs.barHeight) + Prefs.shellGap : 0
-    readonly property real spawnBottom: (Prefs.dockEnabled && !Prefs.dockAutoHide) ? Theme.dp(Prefs.dockIconSize + 20) + Prefs.effectiveDockBottomMargin + Prefs.shellGap : 0
+    // a dynamic dock has no zone but is up whenever the desktop is
+    readonly property real spawnBottom: (Prefs.dockEnabled && (!Prefs.dockAutoHide || Prefs.dockDynamicHide)) ? Theme.dp(Prefs.dockIconSize + 20) + Prefs.effectiveDockBottomMargin + Prefs.shellGap : 0
 
     // one entry per category; a variant is another face on the same data, not another widget
     readonly property var catalogue: [{
@@ -100,6 +105,18 @@ Singleton {
             "blurb": "Three cities at once, with their offsets.",
             "w": 264,
             "h": 200
+        }, {
+            "id": "oval",
+            "name": "Oval",
+            "blurb": "The time on a band across a round face, the day over it.",
+            "w": 220,
+            "h": 220
+        }, {
+            "id": "dial",
+            "name": "Dial",
+            "blurb": "Bold hands on a scalloped face, the seconds as a dot.",
+            "w": 220,
+            "h": 220
         }],
         "options": [{
             "key": "hourMode",
@@ -120,7 +137,14 @@ Singleton {
             "key": "seconds",
             "label": "Show seconds",
             "type": "bool",
-            "def": false
+            "def": false,
+            "variants": ["digital", "stack", "analog", "shape", "minimal", "world", "oval"]
+        }, {
+            "key": "dot",
+            "label": "Seconds dot",
+            "type": "bool",
+            "def": true,
+            "variants": ["dial"]
         }, {
             "key": "showDate",
             "label": "Show the date",
@@ -202,6 +226,49 @@ Singleton {
             "label": "Show the month",
             "type": "bool",
             "def": true
+        }]
+    }, {
+        "id": "progress",
+        "name": "Progress",
+        "blurb": "How much of the day, the week, the month and the year has gone.",
+        "variants": [{
+            "id": "ring",
+            "name": "Ring",
+            "blurb": "One wavy ring for the stretch you pick.",
+            "w": 204,
+            "h": 204
+        }, {
+            "id": "bars",
+            "name": "Bars",
+            "blurb": "Day, week, month and year, a bar each.",
+            "w": 300,
+            "h": 204
+        }, {
+            "id": "dots",
+            "name": "Year",
+            "blurb": "Every day of the year as a dot, the ones gone filled in.",
+            "w": 300,
+            "h": 212
+        }],
+        "options": [{
+            "key": "span",
+            "label": "Counts",
+            "type": "choice",
+            "def": "day",
+            "variants": ["ring"],
+            "choices": [{
+                "key": "day",
+                "label": "Day"
+            }, {
+                "key": "week",
+                "label": "Week"
+            }, {
+                "key": "month",
+                "label": "Month"
+            }, {
+                "key": "year",
+                "label": "Year"
+            }]
         }]
     }, {
         "id": "system",
@@ -438,6 +505,45 @@ Singleton {
             "def": true
         }]
     }, {
+        "id": "toggles",
+        "name": "Quick toggles",
+        "blurb": "Wi-Fi, Bluetooth, Do not disturb and more, a tap away on the desktop.",
+        "variants": [{
+            "id": "shapes",
+            "name": "Shapes",
+            "blurb": "Round switches that turn into shapes as they come on.",
+            "w": 228,
+            "h": 228
+        }, {
+            "id": "row",
+            "name": "Row",
+            "blurb": "A pill of buttons that square up when on.",
+            "w": 300,
+            "h": 88
+        }, {
+            "id": "tiles",
+            "name": "Tiles",
+            "blurb": "Quick Settings tiles, with each one's state spelled out.",
+            "w": 392,
+            "h": 168
+        }],
+        "options": [{
+            "key": "set",
+            "label": "Toggles",
+            "type": "choice",
+            "def": "connect",
+            "choices": [{
+                "key": "connect",
+                "label": "Radios"
+            }, {
+                "key": "evening",
+                "label": "Evening"
+            }, {
+                "key": "sound",
+                "label": "Sound"
+            }]
+        }]
+    }, {
         "id": "media",
         "name": "Media",
         "blurb": "Whatever is playing, with its artwork.",
@@ -465,6 +571,30 @@ Singleton {
             "blurb": "The cover as a record that turns while it plays.",
             "w": 220,
             "h": 220
+        }, {
+            "id": "pill",
+            "name": "Pill",
+            "blurb": "A capsule, the cover round at one end with the track's progress circling it.",
+            "w": 360,
+            "h": 92
+        }, {
+            "id": "orbit",
+            "name": "Orbit",
+            "blurb": "A round face: the cover at its heart, a wavy ring of progress, the controls along its foot.",
+            "w": 240,
+            "h": 240
+        }, {
+            "id": "shape",
+            "name": "Shape",
+            "blurb": "The cover cut to a shape of its own, a new one easing in with every track.",
+            "w": 236,
+            "h": 300
+        }, {
+            "id": "capsule",
+            "name": "Capsule",
+            "blurb": "A tall pill: the cover on top, the track turned on its side.",
+            "w": 116,
+            "h": 380
         }],
         "options": [{
             "key": "artTint",
@@ -481,7 +611,7 @@ Singleton {
             "label": "Scroll long titles",
             "type": "bool",
             "def": true,
-            "variants": ["card", "row"]
+            "variants": ["card", "row", "pill", "capsule"]
         }]
     }, {
         "id": "visualiser",
@@ -622,6 +752,97 @@ Singleton {
             "def": false
         }]
     }, {
+        "id": "shortcuts",
+        "name": "Shortcuts",
+        "blurb": "Your dock's apps on shapes of their own, one tap from open.",
+        "variants": [{
+            "id": "shapes",
+            "name": "Shapes",
+            "blurb": "Four apps on four shapes, straight on the wallpaper.",
+            "w": 228,
+            "h": 228
+        }, {
+            "id": "row",
+            "name": "Row",
+            "blurb": "A pill of apps that bloom under the pointer.",
+            "w": 300,
+            "h": 88
+        }, {
+            "id": "folder",
+            "name": "Folder",
+            "blurb": "Four apps with their names, like a folder on a phone.",
+            "w": 252,
+            "h": 236
+        }],
+        "options": [{
+            "key": "start",
+            "label": "Dock apps",
+            "type": "choice",
+            "def": "0",
+            "choices": [{
+                "key": "0",
+                "label": "1–4"
+            }, {
+                "key": "4",
+                "label": "5–8"
+            }, {
+                "key": "8",
+                "label": "9–12"
+            }]
+        }]
+    }, {
+        "id": "search",
+        "name": "Search",
+        "blurb": "The launcher's search, kept on the desktop.",
+        "variants": [{
+            "id": "pill",
+            "name": "Pill",
+            "blurb": "A search bar like a phone's, emoji and the clipboard at its end.",
+            "w": 440,
+            "h": 72
+        }, {
+            "id": "bar",
+            "name": "With modes",
+            "blurb": "The search bar over the launcher's modes, each on a shape.",
+            "w": 440,
+            "h": 172
+        }],
+        "options": []
+    }, {
+        "id": "github",
+        "name": "GitHub",
+        "blurb": "Your contributions, the way your profile draws them.",
+        "variants": [{
+            "id": "year",
+            "name": "Year",
+            "blurb": "The contribution graph. Drag an edge to fit more weeks.",
+            "w": 452,
+            "h": 176,
+            "resizable": true,
+            "minW": 200,
+            "minH": 150,
+            "maxW": 3840,
+            "maxH": 320
+        }, {
+            "id": "streak",
+            "name": "Streak",
+            "blurb": "Days in a row, today and the year, over the last few days.",
+            "w": 300,
+            "h": 168
+        }],
+        "options": [{
+            "key": "months",
+            "label": "Month names",
+            "type": "bool",
+            "def": true,
+            "variants": ["year"]
+        }, {
+            "key": "user",
+            "label": "",
+            "type": "hidden",
+            "def": ""
+        }]
+    }, {
         "id": "weather",
         "name": "Weather",
         "blurb": "Conditions now and over the next few days.",
@@ -649,20 +870,38 @@ Singleton {
             "blurb": "The next twelve hours as a temperature curve.",
             "w": 360,
             "h": 188
+        }, {
+            "id": "detail",
+            "name": "Details",
+            "blurb": "Feels like, high and low, rain, humidity and wind beside the reading.",
+            "w": 340,
+            "h": 204
         }],
-        "options": [{
-            "key": "units",
-            "label": "Units",
-            "type": "choice",
-            "def": "metric",
-            "choices": [{
-                "key": "metric",
-                "label": "°C"
-            }, {
-                "key": "imperial",
-                "label": "°F"
-            }]
-        }]
+        "options": []
+    }, {
+        "id": "sun",
+        "name": "Sun",
+        "blurb": "Sunrise, sunset and the daylight left, worked out where you are.",
+        "variants": [{
+            "id": "arc",
+            "name": "Arc",
+            "blurb": "The sun on its road across the sky, both ends of the day under it.",
+            "w": 300,
+            "h": 184
+        }, {
+            "id": "times",
+            "name": "Times",
+            "blurb": "Sunrise over sunset, a wave between them.",
+            "w": 264,
+            "h": 176
+        }, {
+            "id": "compact",
+            "name": "Compact",
+            "blurb": "Whichever comes next, and when.",
+            "w": 248,
+            "h": 88
+        }],
+        "options": []
     }, {
         "id": "notes",
         "name": "Notes",
@@ -866,19 +1105,7 @@ Singleton {
             "w": 440,
             "h": 110
         }],
-        "options": [{
-            "key": "units",
-            "label": "Units",
-            "type": "choice",
-            "def": "metric",
-            "choices": [{
-                "key": "metric",
-                "label": "°C"
-            }, {
-                "key": "imperial",
-                "label": "°F"
-            }]
-        }]
+        "options": []
     }, {
         "id": "photo",
         "name": "Photo",
@@ -1116,6 +1343,20 @@ Singleton {
             { "type": "media", "variant": "row", "at": "bl", "x": 40, "y": 806 },
             { "type": "battery", "variant": "bar", "at": "br", "x": 1632, "y": 806 }
         ]
+       }, {
+        "id": "expressive",
+        "name": "Expressive",
+        "blurb": "Shaped toggles and apps, the sun and the day's progress, in Material You's shapes.",
+        "cards": [
+            root.footBars,
+            { "type": "clock", "variant": "dial", "at": "tl", "x": 40, "y": 96 },
+            { "type": "toggles", "variant": "shapes", "at": "tl", "x": 276, "y": 92 },
+            { "type": "progress", "variant": "ring", "at": "tl", "x": 48, "y": 336 },
+            { "type": "sun", "variant": "times", "at": "tl", "x": 268, "y": 350 },
+            { "type": "search", "variant": "pill", "at": "tr", "x": 1440, "y": 96 },
+            { "type": "weather", "variant": "detail", "at": "tr", "x": 1540, "y": 186 },
+            { "type": "shortcuts", "variant": "shapes", "at": "tr", "x": 1652, "y": 408 }
+        ]
     }]
 
     // every way the store finishes loading, an empty or missing file included
@@ -1292,21 +1533,26 @@ Singleton {
         if (o.avoid)
             taken.push(o.avoid);
 
-        for (var y = top; y <= maxY; y += step) {
-            for (var x = pad; x <= maxX; x += step) {
-                var clear = true;
-                for (var k = 0; k < taken.length && clear; k++) {
-                    var t = taken[k];
-                    if (x < t.x + t.w + 18 && x + w + 18 > t.x && y < t.y + t.h + 18 && y + h + 18 > t.y)
-                        clear = false;
+        // on the icons' screen, twice: clear of the icons too if it can be, then
+        // of the other cards alone (icons step aside for a card, never the reverse)
+        var iconScreen = DesktopIcons.live && DesktopIcons.screen && (o.screen === undefined || o.screen === DesktopIcons.screen.name);
+        for (var pass = iconScreen ? 0 : 1; pass < 2; pass++) {
+            for (var y = top; y <= maxY; y += step) {
+                for (var x = pad; x <= maxX; x += step) {
+                    var clear = pass === 1 || !DesktopIcons.overlapsIcons(x, y, w, h);
+                    for (var k = 0; k < taken.length && clear; k++) {
+                        var t = taken[k];
+                        if (x < t.x + t.w + 18 && x + w + 18 > t.x && y < t.y + t.h + 18 && y + h + 18 > t.y)
+                            clear = false;
+
+                    }
+                    if (clear)
+                        return ({
+                            "x": x,
+                            "y": y
+                        });
 
                 }
-                if (clear)
-                    return ({
-                        "x": x,
-                        "y": y
-                    });
-
             }
         }
         var n = instances.count;
@@ -1315,6 +1561,11 @@ Singleton {
             "x": Math.min(maxX, left + (n % 8) * 34),
             "y": Math.min(maxY, top + (n % 8) * 34)
         });
+    }
+
+    function setLive(uid, x, y, w, h) {
+        root.liveRect = Qt.rect(x, y, w, h);
+        root.liveUid = uid;
     }
 
     // a card with no screen of its own follows the main one

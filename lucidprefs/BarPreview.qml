@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import qs
 
 Rectangle {
@@ -12,6 +13,7 @@ Rectangle {
         id: screen
 
         readonly property real unit: screen.height / 100
+        readonly property bool notchedPopup: Prefs.barPopupMode && Prefs.barPopupNotched
 
         // a rough width per module, so the sketch keeps the real proportions
         readonly property var pillSpan: ({
@@ -27,6 +29,12 @@ Rectangle {
             return screen.pillSpan[key] || 0.06;
         }
 
+        // whether the module at i in a zone is joined to the one after it
+        function joinedAt(zone, i) {
+            const keys = Prefs.barKeysOf(zone);
+            return i >= 0 && i + 1 < keys.length && Prefs.barJoinedNow(keys[i], keys[i + 1]);
+        }
+
         function zoneSpan(zone) {
             const keys = Prefs.barKeysOf(zone);
             var w = 0;
@@ -34,7 +42,7 @@ Rectangle {
             return w;
         }
         readonly property real modH: screen.unit * 11
-        readonly property real barY: Prefs.barNotch ? 0 : screen.unit * 7
+        readonly property real barY: Prefs.barFlush ? 0 : screen.unit * 7
         readonly property real sideM: screen.unit * 4
         readonly property real gap: screen.unit * 3
 
@@ -68,6 +76,63 @@ Rectangle {
 
         }
 
+        // the full bar's strip, and the corners it hangs into the screen sides
+        Rectangle {
+            width: screen.width
+            height: screen.modH
+            color: Theme.bgOpaque
+            visible: Prefs.barFull
+        }
+
+        Repeater {
+            model: Prefs.barFull ? [false, true] : []
+
+            Shape {
+                required property bool modelData
+                readonly property real r: Math.max(0, Prefs.barFullCorner * 0.5)
+
+                x: modelData ? screen.width - r : 0
+                y: screen.modH
+                width: r
+                height: r
+                visible: r > 0
+                preferredRendererType: Shape.CurveRenderer
+
+                transform: Scale {
+                    xScale: modelData ? 1 : -1
+                    origin.x: r / 2
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    fillColor: Theme.bgOpaque
+                    startX: r
+                    startY: r
+
+                    PathArc {
+                        x: 0
+                        y: 0
+                        radiusX: r
+                        radiusY: r
+                        direction: PathArc.Counterclockwise
+                    }
+
+                    PathLine {
+                        x: r
+                        y: 0
+                    }
+
+                    PathLine {
+                        x: r
+                        y: r
+                    }
+
+                }
+
+            }
+
+        }
+
         Row {
             id: leftRow
 
@@ -88,14 +153,19 @@ Rectangle {
 
                 Rectangle {
                     required property var modelData
+                    required property int index
+                    // joined in the arrangement: no gap, and square where they meet
+                    readonly property bool joinL: screen.joinedAt("left", index - 1)
+                    readonly property bool joinR: screen.joinedAt("left", index)
 
-                    width: screen.width * screen.cellSpan(modelData)
+                    // a joined one reaches across the gap to its neighbour
+                    width: screen.width * screen.cellSpan(modelData) + (joinR ? screen.gap + 1 : 0)
                     height: screen.modH
-                    color: Theme.bgOpaque
-                    topLeftRadius: Prefs.barNotch ? 0 : height / 2
-                    topRightRadius: Prefs.barNotch ? 0 : height / 2
-                    bottomLeftRadius: height / 2
-                    bottomRightRadius: height / 2
+                    color: Prefs.barFull ? "transparent" : Theme.bgOpaque
+                    topLeftRadius: Prefs.barFlush || joinL ? 0 : height / 2
+                    topRightRadius: Prefs.barFlush || joinR ? 0 : height / 2
+                    bottomLeftRadius: joinL ? 0 : height / 2
+                    bottomRightRadius: joinR ? 0 : height / 2
 
                     Behavior on color {
                         ColorAnimation {
@@ -130,14 +200,19 @@ Rectangle {
 
                 Rectangle {
                     required property var modelData
+                    required property int index
+                    // joined in the arrangement: no gap, and square where they meet
+                    readonly property bool joinL: screen.joinedAt("centre", index - 1)
+                    readonly property bool joinR: screen.joinedAt("centre", index)
 
-                    width: screen.width * screen.cellSpan(modelData)
+                    // a joined one reaches across the gap to its neighbour
+                    width: screen.width * screen.cellSpan(modelData) + (joinR ? screen.gap + 1 : 0)
                     height: screen.modH
-                    color: Theme.bgOpaque
-                    topLeftRadius: Prefs.barNotch ? 0 : height / 2
-                    topRightRadius: Prefs.barNotch ? 0 : height / 2
-                    bottomLeftRadius: height / 2
-                    bottomRightRadius: height / 2
+                    color: Prefs.barFull ? "transparent" : Theme.bgOpaque
+                    topLeftRadius: Prefs.barFlush || joinL ? 0 : height / 2
+                    topRightRadius: Prefs.barFlush || joinR ? 0 : height / 2
+                    bottomLeftRadius: joinL ? 0 : height / 2
+                    bottomRightRadius: joinR ? 0 : height / 2
 
                     Behavior on color {
                         ColorAnimation {
@@ -172,14 +247,19 @@ Rectangle {
 
                 Rectangle {
                     required property var modelData
+                    required property int index
+                    // joined in the arrangement: no gap, and square where they meet
+                    readonly property bool joinL: screen.joinedAt("right", index - 1)
+                    readonly property bool joinR: screen.joinedAt("right", index)
 
-                    width: screen.width * screen.cellSpan(modelData)
+                    // a joined one reaches across the gap to its neighbour
+                    width: screen.width * screen.cellSpan(modelData) + (joinR ? screen.gap + 1 : 0)
                     height: screen.modH
-                    color: Theme.bgOpaque
-                    topLeftRadius: Prefs.barNotch ? 0 : height / 2
-                    topRightRadius: Prefs.barNotch ? 0 : height / 2
-                    bottomLeftRadius: height / 2
-                    bottomRightRadius: height / 2
+                    color: Prefs.barFull ? "transparent" : Theme.bgOpaque
+                    topLeftRadius: Prefs.barFlush || joinL ? 0 : height / 2
+                    topRightRadius: Prefs.barFlush || joinR ? 0 : height / 2
+                    bottomLeftRadius: joinL ? 0 : height / 2
+                    bottomRightRadius: joinR ? 0 : height / 2
 
                     Behavior on color {
                         ColorAnimation {
@@ -201,12 +281,13 @@ Rectangle {
 
                     width: parent.width
                     height: screen.modH
-                    color: Theme.bgOpaque
+                    color: Prefs.barFull ? "transparent" : Theme.bgOpaque
                     visible: Prefs.barPopupMode
-                    topLeftRadius: Prefs.barNotch ? 0 : height / 2
-                    topRightRadius: Prefs.barNotch ? 0 : height / 2
-                    bottomLeftRadius: height / 2
-                    bottomRightRadius: height / 2
+                    topLeftRadius: Prefs.barFlush ? 0 : height / 2
+                    topRightRadius: Prefs.barFlush ? 0 : height / 2
+                    // a notched pop-up hangs flush from it
+                    bottomLeftRadius: screen.notchedPopup ? 0 : height / 2
+                    bottomRightRadius: screen.notchedPopup ? 0 : height / 2
                 }
 
                 Rectangle {
@@ -214,11 +295,11 @@ Rectangle {
 
                     width: parent.width
                     height: Prefs.barPopupMode ? screen.unit * 40 : screen.unit * 52
-                    y: Prefs.barPopupMode ? screen.modH + Math.max(screen.unit * 1.5, Prefs.barPopupGap * screen.unit * 0.22) : 0
+                    y: Prefs.barPopupMode ? screen.modH + (screen.notchedPopup ? 0 : Math.max(screen.unit * 1.5, Prefs.barPopupGap * screen.unit * 0.22)) : 0
                     color: Theme.bgOpaque
                     radius: screen.unit * 4
-                    topLeftRadius: Prefs.barPopupMode || !Prefs.barNotch ? screen.unit * 4 : 0
-                    topRightRadius: Prefs.barPopupMode || !Prefs.barNotch ? screen.unit * 4 : 0
+                    topLeftRadius: (Prefs.barPopupMode && !screen.notchedPopup) || (!Prefs.barPopupMode && !Prefs.barFlush) ? screen.unit * 4 : 0
+                    topRightRadius: (Prefs.barPopupMode && !screen.notchedPopup) || (!Prefs.barPopupMode && !Prefs.barFlush) ? screen.unit * 4 : 0
 
                     Behavior on y {
                         NumberAnimation {
@@ -267,7 +348,7 @@ Rectangle {
         anchors.rightMargin: Theme.dp(22)
         anchors.bottom: parent.bottom
         anchors.bottomMargin: Theme.dp(20)
-        text: (Prefs.barNotch ? "Notches" : "Islands") + "  ·  " + (Prefs.barPopupMode ? "pop-up" : "morph")
+        text: (Prefs.barFull ? "Full bar" : Prefs.barNotch ? "Notches" : "Islands") + "  ·  " + (Prefs.barPopupMode ? (screen.notchedPopup ? "notched pop-up" : "pop-up") : "morph") + (Prefs.barAutoHide ? "  ·  auto-hide" : "")
         color: Theme.subtext
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontLabel

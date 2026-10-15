@@ -29,9 +29,12 @@ Singleton {
     }
 
     readonly property bool barNotch: root.barStyle === "notch"
+    readonly property bool barFull: root.barStyle === "full"
+    // notches and the full bar both sit flush against the top edge
+    readonly property bool barFlush: root.barNotch || root.barFull
     readonly property bool dockNotch: root.dockStyle === "notch"
     readonly property int barPillRadius: Math.min(Theme.rad(18), Math.round(Theme.pill(Theme.dp(root.barHeight))))
-    readonly property int effectiveBarTopMargin: root.barNotch ? 0 : Theme.dp(root.barTopMargin)
+    readonly property int effectiveBarTopMargin: root.barFlush ? 0 : Theme.dp(root.barTopMargin)
     readonly property int effectiveDockBottomMargin: root.dockNotch ? 0 : Theme.dp(root.dockBottomMargin)
     readonly property int dockItemRadius: Math.min(Theme.rad(root.dockRadius), Math.round(Theme.pill(Theme.dp(root.dockIconSize))))
     readonly property int dockIconInset: Math.max(0, Math.min(Theme.dp(root.dockIconPadding), Math.floor(Theme.dp(root.dockIconSize) / 2) - Theme.dp(6)))
@@ -39,7 +42,7 @@ Singleton {
     // only the modules switched on. the names are the zones' from before the
     // bar page's arrangement editor, so the bar itself needn't know the difference
     readonly property var barZones: ["left", "centre", "right"]
-    readonly property var barLayoutKeys: ["barLayout"]
+    readonly property var barLayoutKeys: ["barLayout", "barJoins", "barJoinDividers"]
 
     function barModuleAt(key) {
         return root.barModuleById[key] || null;
@@ -378,6 +381,27 @@ Singleton {
     // the same clamp Theme.uiScale applies, for code that has to wait on Prefs.loaded
     readonly property real interfaceScale: Math.max(0.7, Math.min(1.3, root.uiScale || 1))
     property alias wallpaperFolder: s.wallpaperFolder
+    property alias wallpaperPickerStyle: s.wallpaperPickerStyle
+    property alias wallpaperPickerKeys: s.wallpaperPickerKeys
+    property alias liveWallpapers: s.liveWallpapers
+    property alias liveDecoder: s.liveDecoder
+    property alias livePauseUnder: s.livePauseUnder
+    property alias liveGameMode: s.liveGameMode
+    property alias wallpaperPillsShape: s.wallpaperPillsShape
+    property alias wallpaperStripSteps: s.wallpaperStripSteps
+    property alias wallpaperStripSides: s.wallpaperStripSides
+    property alias wallpaperTilesRows: s.wallpaperTilesRows
+    property alias wallpaperTilesAspect: s.wallpaperTilesAspect
+    property alias wallpaperBentoHero: s.wallpaperBentoHero
+    property alias wallpaperBentoPrev: s.wallpaperBentoPrev
+    property alias wallTransType: s.wallTransType
+    property alias wallTransDuration: s.wallTransDuration
+    property alias wallTransAngle: s.wallTransAngle
+    property alias wallTransOrigin: s.wallTransOrigin
+    property alias wallTransBezier: s.wallTransBezier
+    property alias wallTransWave: s.wallTransWave
+    property alias wallTransPreset: s.wallTransPreset
+    property alias wallTransCustomPresets: s.wallTransCustomPresets
     // bracket writes on the adapter are dropped, so this must go through the alias
     property alias themeOrder: s.themeOrder
     // how matugen builds a palette, from the wallpaper or from themeColour: its
@@ -415,6 +439,7 @@ Singleton {
     property alias barEnabled: s.barEnabled
     property alias barPopupMode: s.barPopupMode
     property alias barPopupGap: s.barPopupGap
+    property alias barPopupNotched: s.barPopupNotched
     property alias barHeight: s.barHeight
     property alias barTopMargin: s.barTopMargin
     property alias barSideMargin: s.barSideMargin
@@ -423,6 +448,8 @@ Singleton {
     property alias barZoneGap: s.barZoneGap
     property alias systemTiles: s.systemTiles
     property alias barLayout: s.barLayout
+    property alias barJoins: s.barJoins
+    property alias barJoinDividers: s.barJoinDividers
     property alias showWorkspaces: s.showWorkspaces
     property alias showMedia: s.showMedia
     property alias showTray: s.showTray
@@ -568,8 +595,13 @@ Singleton {
     property alias dockHoverEffect: s.dockHoverEffect
     property alias barMotionScale: s.barMotionScale
     property alias barNotchFlare: s.barNotchFlare
+    // the concave corners the full bar hangs against the screen sides
+    property alias barFullCorner: s.barFullCorner
+    property alias barHoverOpen: s.barHoverOpen
+    property alias barAutoHide: s.barAutoHide
     property alias dockNotchFlare: s.dockNotchFlare
     property alias dockAutoHide: s.dockAutoHide
+    property alias dockDynamicHide: s.dockDynamicHide
     property alias dockShowIndicators: s.dockShowIndicators
     property alias dockShowTooltips: s.dockShowTooltips
     property alias dockShowRunning: s.dockShowRunning
@@ -584,6 +616,10 @@ Singleton {
 
     property alias btScanOnOpen: s.btScanOnOpen
     property alias btShowUnnamed: s.btShowUnnamed
+    property alias btReceive: s.btReceive
+    property alias btAgent: s.btAgent
+    property alias btReceiveFolder: s.btReceiveFolder
+    property alias btReceiveAutoPaired: s.btReceiveAutoPaired
     property alias audioMoveStreams: s.audioMoveStreams
     property alias kdeConnectEnabled: s.kdeConnectEnabled
     property alias updateCheck: s.updateCheck
@@ -611,6 +647,16 @@ Singleton {
     property alias specialCustom: s.specialCustom
     // Hyprland options set from Settings > Windows, as JSON { "general.gaps_in": 8, ... }
     property alias hyprOptions: s.hyprOptions
+    property alias pinBorder: s.pinBorder
+    property alias pinBadge: s.pinBadge
+    property alias pinPulse: s.pinPulse
+    property alias urgentBadge: s.urgentBadge
+    property alias urgentPulse: s.urgentPulse
+    // Settings > Startup: JSON lists of { name, cmd, entry, on } and { name, value, on },
+    // and whether the session starts the XDG autostart entries
+    property alias startupApps: s.startupApps
+    property alias startupEnv: s.startupEnv
+    property alias startupXdg: s.startupXdg
 
     property alias glassApps: s.glassApps
     property alias glassValues: s.glassValues
@@ -646,8 +692,27 @@ Singleton {
 
     property alias desktopSelection: s.desktopSelection
     property alias desktopMenu: s.desktopMenu
+    property alias desktopIcons: s.desktopIcons
+    property alias desktopIconSize: s.desktopIconSize
+    property alias desktopIconsCorner: s.desktopIconsCorner
+    property alias desktopIconsSort: s.desktopIconsSort
+    property alias desktopIconsOpen: s.desktopIconsOpen
+    property alias desktopIconsThumbs: s.desktopIconsThumbs
+    property alias desktopIconsHidden: s.desktopIconsHidden
+    property alias desktopIconsHideExt: s.desktopIconsHideExt
+    property alias desktopIconsHome: s.desktopIconsHome
+    property alias desktopIconsTrash: s.desktopIconsTrash
+    property alias desktopIconsDrives: s.desktopIconsDrives
+    property alias desktopIconsShown: s.desktopIconsShown
+    property alias desktopIconsAutoArrange: s.desktopIconsAutoArrange
+    property alias desktopIconsSortDesc: s.desktopIconsSortDesc
+    property alias desktopIconsSpring: s.desktopIconsSpring
+    property alias desktopKeys: s.desktopKeys
+    property alias desktopIconSpacing: s.desktopIconSpacing
     property alias shotPreview: s.shotPreview
     property alias shotPreviewSeconds: s.shotPreviewSeconds
+    property alias osdCapsLock: s.osdCapsLock
+    property alias osdNumLock: s.osdNumLock
 
     // one-shot: the machine's own gtk/qt/cursor settings are read in once
     property alias envAdopted: s.envAdopted
@@ -685,6 +750,7 @@ Singleton {
     property alias timerSound: s.timerSound
     property alias reminderSound: s.reminderSound
     property alias weekStartMonday: s.weekStartMonday
+    property alias units: s.units
     property alias launcherSearchEngine: s.launcherSearchEngine
     property alias launcherWebRow: s.launcherWebRow
     property alias launcherWindows: s.launcherWindows
@@ -739,12 +805,12 @@ Singleton {
         { "key": "users", "icon": "account_circle", "keys": "user account password avatar login admin sudo", "group": "Account", "label": "Account", "title": "Users and Accounts", "blurb": "Who may sign in to this machine, what they are called and what they are allowed to do", "hidden": true },
         { "key": "general", "icon": "tune", "keys": "style islands notches accent darkness surface tint motion animation speed font scale typography interface size zoom smaller bigger density", "group": "Appearance", "label": "General", "title": "General", "blurb": "Size, shape, colour and motion across the whole shell" },
         { "key": "glass", "icon": "blur_on", "keys": "blur transparency opacity translucent frosted kitty terminal windows", "group": "Appearance", "label": "Glass", "title": "Glass", "blurb": "How far the desktop shows through the shell, the terminal and your windows" },
-        { "key": "theme", "icon": "palette", "keys": "colour color scheme wallpaper matugen pywal catppuccin gruvbox nord dark light mode import", "group": "Appearance", "label": "Theme", "title": "Theme and Appearance", "blurb": "Colour schemes, wallpapers and themes you import" },
+        { "key": "theme", "icon": "palette", "keys": "colour color scheme wallpaper picker arrow keys live video animated mp4 decoder matugen pywal catppuccin gruvbox nord dark light mode import", "group": "Appearance", "label": "Theme", "title": "Theme and Appearance", "blurb": "Colour schemes, wallpapers and themes you import" },
         { "key": "colours", "icon": "format_color_fill", "keys": "matugen style scheme contrast your colour hex picker templates apps render variables", "group": "Appearance", "label": "Colours", "title": "Colours", "blurb": "How Matugen and Your colour build a palette, the applications that follow it, and templates of your own" },
         { "key": "palettes", "icon": "colors", "keys": "gallery schemes base16 base24 tinted import repo file editor export", "group": "Appearance", "label": "Palettes", "title": "Palettes", "blurb": "A gallery of colour schemes, and themes from a repo or a file" },
         { "key": "environment", "icon": "format_paint", "keys": "cursor icons gtk qt fonts application theme", "group": "Appearance", "label": "Environment", "title": "Environment", "blurb": "Cursors, icons, fonts and application themes, across GTK, Qt and Hyprland alike" },
-        { "key": "bar", "icon": "toolbar", "keys": "status height margin spacing modules workspaces clock media tray system popup", "group": "Desktop", "label": "Bar", "title": "Bar", "blurb": "The status bar, its modules and how they open", "toggle": "barEnabled" },
-        { "key": "dock", "icon": "dock_to_bottom", "keys": "icons size magnify autohide pinned running indicators tooltips windows notch radius corners rounding padding inset", "group": "Desktop", "label": "Dock", "title": "Dock", "blurb": "The dock, its icons and how it behaves", "toggle": "dockEnabled" },
+        { "key": "bar", "icon": "toolbar", "keys": "status height margin spacing modules workspaces clock media tray system popup full hover auto-hide autohide corners", "group": "Desktop", "label": "Bar", "title": "Bar", "blurb": "The status bar, its modules and how they open", "toggle": "barEnabled" },
+        { "key": "dock", "icon": "dock_to_bottom", "keys": "icons size magnify autohide dynamic hiding pinned running indicators tooltips windows notch radius corners rounding padding inset", "group": "Desktop", "label": "Dock", "title": "Dock", "blurb": "The dock, its icons and how it behaves", "toggle": "dockEnabled" },
         { "key": "launcher", "icon": "search", "keys": "launcher search spotlight apps results width density rows chips modes prefix engine web emoji run clipboard calculator frequent recent", "group": "Desktop", "label": "Launcher", "title": "Launcher", "blurb": "The search panel the dock opens into: how wide it is, how its results read, and what it looks through" },
         { "key": "widgets", "icon": "widgets", "keys": "desktop cards clock calendar weather presets", "group": "Desktop", "label": "Widgets", "title": "Widgets", "blurb": "Cards you place on the desktop and arrange yourself", "toggle": "widgetsEnabled" },
         { "key": "windows", "icon": "select_window", "keys": "hyprland gaps exclusive zone reserved distance shell bar dock borders border colour rounding corners shadow dim tiling layout dwindle master scrolling focus follow mouse cursor resize snap animations", "group": "Desktop", "label": "Windows", "title": "Windows", "blurb": "How Hyprland draws your windows, tiles them and hands them the focus" },
@@ -756,9 +822,10 @@ Singleton {
         { "key": "network", "icon": "wifi", "keys": "wifi ethernet vpn dns ip proxy internet", "group": "Devices", "label": "Network", "title": "Network", "blurb": "Wi-Fi, wired, VPN and how this machine gets its address" },
         { "key": "bluetooth", "icon": "bluetooth", "keys": "devices pair headphones", "group": "Devices", "label": "Bluetooth", "title": "Bluetooth and Devices", "blurb": "The radio, what it is paired with, and the phone you connect to it" },
         { "key": "kdeconnect", "icon": "smartphone", "keys": "phone kde connect files notifications clipboard", "group": "Devices", "label": "Phone", "title": "Phone", "blurb": "Your phone on this machine over KDE Connect: files, notifications, clipboard and a remote", "toggle": "kdeConnectEnabled" },
+        { "key": "startup", "icon": "start", "keys": "autostart login apps open at login run startup environment variables env xdg session", "group": "System", "label": "Startup", "title": "Startup", "blurb": "Apps opened when you log in, system autostart and environment variables" },
         { "key": "notifications", "icon": "notifications", "keys": "popups toasts do not disturb dnd quiet hours sound muted apps", "group": "System", "label": "Notifications", "title": "Notifications", "blurb": "Popups, quiet hours, sound and which applications may interrupt you", "toggle": "barNotifications" },
         { "key": "idle", "icon": "bedtime", "keys": "sleep suspend lock dim screen off hypridle caffeine", "group": "System", "label": "Idle", "title": "Idle and Sleep", "blurb": "What happens when you walk away: dimming, locking, screen off and suspend", "toggle": "idleEnabled" },
-        { "key": "datetime", "icon": "schedule", "keys": "clock time zone location 24 hour seconds week monday sunday timer pomodoro focus break alarm world", "group": "System", "label": "Date & Time", "title": "Date and Time", "blurb": "Where you are, the clock, and its timers" },
+        { "key": "datetime", "icon": "schedule", "keys": "clock time zone location 24 hour seconds week monday sunday units metric imperial celsius fahrenheit temperature wind mph timer pomodoro focus break alarm world", "group": "System", "label": "Date & Time", "title": "Date and Time", "blurb": "Where you are, the clock, and its timers" },
         { "key": "storage", "icon": "hard_drive", "keys": "disk space storage usage free full clean cleanup cache trash duplicates large files drives ssd health smart trim mount", "group": "System", "label": "Storage", "title": "Storage", "blurb": "What fills your drives, what could go, and the drives themselves" },
         { "key": "about", "icon": "info", "keys": "version update lucid", "group": "System", "label": "About", "title": "About", "blurb": "Lucid" }
     ]
@@ -828,6 +895,27 @@ Singleton {
         "cornerScale": 1,
         "shellGap": 0,
         "wallpaperFolder": "",
+        "wallpaperPickerStyle": "strip",
+        "wallpaperPickerKeys": "sides",
+        "liveWallpapers": true,
+        "liveDecoder": "auto",
+        "livePauseUnder": "any",
+        "liveGameMode": "pause",
+        "wallpaperPillsShape": "uniform",
+        "wallpaperStripSteps": "normal",
+        "wallpaperStripSides": 2,
+        "wallpaperTilesRows": 2,
+        "wallpaperTilesAspect": "square",
+        "wallpaperBentoHero": "medium",
+        "wallpaperBentoPrev": true,
+        "wallTransType": "fade",
+        "wallTransDuration": 1,
+        "wallTransAngle": 45,
+        "wallTransOrigin": "center",
+        "wallTransBezier": ".54,0,.34,.99",
+        "wallTransWave": "20,20",
+        "wallTransPreset": "soft",
+        "wallTransCustomPresets": "",
         "themeOrder": "",
         "matugenScheme": "scheme-tonal-spot",
         "matugenContrast": 0,
@@ -837,6 +925,7 @@ Singleton {
         "barEnabled": true,
         "barPopupMode": false,
         "barPopupGap": 10,
+        "barPopupNotched": false,
         "barHeight": 35,
         "barTopMargin": 22,
         "barSideMargin": 17,
@@ -845,6 +934,8 @@ Singleton {
         "barZoneGap": 26,
         "systemTiles": "dnd,awake,dark,airplane,location,mic,capture,record,picker,keyboard,timer,session",
         "barLayout": "{\"left\":[\"workspaces\",\"media\",\"tray\"],\"center\":[\"clock\"],\"right\":[\"notifications\",\"system\"]}",
+        "barJoins": "[]",
+        "barJoinDividers": true,
         "showWorkspaces": true,
         "showMedia": true,
         "showTray": true,
@@ -962,8 +1053,12 @@ Singleton {
         "dockHoverEffect": 1,
         "barMotionScale": 1.35,
         "barNotchFlare": 14,
+        "barFullCorner": 18,
+        "barHoverOpen": false,
+        "barAutoHide": false,
         "dockNotchFlare": 14,
         "dockAutoHide": false,
+        "dockDynamicHide": false,
         "dockShowIndicators": true,
         "dockShowTooltips": true,
         "dockShowRunning": true,
@@ -976,6 +1071,10 @@ Singleton {
         "widgetOnTop": false,
         "btScanOnOpen": true,
         "btShowUnnamed": false,
+        "btReceive": true,
+        "btAgent": true,
+        "btReceiveFolder": "",
+        "btReceiveAutoPaired": false,
         "audioMoveStreams": true,
         "kdeConnectEnabled": true,
         "updateCheck": true,
@@ -1003,8 +1102,27 @@ Singleton {
         "idleWhileMedia": true,
         "desktopSelection": true,
         "desktopMenu": true,
+        "desktopIcons": false,
+        "desktopIconSize": "medium",
+        "desktopIconsCorner": "left",
+        "desktopIconsSort": "name",
+        "desktopIconsOpen": "double",
+        "desktopIconsThumbs": true,
+        "desktopIconsHidden": false,
+        "desktopIconsHideExt": false,
+        "desktopIconsHome": false,
+        "desktopIconsTrash": true,
+        "desktopIconsDrives": true,
+        "desktopIconsShown": true,
+        "desktopIconsAutoArrange": false,
+        "desktopIconsSortDesc": false,
+        "desktopIconsSpring": true,
+        "desktopKeys": "{}",
+        "desktopIconSpacing": "normal",
         "shotPreview": "preview",
         "shotPreviewSeconds": 6,
+        "osdCapsLock": true,
+        "osdNumLock": true,
         "envAdopted": false,
         "envCursorTheme": "",
         "envCursorSize": 24,
@@ -1040,6 +1158,14 @@ Singleton {
         "specialGaps": 0,
         "specialCustom": "[]",
         "hyprOptions": "{}",
+        "pinBorder": "tertiary",
+        "pinBadge": "top-right",
+        "pinPulse": true,
+        "urgentBadge": "top-left",
+        "urgentPulse": true,
+        "startupApps": "[]",
+        "startupEnv": "[]",
+        "startupXdg": false,
         "glassApps": "vscodium",
         "glassValues": "vscodium=0.9",
         "monitorSetups": "{}",
@@ -1062,6 +1188,7 @@ Singleton {
         "timerSound": true,
         "reminderSound": true,
         "weekStartMonday": true,
+        "units": "metric",
         "launcherSearchEngine": "duckduckgo",
         "launcherWebRow": true,
         "launcherWindows": true,
@@ -1184,6 +1311,51 @@ Singleton {
             "center": groups.center,
             "right": groups.right
         });
+    }
+
+    // modules joined into one island (or one notch), as "a+b" pairs in barJoins.
+    // a pair only counts while the two sit side by side in a group with both
+    // shown, so moving one away parts them without touching the list, and putting
+    // it back joins them again
+    readonly property var barJoinSet: root.parseBarJoins(root.barJoins)
+
+    function parseBarJoins(text) {
+        const out = ({});
+        let parsed = null;
+        try {
+            parsed = JSON.parse(text);
+        } catch (e) {
+        }
+        if (!Array.isArray(parsed))
+            return out;
+
+        for (const pair of parsed) {
+            if (typeof pair === "string" && pair.indexOf("+") > 0)
+                out[pair] = true;
+
+        }
+        return out;
+    }
+
+    function barJoined(a, b) {
+        return root.barJoinSet[a + "+" + b] === true || root.barJoinSet[b + "+" + a] === true;
+    }
+
+    // what the bar draws: every module already shares the full bar's one strip
+    function barJoinedNow(a, b) {
+        return !root.barFull && root.barJoined(a, b);
+    }
+
+    function setBarJoined(a, b, on) {
+        const keep = Object.keys(root.barJoinSet).filter((k) => {
+            return k !== a + "+" + b && k !== b + "+" + a;
+        });
+        if (on)
+            keep.push(a + "+" + b);
+
+        // the pills ease into their new places, as for any rearrangement
+        root.barReorderTick++;
+        root.barJoins = JSON.stringify(keep);
     }
 
     // on means the modules that ship switched on; one that ships off stays off
@@ -1419,6 +1591,32 @@ Singleton {
             property real cornerScale: 1
             property int shellGap: 0
             property string wallpaperFolder: ""
+            property string wallpaperPickerStyle: "strip"
+            // "sides": left and right change the wallpaper; "updown": up and down do,
+            // and left and right stay with the search field. Tiles takes all four.
+            property string wallpaperPickerKeys: "sides"
+            // videos in the wallpaper folder, played behind the desktop (LiveWall.qml).
+            // decoder: auto | vaapi | cuda | cpu; pause under: never | fullscreen | any;
+            // in game mode: play | pause | still (the first frame, player stopped)
+            property bool liveWallpapers: true
+            property string liveDecoder: "auto"
+            property string livePauseUnder: "any"
+            property string liveGameMode: "pause"
+            property string wallpaperPillsShape: "uniform"
+            property string wallpaperStripSteps: "normal"
+            property int wallpaperStripSides: 2
+            property int wallpaperTilesRows: 2
+            property string wallpaperTilesAspect: "square"
+            property string wallpaperBentoHero: "medium"
+            property bool wallpaperBentoPrev: true
+            property string wallTransType: "fade"
+            property real wallTransDuration: 1
+            property int wallTransAngle: 45
+            property string wallTransOrigin: "center"
+            property string wallTransBezier: ".54,0,.34,.99"
+            property string wallTransWave: "20,20"
+            property string wallTransPreset: "soft"
+            property string wallTransCustomPresets: ""
             property string themeOrder: ""
             property string matugenScheme: "scheme-tonal-spot"
             property real matugenContrast: 0
@@ -1428,6 +1626,7 @@ Singleton {
             property bool barEnabled: true
             property bool barPopupMode: false
             property int barPopupGap: 10
+            property bool barPopupNotched: false
             property int barHeight: 35
             property int barTopMargin: 22
             property int barSideMargin: 17
@@ -1436,6 +1635,8 @@ Singleton {
             property int barZoneGap: 26
             property string systemTiles: "dnd,awake,dark,airplane,location,mic,capture,record,picker,keyboard,timer,session"
             property string barLayout: "{\"left\":[\"workspaces\",\"media\",\"tray\"],\"center\":[\"clock\"],\"right\":[\"notifications\",\"system\"]}"
+            property string barJoins: "[]"
+            property bool barJoinDividers: true
             property bool showWorkspaces: true
             property bool showMedia: true
             property bool showTray: true
@@ -1553,8 +1754,12 @@ Singleton {
             property real dockHoverEffect: 1
             property real barMotionScale: 1.35
             property int barNotchFlare: 14
+            property int barFullCorner: 18
+            property bool barHoverOpen: false
+            property bool barAutoHide: false
             property int dockNotchFlare: 14
             property bool dockAutoHide: false
+            property bool dockDynamicHide: false
             property bool dockShowIndicators: true
             property bool dockShowTooltips: true
             property bool dockShowRunning: true
@@ -1567,6 +1772,10 @@ Singleton {
             property bool widgetOnTop: false
             property bool btScanOnOpen: true
             property bool btShowUnnamed: false
+            property bool btReceive: true
+            property bool btAgent: true
+            property string btReceiveFolder: ""
+            property bool btReceiveAutoPaired: false
             property bool audioMoveStreams: true
             property bool kdeConnectEnabled: true
             property bool updateCheck: true
@@ -1594,8 +1803,28 @@ Singleton {
             property bool idleWhileMedia: true
             property bool desktopSelection: true
             property bool desktopMenu: true
+            property bool desktopIcons: false
+            property string desktopIconSize: "medium"
+            property string desktopIconsCorner: "left"
+            property string desktopIconsSort: "name"
+            property string desktopIconsOpen: "double"
+            property bool desktopIconsThumbs: true
+            property bool desktopIconsHidden: false
+            property bool desktopIconsHideExt: false
+            property bool desktopIconsHome: false
+            property bool desktopIconsTrash: true
+            property bool desktopIconsDrives: true
+            property bool desktopIconsShown: true
+            property bool desktopIconsAutoArrange: false
+            property bool desktopIconsSortDesc: false
+            property bool desktopIconsSpring: true
+            property string desktopKeys: "{}"
+            property string desktopIconSpacing: "normal"
             property string shotPreview: "preview"
             property int shotPreviewSeconds: 6
+            // the osd's card as caps lock or num lock goes on or off
+            property bool osdCapsLock: true
+            property bool osdNumLock: true
             property bool envAdopted: false
             property string envCursorTheme: ""
             property int envCursorSize: 24
@@ -1631,6 +1860,14 @@ Singleton {
             property int specialGaps: 0
             property string specialCustom: "[]"
             property string hyprOptions: "{}"
+            property string pinBorder: "tertiary"
+            property string pinBadge: "top-right"
+            property bool pinPulse: true
+            property string urgentBadge: "top-left"
+            property bool urgentPulse: true
+            property string startupApps: "[]"
+            property string startupEnv: "[]"
+            property bool startupXdg: false
             // the apps on the Glass page, and the ones given their own value
             property string glassApps: "vscodium"
             property string glassValues: "vscodium=0.9"
@@ -1655,6 +1892,7 @@ Singleton {
             property bool timerSound: true
             property bool reminderSound: true
             property bool weekStartMonday: true
+            property string units: "metric"
             property string launcherSearchEngine: "duckduckgo"
             property bool launcherWebRow: true
             property bool launcherWindows: true

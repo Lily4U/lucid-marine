@@ -19,6 +19,8 @@ QtObject {
 
     readonly property string visible: "visibility"
     readonly property string hidden: "visibility_off"
+    readonly property string iconsShown: "grid_on"
+    readonly property string iconsHidden: "grid_off"
     readonly property string camera: "photo_camera"
 
     readonly property string power: "power_settings_new"

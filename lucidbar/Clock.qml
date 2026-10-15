@@ -244,7 +244,14 @@ BarPill {
                 MouseArea {
                     anchors.fill: parent
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: root.openTab(timerChip.h && timerChip.h.kind === "stopwatch" ? "stopwatch" : "timer")
+                    onClicked: {
+                        const t = timerChip.h && timerChip.h.kind === "stopwatch" ? "stopwatch" : "timer";
+                        // in pop-up mode the chip stays under its open tab, so a second click shuts it
+                        if (root.popupMode && root.expanded && root.tab === t)
+                            root.expanded = false;
+                        else
+                            root.openTab(t);
+                    }
                 }
 
             }
@@ -403,7 +410,7 @@ BarPill {
                     size: Theme.fs(13.5)
                     weight: 600
                     rounded: 100
-                    text: root.wx ? root.wx.tempC + "°" : ""
+                    text: root.wx ? Units.deg(root.wx.tempC, root.wx.tempF) : ""
                 }
 
             }

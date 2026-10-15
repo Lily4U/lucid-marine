@@ -18,7 +18,7 @@ Item {
     // words people search for that a page never uses itself
     property var keywords: ({
         "users": "password avatar picture login sign in",
-        "general": "accent animation motion rounding corners islands notches size scale zoom smaller bigger larger compact density",
+        "general": "accent animation motion rounding corners islands notches size scale zoom smaller bigger larger compact density desktop icons files folders trash recycle bin drives osd pop-up popup caps lock num lock on-screen display",
         "glass": "blur transparency transparent opacity translucent frosted",
         "theme": "palette wallpaper background dark light matugen",
         "environment": "gtk qt cursor icon theme font",
@@ -27,7 +27,8 @@ Item {
         "launcher": "app menu start",
         "widgets": "desktop cards",
         "workspaces": "scratchpad special",
-        "keybinds": "shortcuts hotkeys keys keyboard",
+        "startup": "autostart login boot launch run open env variable variables environment export",
+        "keybinds": "shortcuts hotkeys keys keyboard desktop icons copy cut paste undo rename delete",
         "displays": "monitor monitors screen resolution refresh scale hdmi",
         "sound": "audio volume speakers headphones microphone system sounds chime beep usb charger camera",
         "network": "internet ethernet wired wireless",
@@ -35,7 +36,7 @@ Item {
         "kdeconnect": "kde connect android",
         "notifications": "dnd popups toast usb camera",
         "idle": "lock suspend screen off timeout hypridle",
-        "datetime": "clock timezone time zone",
+        "datetime": "clock timezone time zone units metric imperial celsius fahrenheit mph km/h",
         "storage": "disk space full free clean cleanup cache trash duplicates large files drive ssd health smart trim mount usb",
         "about": "version update"
     })

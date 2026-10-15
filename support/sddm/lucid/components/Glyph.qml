@@ -12,6 +12,7 @@ Item {
         "lockOpen": "lock_open",
         "key": "key",
         "arrow": "arrow_forward",
+        "finger": "fingerprint",
         "check": "check",
         "eye": "visibility",
         "eyeOff": "visibility_off",

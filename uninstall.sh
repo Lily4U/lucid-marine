@@ -47,6 +47,11 @@ if [[ -d "$SDDM_THEME_DIR" ]] && ask "Remove the sddm theme at $SDDM_THEME_DIR (
         printf '           theme first, or you will get sddm'"'"'s fallback greeter.\n' >&2
     fi
     sudo rm -rf "$SDDM_THEME_DIR" && echo "  removed"
+    # the fingerprint lines install-theme.sh put in sddm's pam service
+    if grep -q '^# >>> lucid: fingerprint login' /etc/pam.d/sddm 2>/dev/null; then
+        sudo sed -i '/^# >>> lucid: fingerprint login/,/^# <<< lucid: fingerprint login/d' /etc/pam.d/sddm \
+            && echo "  fingerprint login taken out of /etc/pam.d/sddm"
+    fi
 fi
 
 printf '\n%sDone.%s Left in place, each with a timestamped backup beside it:\n' "$b" "$r"

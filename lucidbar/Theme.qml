@@ -529,7 +529,8 @@ Singleton {
     }
 
     // one rung of the surface ramp. tinting also walks the rung away from the
-    // extreme it sits against, because a tone carries no hue there
+    // extreme it sits against, because a tone carries no hue there. apps get the
+    // same light surfaces from lucid_palette.app_surfaces: keep the two in step
     function surface(c, tones) {
         return root.tint(root.shade(c, tones + root._rampShift), root.surfaceTint);
     }

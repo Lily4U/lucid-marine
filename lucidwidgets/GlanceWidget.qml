@@ -9,7 +9,6 @@ WidgetBody {
     id: w
 
     property date now: Loc.now()
-    readonly property bool metric: w.opt("units") !== "imperial"
     readonly property bool onWall: w.variant === "line"
     readonly property var report: WeatherSource.report
     readonly property bool night: w.report && w.report.isDay !== undefined ? !w.report.isDay : (w.now.getHours() < 6 || w.now.getHours() >= 20)
@@ -159,7 +158,7 @@ WidgetBody {
                     weight: 560
                     rounded: 60
                     color: w.fg
-                    text: w.report ? (w.metric ? w.report.tempC : w.report.tempF) + "°" : ""
+                    text: w.report ? Units.deg(w.report.tempC, w.report.tempF) : ""
                 }
 
             }

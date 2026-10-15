@@ -55,7 +55,7 @@ Item {
 
         bits.push(ov.vol.fstype);
         if (ov.drive && ov.drive.temp > 0)
-            bits.push(Math.round(ov.drive.temp) + " °C");
+            bits.push(Units.degUnit(ov.drive.temp));
 
         return bits.join("  ·  ");
     }

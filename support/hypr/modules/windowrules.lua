@@ -57,7 +57,7 @@ hl.window_rule({
     name  = "float-lucid-choosers",
     match = {
         class = "^(org\\.gnome\\.Nautilus|xdg-desktop-portal-gtk|xdg-desktop-portal-gnome|zenity|org\\.kde\\.kdialog|kdialog)$",
-        title = "^(Choose an account picture|Choose a template|Choose a colour scheme|Export the palette|Add wallpaper|Send files|Send to .+)$",
+        title = "^(Choose an account picture|Choose a template|Choose a colour scheme|Export the palette|Add wallpaper|Save received files to|Send files|Send to .+)$",
     },
 
     float  = true,

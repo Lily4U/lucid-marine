@@ -18,6 +18,10 @@ Item {
 
     property bool dragging: false
     property real pinDragCenter: -1
+    // a pin pulled off the dock goes to the desktop as a launcher instead of unpinning;
+    // sending is set while that drag is in the air
+    property bool desktopDrop: false
+    property bool sending: false
 
     signal stackPopupRequested(Item view, string appId, string iconName, string command)
     signal contextMenuRequested(Item view, string appId, string command)
@@ -122,7 +126,24 @@ Item {
             readonly property real removeThreshold: 40
             property real dragOffsetY: 0
 
-            readonly property bool overRemoveThreshold: row.dragMode === "reorder" && dragHandler.active && -slot.y > slot.removeThreshold
+            readonly property bool overRemoveThreshold: row.dragMode === "reorder" && !row.desktopDrop && dragHandler.active && -slot.y > slot.removeThreshold
+            // pulled far enough to leave for the desktop
+            property bool outward: false
+
+            // hands the pin to a system drag the desktop takes as a launcher; the slot springs back
+            function sendOut() {
+                slot.outward = true;
+                row.sending = true;
+                proxy.Drag.mimeData = {
+                    "application/x-lucid-desktop-app": JSON.stringify({
+                        "appId": slot.appId,
+                        "iconName": slot.iconName,
+                        "name": slot.displayName,
+                        "command": slot.command
+                    })
+                };
+                proxy.Drag.active = true;
+            }
             readonly property bool overPinThreshold: row.dragMode === "pin" && dragHandler.active && row.pinArmed
 
             property real entranceScale: slot.justAdded ? 0.55 : 1
@@ -169,8 +190,12 @@ Item {
 
             }
             onYChanged: {
-                if (dragHandler.active)
-                    slot.dragOffsetY = slot.y;
+                if (!dragHandler.active)
+                    return;
+
+                slot.dragOffsetY = slot.y;
+                if (row.desktopDrop && row.dragMode === "reorder" && !slot.outward && -slot.y > slot.removeThreshold)
+                    slot.sendOut();
 
             }
 
@@ -284,6 +309,24 @@ Item {
 
             }
 
+            // what the desktop receives: the app, under its own type, with the icon riding the pointer
+            Item {
+                id: proxy
+
+                width: slot.width
+                height: slot.height
+                Drag.dragType: Drag.Automatic
+                Drag.supportedActions: Qt.CopyAction | Qt.LinkAction
+                Drag.proposedAction: Qt.CopyAction
+                Drag.hotSpot.x: slot.width / 2
+                Drag.hotSpot.y: slot.height / 2
+                Drag.onDragFinished: (action) => {
+                    proxy.Drag.active = false;
+                    slot.outward = false;
+                    row.sending = false;
+                }
+            }
+
             DragHandler {
                 id: dragHandler
 
@@ -300,16 +343,33 @@ Item {
                     if (active) {
                         slot.dragOffsetY = 0;
                         slot.publishCenter();
+                        // the drag image, ready by the time the pin is pulled off
+                        if (row.desktopDrop && row.dragMode === "reorder")
+                            itemView.grabToImage((r) => {
+                                proxy.Drag.imageSource = r.url;
+                            });
+
+                        return;
+                    }
+                    // gone to the desktop as a system drag: the pin stays where it was
+                    if (slot.outward) {
+                        row.orderChanged();
                         return;
                     }
                     if (row.dragMode === "pin") {
-                        if (row.pinArmed)
-                            row.pinRequested(slot.appId, row.dropIndex);
-
+                        // pinning takes this running entry out of the model, which destroys this
+                        // delegate mid-handler: read and reset everything before asking
+                        var armed = row.pinArmed;
+                        var at = row.dropIndex;
+                        var id = slot.appId;
                         row.pinDragCenter = -1;
+                        if (armed)
+                            row.pinRequested(id, at);
+
                         return;
                     }
-                    if (-slot.dragOffsetY > slot.removeThreshold)
+                    // with the desktop taking pins, a pull never unpins: the menu does that
+                    if (-slot.dragOffsetY > slot.removeThreshold && !row.desktopDrop)
                         removeAnim.start();
                     else
                         row.orderChanged();

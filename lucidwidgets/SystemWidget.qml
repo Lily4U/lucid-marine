@@ -88,7 +88,7 @@ WidgetBody {
             "short": "Temp",
             "icon": "thermostat",
             "value": Math.min(1, w.temp / 100),
-            "text": Math.round(w.temp) + "°",
+            "text": Units.deg(w.temp),
             "detail": w.temp > 80 ? "Running hot" : "CPU package"
         });
 
@@ -100,7 +100,7 @@ WidgetBody {
             "icon": "developer_board",
             "value": w.gpu,
             "text": Math.round(w.gpu * 100) + "%",
-            "detail": Sys.gpuTemp >= 0 ? Math.round(Sys.gpuTemp) + "°" : ""
+            "detail": Sys.gpuTemp >= 0 ? Units.deg(Sys.gpuTemp) : ""
         });
 
         return out;
