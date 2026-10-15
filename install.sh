@@ -48,7 +48,7 @@ ${b}Lucid $VERSION installer${r}
 
   --no-theming   skip the palette layer; leave ~/.config/lucid
                  and ~/.config/matugen untouched
-  --no-look      don't touch kitty.conf, starship.toml or VSCode
+  --no-look      don't touch kitty.conf, starship.toml, fastfetch or VSCode
                  settings
   --no-hypr      keep your Hyprland config; Lucid's binds, window
                  rules and blur are not installed
@@ -1043,7 +1043,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     # --- the look: terminal + prompt + blur -------------------------------
     # each piece is additive and backed up first, because these are files the
     # user owns and may already have tuned
-    if [[ $WITH_LOOK -eq 1 ]] && ask "  Apply the Lucid look (kitty, starship prompt, VSCode theme, GTK theme + icons)?"; then
+    if [[ $WITH_LOOK -eq 1 ]] && ask "  Apply the Lucid look (kitty, starship prompt, fastfetch, VSCode theme, GTK theme + icons)?"; then
 
         # --- gtk theme + icons --------------------------------------------
         # gtk reads three places and they disagree happily. under hyprland
@@ -1310,6 +1310,20 @@ TRAPWINCH() { zle && { zle reset-prompt; zle -R } }'    zsh
         # the font every segment renders as a replacement box
         fc-list 2>/dev/null | grep -i 'JetBrainsMono Nerd Font' >/dev/null \
             || warn "  JetBrainsMono Nerd Font is missing — the prompt will show boxes"
+
+        # fastfetch - its keys, title and logo are ANSI 32 (color2), which
+        # every Lucid theme paints the primary, so it follows the theme. a
+        # config of your own stays as it is
+        FASTFETCH_CFG="$HOME/.config/fastfetch/config.jsonc"
+        if [[ ! -f "$FASTFETCH_CFG" ]]; then
+            mkdir -p "$(dirname "$FASTFETCH_CFG")"
+            cp "$SRC/support/look/fastfetch.jsonc" "$FASTFETCH_CFG"
+            say "  fastfetch config -> ~/.config/fastfetch/config.jsonc"
+        elif cmp -s "$FASTFETCH_CFG" "$SRC/support/look/fastfetch.jsonc"; then
+            say "  ${dim}fastfetch config is already Lucid's${r}"
+        else
+            say "  ${dim}keeping your fastfetch config; Lucid's is support/look/fastfetch.jsonc${r}"
+        fi
 
         # hyprland blur - skipped when the lua config went in above, since its
         # decorations module already carries the same blur

@@ -61,6 +61,7 @@ printf '  ~/.local/share/lucid/plugins    the tilting cursor plugin that config\
 printf '                                  loads (scripts/cursor-plugin.sh remove)\n'
 printf '  ~/.config/starship.toml         the prompt, and its init line in\n'
 printf '                                  .bashrc / .zshrc / config.fish\n'
+printf '  ~/.config/fastfetch/config.jsonc  the fastfetch config, if Lucid put it there\n'
 printf '  ~/.config/kitty/kitty.conf      the matugen-colors.conf and\n'
 printf '                                  lucid-glass.conf includes\n'
 printf '  ~/Pictures/wallpapers           the wallpapers, yours and the\n'

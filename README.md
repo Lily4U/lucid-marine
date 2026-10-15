@@ -75,7 +75,8 @@ That's it — the installer does the rest:
 5. **Sets up theming** — the palettes, the wallpaper hook, and the matugen
    template. An existing `matugen/config.toml` is appended to, never replaced.
 6. **Applies the look** — kitty's colours, its opacity and its fish shell, the
-   starship prompt (wired into `.bashrc`, `.zshrc` and `config.fish`), the
+   starship prompt (wired into `.bashrc`, `.zshrc` and `config.fish`), a
+   fastfetch config that wears the theme (only where you have none), the
    VSCode/VSCodium Matugen theme, and the GTK theme: `adw-gtk3-dark` with the
    FairyWren icons, written to `gsettings` and to both `gtk-3.0` and `gtk-4.0`
    `settings.ini`. A `kitty.conf` or prompt an earlier release installed, and
@@ -138,7 +139,7 @@ enough that it is worth installing fresh.
 | `--no-theming` | Skips the palette layer. Leaves `~/.config/lucid` and `~/.config/matugen` alone — use this if you already have a matugen setup you don't want touched. |
 | `--no-hypr` | Keeps your Hyprland config. Lucid's binds, window rules, blur and autostart are not installed. |
 | `--no-apps` | Doesn't install the apps the dock ships pinned (Zen, VSCodium, Spotify, Vesktop, Files, Steam, Proton VPN). The dock then pins whatever equivalents you already have. |
-| `--no-look` | Doesn't touch `kitty.conf`, `starship.toml`, your shell rc files, VSCode settings, or the GTK theme and icons. |
+| `--no-look` | Doesn't touch `kitty.conf`, `starship.toml`, the fastfetch config, your shell rc files, VSCode settings, or the GTK theme and icons. |
 | `--no-wallpapers` | Doesn't copy the bundled wallpapers into `~/Pictures/wallpapers`. They are ~180 MB, so this is worth passing on a small disk or a slow link. |
 | `--with-hypr` | Reinstalls Lucid's Hyprland config even when one is already in place. |
 | `--skip-deps` | Never installs packages, just reports what's missing. |
@@ -1301,8 +1302,8 @@ Every surface is scriptable. `qs ipc call -- <target> <function> [arg]`:
 Moves `~/.config/quickshell` aside rather than deleting it, so your settings
 survive. Packages installed by `install.sh` are left alone. It prints what else
 it left in place — the matugen template blocks, `~/.config/hypr`,
-`starship.toml` and its init lines in your rc files, kitty's colour and
-opacity includes — each with a timestamped backup beside it, so you can undo
+`starship.toml` and its init lines in your rc files, the fastfetch config,
+kitty's colour and opacity includes — each with a timestamped backup beside it, so you can undo
 them by hand.
 
 ## Troubleshooting
