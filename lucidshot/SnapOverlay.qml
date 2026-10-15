@@ -64,6 +64,8 @@ PanelWindow {
     signal colorPickRequested(string format)
     // the finished recording is on disk
     signal recordingSaved(string file)
+    // grim could not freeze the screen, so the overlay stays shut
+    signal freezeFailed(string why)
     // the screenshot card; the freeze waits for it to be off the screen
     property var shotPreview: null
 
@@ -583,12 +585,23 @@ function stopRecordingBackend() {
         id: freezeProcess
 
         property bool quiet: false
+        // what the last freeze ended with, for `qs ipc call snap status`
+        property int lastExit: -1
+        property string lastError: ""
+
+        stderr: StdioCollector {
+            onStreamFinished: freezeProcess.lastError = this.text.trim()
+        }
 
         // -o, or a second display would be stitched into the freeze and every
         // crop taken off it would be read at the wrong scale
         command: ["sh", "-c", (snapWindow.screen ? "grim -o '" + snapWindow.screen.name + "'" : "grim") + " -l 0 '" + snapWindow.freezePath + "'"]
 
         onExited: (code) => {
+            freezeProcess.lastExit = code;
+            if (code !== 0 && !freezeProcess.quiet)
+                freezeFailTimer.restart();
+
             if (freezeProcess.quiet) {
                 freezeProcess.quiet = false;
                 if (code === 0) {
@@ -605,6 +618,18 @@ function stopRecordingBackend() {
             freezeImg.source = "file://" + snapWindow.freezePath;
             snapWindow.open = true;
             snapWindow.resetToFreshSession();
+        }
+    }
+
+    // stderr finishes after the exit, so the reason is read a beat later
+    Timer {
+        id: freezeFailTimer
+
+        interval: 100
+        onTriggered: {
+            const why = freezeProcess.lastError !== "" ? freezeProcess.lastError : "grim exited with " + freezeProcess.lastExit;
+            console.warn("snap: could not freeze the screen: " + why);
+            snapWindow.freezeFailed(why);
         }
     }
 
@@ -1789,6 +1814,24 @@ function stopRecordingBackend() {
 
         function close(): void {
             snapWindow.open = false;
+        }
+
+        // what the overlay thinks it is doing, for a bug report
+        function status(): string {
+            return JSON.stringify({
+                "open": snapWindow.open,
+                "closing": snapWindow.closing,
+                "toolbarHidden": snapWindow.toolbarHidden,
+                "freezing": freezeProcess.running,
+                "lastFreezeExit": freezeProcess.lastExit,
+                "lastFreezeError": freezeProcess.lastError,
+                "settleMs": Math.round(220 - (Date.now() - snapWindow.unmappedAt)),
+                "settling": settleDelay.running,
+                "previewOnScreen": snapWindow.shotPreview ? snapWindow.shotPreview.onScreen === true : false,
+                "screen": snapWindow.screen ? snapWindow.screen.name : "",
+                "focusedScreen": Monitors.focusedScreen ? Monitors.focusedScreen.name : "",
+                "screens": Quickshell.screens.map((s) => s.name)
+            });
         }
     }
 }

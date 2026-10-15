@@ -1195,6 +1195,7 @@ ShellRoot {
         onRecordingSaved: (file) => {
             return screenshotMod.announce(file, "video");
         }
+        onFreezeFailed: (why) => toastMod.popup("alert", "Couldn't capture the screen", true)
     }
 
     ShotPreview {
