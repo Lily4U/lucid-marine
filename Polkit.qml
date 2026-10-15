@@ -198,6 +198,7 @@ Singleton {
             if (root.flowRef && root.flowRef.isResponseRequired) {
                 root.checking = false;
                 root.restarting = false;
+                root.infoText = "";
             }
 
         }

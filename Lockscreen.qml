@@ -46,6 +46,9 @@ Singleton {
     // pam's own last sentence, which is better copy than anything we invent
     property string pamText: ""
     property int attempts: 0
+    property bool fingerOn: false
+    property string fingerText: ""
+    property bool fingerFailed: false
     // faillock's defaults, replaced by its config when that sets them
     property int denyAfter: 3
     property int unlockAfter: 600
@@ -84,6 +87,9 @@ Singleton {
         if (root.phase === "checking" || root.phase === "prompting")
             return "info";
 
+        if (root.fingerOn)
+            return root.fingerFailed ? "error" : "info";
+
         return "none";
     }
     readonly property string statusText: {
@@ -113,6 +119,9 @@ Singleton {
         }
         if (root.phase === "prompting" && root.prompt !== "")
             return root.prompt;
+
+        if (root.fingerOn)
+            return root.fingerText !== "" ? root.fingerText : "Touch the fingerprint sensor or type your password";
 
         return "";
     }
@@ -149,6 +158,7 @@ Singleton {
         root.lockedAt = Date.now();
         root.locked = true;
         Users.probe();
+        root.startFinger();
     }
 
     // ── the desktop the lock grows out of ──────────────────────────────────
@@ -305,6 +315,7 @@ Singleton {
         if (pam.active)
             pam.abort();
 
+        root.stopFinger();
         root.phase = "idle";
         root.prompt = "";
         root.secret = true;
@@ -367,6 +378,11 @@ Singleton {
 
     function grant() {
         authTimeout.stop();
+        root.stopFinger();
+        if (pam.active)
+            pam.abort();
+
+        root.pending = "";
         root.phase = "granted";
         root.attempts = 0;
         // let the lock be seen opening; the surface leaves a beat later
@@ -426,6 +442,66 @@ Singleton {
         root.phase = "error";
         root.focused = true;
         failed();
+    }
+
+    // ── fingerprint ────────────────────────────────────────────────────────
+    // pam_fprintd fails silently when there is no reader, so that stops the retries
+    property bool fingerHeard: false
+
+    function startFinger() {
+        if (!root.locked || root.leaving || root.granted || fprint.active)
+            return ;
+
+        root.fingerHeard = false;
+        root.fingerOn = fprint.start();
+    }
+
+    function stopFinger() {
+        fingerRetry.stop();
+        root.fingerOn = false;
+        root.fingerText = "";
+        root.fingerFailed = false;
+        if (fprint.active)
+            fprint.abort();
+
+    }
+
+    PamContext {
+        id: fprint
+
+        configDirectory: Quickshell.shellPath("pam")
+        config: "fingerprint"
+        onPamMessage: {
+            if (fprint.message === "")
+                return ;
+
+            root.fingerHeard = true;
+            root.fingerText = fprint.message;
+            root.fingerFailed = fprint.messageIsError;
+        }
+        onCompleted: (result) => {
+            if (result === PamResult.Success) {
+                root.grant();
+                return ;
+            }
+            if (!root.fingerHeard) {
+                root.fingerOn = false;
+                return ;
+            }
+            fingerRetry.restart();
+        }
+        onError: root.fingerOn = false
+    }
+
+    Timer {
+        id: fingerRetry
+
+        interval: 2000
+        onTriggered: {
+            root.fingerFailed = false;
+            root.fingerText = "";
+            root.startFinger();
+        }
     }
 
     // pam should never take this long; if it does, say so instead of spinning
