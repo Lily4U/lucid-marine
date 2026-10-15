@@ -499,7 +499,9 @@ function stopRecordingBackend() {
             sceneFade.stop();
             snapWindow.closing = false;
         }
-        var settle = 220 - (Date.now() - snapWindow.unmappedAt);
+        // the wall clock can step back (ntp fixing the rtc after boot), so never wait past 220 ms
+        var since = Date.now() - snapWindow.unmappedAt;
+        var settle = since < 0 ? 220 : 220 - since;
         if (!snapWindow.open && settle > 0) {
             settleDelay.interval = Math.ceil(settle);
             settleDelay.restart();

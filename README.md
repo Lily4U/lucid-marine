@@ -371,10 +371,10 @@ under it and what the colours come from, so the palette matches the picture the
 video starts on. The player is a quickshell of its own (`lucidlive/`), started
 by `LiveWall.qml` with the decoder you pick: *Automatic* tries VA-API (the
 integrated GPU) before NVIDIA, so a hybrid laptop keeps its graphics card asleep;
-Intel needs `intel-media-driver` for that. It holds still on a screen whose
-workspace has windows (or only a fullscreen one, or never), behind the lock
-screen, and in game mode it keeps playing, pauses, or stops and leaves the first
-frame. It sits between `awww` and the desktop through layer-rule `order`, which
+Intel needs `intel-media-driver` for that. It holds still on a screen with a
+fullscreen window (or under any window, or never), behind the lock screen, and
+in game mode it keeps playing, pauses, or stops and leaves the first frame.
+It sits between `awww` and the desktop through layer-rule `order`, which
 `LiveWall.qml` sets with `hyprctl eval` before the player starts.
 
 Type a sum in the search field for a calculator (`2^3^2`, right-associative).

@@ -899,7 +899,7 @@ Singleton {
         "wallpaperPickerKeys": "sides",
         "liveWallpapers": true,
         "liveDecoder": "auto",
-        "livePauseUnder": "any",
+        "livePauseUnder": "fullscreen",
         "liveGameMode": "pause",
         "wallpaperPillsShape": "uniform",
         "wallpaperStripSteps": "normal",
@@ -1600,7 +1600,7 @@ Singleton {
             // in game mode: play | pause | still (the first frame, player stopped)
             property bool liveWallpapers: true
             property string liveDecoder: "auto"
-            property string livePauseUnder: "any"
+            property string livePauseUnder: "fullscreen"
             property string liveGameMode: "pause"
             property string wallpaperPillsShape: "uniform"
             property string wallpaperStripSteps: "normal"
