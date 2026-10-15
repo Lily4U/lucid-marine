@@ -55,8 +55,19 @@ PanelWindow {
 
     // grim with no -o stitches every display into one image, and the flash
     // belongs on the display that was captured, so both follow the focus
-    readonly property string output: flashWindow.screen ? flashWindow.screen.name : ""
-    readonly property string grimHere: flashWindow.output !== "" ? "grim -o '" + flashWindow.output + "'" : "grim"
+    // read when a command is built, never kept in a binding: one held on to a
+    // display gone since start-up (a laptop panel switched off after boot)
+    function output() {
+        const name = flashWindow.screen ? String(flashWindow.screen.name || "") : "";
+        return Quickshell.screens.some((s) => {
+            return s.name === name;
+        }) ? name : "";
+    }
+
+    function grimHere() {
+        const name = flashWindow.output();
+        return name !== "" ? "grim -o '" + name + "'" : "grim";
+    }
 
     function aimHere() {
         if (Monitors.focusedScreen)
@@ -110,7 +121,7 @@ PanelWindow {
         var file = flashWindow.timestampedPath();
         grimProcess.targetFile = file;
         grimProcess.showFlash = showFlash;
-        grimProcess.command = ["sh", "-c", "mkdir -p '" + flashWindow.saveDir + "' && " + (source ? flashWindow.imSetup + "$IM '" + source + "'" + flashWindow.imLevel + " '" + file + "'" : flashWindow.grimHere + flashWindow.grimLevel + " '" + file + "'")];
+        grimProcess.command = ["sh", "-c", "mkdir -p '" + flashWindow.saveDir + "' && " + (source ? flashWindow.imSetup + "$IM '" + source + "'" + flashWindow.imLevel + " '" + file + "'" : flashWindow.grimHere() + flashWindow.grimLevel + " '" + file + "'")];
         grimProcess.running = true;
     }
     function captureRegion(x, y, w, h, showFlash, source, scale) {
@@ -184,7 +195,7 @@ PanelWindow {
         if (source)
             capture = region ? "$IM '" + source + "' -crop " + pw + "x" + Math.round(h * scale) + "+" + Math.round(x * scale) + "+" + Math.round(y * scale) + " +repage '" + shot + "'" : "$IM '" + source + "' '" + shot + "'";
         else
-            capture = region ? "grim -g '" + Math.round(x + flashWindow.originX) + "," + Math.round(y + flashWindow.originY) + " " + Math.round(w) + "x" + Math.round(h) + "' '" + shot + "'" : flashWindow.grimHere + " '" + shot + "'";
+            capture = region ? "grim -g '" + Math.round(x + flashWindow.originX) + "," + Math.round(y + flashWindow.originY) + " " + Math.round(w) + "x" + Math.round(h) + "' '" + shot + "'" : flashWindow.grimHere() + " '" + shot + "'";
         // tesseract wants roughly 300dpi text, so blow up anything narrower than a wide crop
         var upscale = (!region || pw >= 1200) ? "" : " -resize 300%";
         ocrProcess.command = ["sh", "-c",

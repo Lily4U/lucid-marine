@@ -17,8 +17,7 @@ PanelWindow {
     property string openMode: "camera"
     property string colorFormat: "hex"
     property string freezePath: Quickshell.env("HOME") + "/.cache/quickshell-snap-freeze.png"
-    // wf-recorder records the overlay's own monitor, not the whole layout
-    readonly property string outputArg: snapWindow.screen ? " -o '" + snapWindow.screen.name + "'" : ""
+    // grim and wf-recorder take the overlay's own monitor, not the whole layout
 
     property string recordingState: "idle"
     property int recordSeconds: 0
@@ -336,9 +335,9 @@ function stopRecordingBackend() {
     function recorderLaunchCmd(segFile) {
         return "DRI=$(ls /dev/dri/renderD* 2>/dev/null | head -1); " +
             "if [ -n \"$DRI\" ]; then " +
-            "wf-recorder" + snapWindow.outputArg + " -c h264_vaapi -d \"$DRI\" --audio=wfrec_combined.monitor -f '" + segFile + "' & " +
+            "wf-recorder" + snapWindow.outputArg() + " -c h264_vaapi -d \"$DRI\" --audio=wfrec_combined.monitor -f '" + segFile + "' & " +
             "else " +
-            "wf-recorder" + snapWindow.outputArg + " --audio=wfrec_combined.monitor -x yuv420p -f '" + segFile + "' & " +
+            "wf-recorder" + snapWindow.outputArg() + " --audio=wfrec_combined.monitor -x yuv420p -f '" + segFile + "' & " +
             "fi; " +
             "echo $! > " + snapWindow.recordPidFile + "; " +
             "wait";
@@ -519,6 +518,7 @@ function stopRecordingBackend() {
         if (Monitors.focusedScreen)
             snapWindow.screen = Monitors.focusedScreen;
 
+        freezeProcess.command = snapWindow.freezeCommand();
         freezeProcess.running = true;
     }
 
@@ -577,6 +577,7 @@ function stopRecordingBackend() {
         interval: 50
         onTriggered: {
             freezeProcess.quiet = true;
+            freezeProcess.command = snapWindow.freezeCommand();
             freezeProcess.running = true;
         }
     }
@@ -593,9 +594,8 @@ function stopRecordingBackend() {
             onStreamFinished: freezeProcess.lastError = this.text.trim()
         }
 
-        // -o, or a second display would be stitched into the freeze and every
-        // crop taken off it would be read at the wrong scale
-        command: ["sh", "-c", (snapWindow.screen ? "grim -o '" + snapWindow.screen.name + "'" : "grim") + " -l 0 '" + snapWindow.freezePath + "'"]
+        // set by freezeCommand() as it starts: -o, or a second display would be stitched
+        // into the freeze and every crop taken off it would be read at the wrong scale
 
         onExited: (code) => {
             freezeProcess.lastExit = code;
@@ -631,6 +631,30 @@ function stopRecordingBackend() {
             console.warn("snap: could not freeze the screen: " + why);
             snapWindow.freezeFailed(why);
         }
+    }
+
+    // read when a command is built, never kept in a binding: one held on to a
+    // display gone since start-up (a laptop panel switched off after boot)
+    function outputName() {
+        const live = Quickshell.screens.map((s) => {
+            return s.name;
+        });
+        for (const s of [snapWindow.screen, Monitors.focusedScreen]) {
+            const name = s ? String(s.name || "") : "";
+            if (name !== "" && live.indexOf(name) !== -1)
+                return name;
+
+        }
+        return "";
+    }
+
+    function outputArg() {
+        const name = snapWindow.outputName();
+        return name !== "" ? " -o '" + name + "'" : "";
+    }
+
+    function freezeCommand() {
+        return ["sh", "-c", "grim" + snapWindow.outputArg() + " -l 0 '" + snapWindow.freezePath + "'"];
     }
 
     function startColorPick() {
@@ -1830,7 +1854,8 @@ function stopRecordingBackend() {
                 "previewOnScreen": snapWindow.shotPreview ? snapWindow.shotPreview.onScreen === true : false,
                 "screen": snapWindow.screen ? snapWindow.screen.name : "",
                 "focusedScreen": Monitors.focusedScreen ? Monitors.focusedScreen.name : "",
-                "screens": Quickshell.screens.map((s) => s.name)
+                "screens": Quickshell.screens.map((s) => s.name),
+                "freezeCommand": snapWindow.freezeCommand()[2]
             });
         }
     }

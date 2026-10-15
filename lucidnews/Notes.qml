@@ -35,7 +35,7 @@ QtObject {
                     "code": ""
                 },
                 {
-                    "text": "<b>The region screenshot opens after a reboot.</b> Before freezing the screen it waits a moment, timed with the system clock, and when the clock was set back after login (as it is on a machine that also runs Windows) that moment lasted hours. It never waits longer than a fraction of a second now.",
+                    "text": "<b>The region screenshot opens after a reboot.</b> On a machine whose built-in screen is switched off just after start-up, it kept asking for that screen and gave up without a word. It now captures the display it is on, a capture that fails says so, and <code>qs ipc call snap status</code> shows what it tried. It also no longer waits for hours when the clock is set back after login.",
                     "code": ""
                 },
                 {

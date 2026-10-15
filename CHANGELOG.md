@@ -28,10 +28,11 @@ of **Ciro Rivera**, fifteen pull requests of it.
   machine has, and a re-run adds the one an earlier install left out.
 - **A second click on a bar module closes its pop-up**, as a click anywhere
   else already did (#70).
-- **The region screenshot opens after a reboot.** Before freezing the screen it
-  waits a moment, timed with the system clock, and when the clock was set back
-  after login (as it is on a machine that also runs Windows) that moment lasted
-  hours. It never waits longer than a fraction of a second now.
+- **The region screenshot opens after a reboot.** On a machine whose built-in
+  screen is switched off just after start-up, it kept asking for that screen and
+  gave up without a word. It now captures the display it is on, a capture that
+  fails says so, and `qs ipc call snap status` shows what it tried. It also no
+  longer waits for hours when the clock is set back after login.
 - **Live wallpapers keep playing behind your windows.** By default they now hold
   still only under a fullscreen window, instead of under any window, which left
   them looking like a still picture whenever something was open. *Settings →
