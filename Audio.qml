@@ -828,12 +828,13 @@ Singleton {
             root.combineTakeover();
         }
 
-        target: root.combined
+        // read before its binding has run while the shell is starting
+        target: root.combined || null
         ignoreUnknownSignals: true
     }
 
     PwObjectTracker {
-        objects: root.tracked
+        objects: root.tracked || []
     }
 
     Component.onCompleted: {
