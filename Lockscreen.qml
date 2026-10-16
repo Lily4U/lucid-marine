@@ -121,7 +121,7 @@ Singleton {
             return root.prompt;
 
         if (root.fingerOn)
-            return root.fingerText !== "" ? root.fingerText : "Touch the fingerprint sensor or type your password";
+            return root.fingerFailed && root.fingerText !== "" ? root.fingerText : "Touch the fingerprint sensor or type your password";
 
         return "";
     }
@@ -445,8 +445,10 @@ Singleton {
     }
 
     // ── fingerprint ────────────────────────────────────────────────────────
-    // pam_fprintd fails silently when there is no reader, so that stops the retries
+    // pam_fprintd fails without a word when the reader is busy (a resume,
+    // another prompt holding it) or missing, so those retries back off
     property bool fingerHeard: false
+    property int fingerQuiet: 0
 
     function startFinger() {
         if (!root.locked || root.leaving || root.granted || fprint.active)
@@ -454,10 +456,14 @@ Singleton {
 
         root.fingerHeard = false;
         root.fingerOn = fprint.start();
+        if (!root.fingerOn)
+            root.retryFinger();
+
     }
 
     function stopFinger() {
         fingerRetry.stop();
+        root.fingerQuiet = 0;
         root.fingerOn = false;
         root.fingerText = "";
         root.fingerFailed = false;
@@ -484,19 +490,23 @@ Singleton {
                 root.grant();
                 return ;
             }
-            if (!root.fingerHeard) {
-                root.fingerOn = false;
-                return ;
-            }
-            fingerRetry.restart();
+            root.retryFinger();
         }
-        onError: root.fingerOn = false
+        onError: root.retryFinger()
+    }
+
+    function retryFinger() {
+        root.fingerQuiet = root.fingerHeard ? 0 : root.fingerQuiet + 1;
+        if (root.fingerQuiet > 0)
+            root.fingerOn = false;
+
+        fingerRetry.interval = Math.min(60000, 2000 * Math.pow(2, root.fingerQuiet));
+        fingerRetry.restart();
     }
 
     Timer {
         id: fingerRetry
 
-        interval: 2000
         onTriggered: {
             root.fingerFailed = false;
             root.fingerText = "";
