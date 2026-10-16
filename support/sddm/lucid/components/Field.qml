@@ -164,7 +164,7 @@ Item {
         anchors.rightMargin: 12
         anchors.verticalCenter: parent.verticalCenter
         transformOrigin: Item.Left
-        text: !Lock.needsPassword ? "No password needed" : (Lock.fingerprint ? "Password, or Enter for fingerprint" : "Password")
+        text: !Lock.needsPassword ? "No password needed" : (Lock.fingerprint ? "Password or fingerprint" : "Password")
         color: Lock.focused ? Theme.subtext : Theme.subtextDim
         font.family: Theme.fontFamily
         font.pixelSize: Theme.fontBodyLg
@@ -241,6 +241,7 @@ Item {
         onCursorPositionChanged: Qt.callLater(field.pin)
         onAccepted: field.submit()
         onTextChanged: {
+            Lock.typing = input.text.length > 0;
             if (input.text.length === 0) {
                 vacate.restart();
                 return ;
