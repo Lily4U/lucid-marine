@@ -82,6 +82,7 @@ QtObject {
         if (i >= 0 && i < root.sessions.length)
             root.sessionIndex = i;
 
+        root.listenSoon(500);
         root.closeSheet();
     }
 
@@ -110,12 +111,21 @@ QtObject {
     property string message: ""
 
     // the login screen's pam takes a fingerprint (install-theme.sh) and this
-    // account has a finger enrolled (sync-sddm.sh): an empty field asks for it
+    // account has a finger enrolled (sync-sddm.sh)
     readonly property bool fingerprint: !root.manual && root.needsPassword && Theme.conf("fingerprintLogin", "false") === "true" && Theme.conf("fingerprint", "false") === "true"
-    // the attempt in flight was the empty field's, so its verdict is the finger's
-    property bool byFinger: false
+    // an empty login kept open while idle; sddm cannot cancel it, so a password waits its turn
+    property bool listening: false
+    // sddm gives every screen its own copy of this; only the one with the card listens
+    property bool driver: true
+    property string listenKey: ""
+    property double listenedAt: 0
+    property string queued: ""
+    property bool typing: false
+    property bool fingerMiss: false
+    property int fingerQuiet: 0
     // pam_fprintd's own words while it waits on the reader
     property string fingerText: ""
+    readonly property bool fingerReady: root.listening && root.listenKey === root.userName + "/" + root.sessionIndex
 
     readonly property bool busy: root.phase === "checking"
     readonly property bool granted: root.phase === "granted"
@@ -128,7 +138,8 @@ QtObject {
     function reset() {
         root.phase = "idle";
         root.message = "";
-        root.fingerText = "";
+        root.fingerMiss = false;
+        root.listenSoon(500);
     }
 
     function submit(text) {
@@ -137,10 +148,41 @@ QtObject {
 
         root.closeSheet();
         root.message = "";
-        root.fingerText = "";
-        root.byFinger = text === "" && root.fingerprint;
+        if (text === "" && root.fingerprint) {
+            root.listen();
+            return ;
+        }
         root.phase = "checking";
+        if (root.listening) {
+            root.queued = text;
+            return ;
+        }
         sddm.login(root.userName, text, root.sessionIndex);
+    }
+
+    function listen() {
+        if (!root.driver || !root.fingerprint || root.listening || !root.acceptsInput || root.typing || root.userName === "")
+            return ;
+
+        listenTimer.stop();
+        root.listening = true;
+        root.listenKey = root.userName + "/" + root.sessionIndex;
+        root.listenedAt = Date.now();
+        root.fingerText = "";
+        root.fingerMiss = false;
+        sddm.login(root.userName, "", root.sessionIndex);
+    }
+
+    function listenSoon(ms) {
+        listenTimer.interval = ms;
+        listenTimer.restart();
+    }
+
+    onFingerprintChanged: root.listenSoon(500)
+    onTypingChanged: {
+        if (!root.typing)
+            root.listenSoon(500);
+
     }
 
     function engage() {
@@ -170,30 +212,36 @@ QtObject {
         if (root.phase === "checking")
             return "info";
 
+        if (root.fingerMiss)
+            return "error";
+
+        if (root.fingerReady)
+            return "info";
+
         return "none";
     }
     readonly property string statusText: {
         if (root.granted)
             return "Welcome back";
 
-        if (root.phase === "checking") {
-            if (root.fingerText !== "")
-                return root.fingerText;
+        if (root.phase === "checking")
+            return "Checking…";
 
-            return root.byFinger ? "Touch the fingerprint sensor" : "Checking…";
-        }
         if (root.phase === "failed") {
             if (root.message !== "")
                 return root.message;
-
-            if (root.byFinger)
-                return "Fingerprint not recognised";
 
             if (root.manual)
                 return "Unknown account or wrong password";
 
             return root.attempts > 1 ? "Incorrect password — " + root.attempts + " attempts" : "Incorrect password";
         }
+        if (root.fingerMiss)
+            return "Fingerprint not recognised";
+
+        if (root.fingerReady)
+            return "Touch the fingerprint sensor or type your password";
+
         return "";
     }
 
@@ -291,6 +339,12 @@ QtObject {
         }
     }
 
+    property Timer _listen: Timer {
+        id: listenTimer
+
+        onTriggered: root.listen()
+    }
+
     property Timer _tick: Timer {
         running: true
         interval: 1000
@@ -304,19 +358,37 @@ QtObject {
         target: sddm
 
         function onLoginFailed() {
+            if (root.listening) {
+                root.listening = false;
+                var heard = root.fingerText !== "";
+                root.fingerText = "";
+                root.fingerQuiet = heard ? 0 : root.fingerQuiet + 1;
+                if (root.queued !== "") {
+                    var text = root.queued;
+                    root.queued = "";
+                    sddm.login(root.userName, text, root.sessionIndex);
+                    return ;
+                }
+                // ended before the 10s timeout: a finger was read and did not match
+                root.fingerMiss = heard && Date.now() - root.listenedAt < 9000;
+                root.listenSoon(heard ? 1500 : Math.min(60000, 2000 * Math.pow(2, root.fingerQuiet)));
+                return ;
+            }
             root.attempts += 1;
             root.phase = "failed";
             root.focused = true;
             root.failed();
+            root.listenSoon(1500);
         }
 
         function onLoginSucceeded() {
+            root.listening = false;
             root.phase = "granted";
         }
 
         // pam's info lines, which is how the reader asks for a finger
         function onInformationMessage(message) {
-            if (root.phase === "checking")
+            if (root.listening)
                 root.fingerText = message;
 
         }

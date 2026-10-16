@@ -55,6 +55,33 @@ local function pattern(list)
     return "(?i)^(" .. table.concat(out, "|") .. ")$"
 end
 
+-- discord clients only go to a workspace when its key launched them
+local roaming = {
+    discord = true, vesktop = true, equibop = true, legcord = true,
+    webcord = true, armcord = true, goofcord = true, ["com.discordapp.discord"] = true,
+}
+
+local function roams(app)
+    for _, c in ipairs(app.class or {}) do
+        if roaming[lower(c)] then return true end
+    end
+    return false
+end
+
+local launches = {}
+
+hl.on("window.open", function(w)
+    if not w then return end
+    local now = os.time()
+    for name, l in pairs(launches) do
+        if now - l.at > 60 then
+            launches[name] = nil
+        elseif owns(l.app, w) and not (w.workspace and w.workspace.name == "special:" .. name) then
+            hl.dispatch(hl.dsp.window.move({ window = w, workspace = "special:" .. name, follow = false }))
+        end
+    end
+end)
+
 -- rules cannot be removed, only switched off, so each apply retires the last set
 local rules = {}
 local ws_rules = {}
@@ -70,7 +97,7 @@ function M.apply()
             if type(ws) == "table" and ws.enabled ~= false then
                 for _, app in ipairs(ws.apps or {}) do
                     for field, list in pairs({ class = app.class, initial_title = app.title }) do
-                        if type(list) == "table" and #list > 0 then
+                        if not roams(app) and type(list) == "table" and #list > 0 then
                             rules[#rules + 1] = hl.window_rule({
                                 match     = { [field] = pattern(list) },
                                 workspace = "special:" .. name,
@@ -135,6 +162,7 @@ function M.toggle(name)
                 end
             end
             if not running and type(app.cmd) == "string" and app.cmd ~= "" then
+                if roams(app) then launches[name] = { app = app, at = os.time() } end
                 hl.dispatch(hl.dsp.exec_cmd(app.cmd, { workspace = target }))
             end
         end
