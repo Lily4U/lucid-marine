@@ -445,6 +445,17 @@ Singleton {
     property alias barSideMargin: s.barSideMargin
     property alias barSpacing: s.barSpacing
     property alias barHoverGrow: s.barHoverGrow
+    // set-wallpaper.sh picks light or dark from the picture's brightness; the
+    // shell only follows what it wrote to current_mode (see that FileView)
+    property alias autoColorMode: s.autoColorMode
+
+    function setAutoColorMode(on) {
+        root.autoColorMode = on;
+        // the picture on screen now, measured the same way a new one would be
+        if (on)
+            Quickshell.execDetached([Quickshell.env("HOME") + "/.config/lucid/set-mode.sh", "auto"]);
+    }
+
     property alias barZoneGap: s.barZoneGap
     property alias systemTiles: s.systemTiles
     property alias barLayout: s.barLayout
@@ -931,6 +942,7 @@ Singleton {
         "barSideMargin": 17,
         "barSpacing": 8,
         "barHoverGrow": 3,
+        "autoColorMode": false,
         "barZoneGap": 26,
         "systemTiles": "dnd,awake,dark,airplane,location,mic,capture,record,picker,keyboard,timer,session",
         "barLayout": "{\"left\":[\"workspaces\",\"media\",\"tray\"],\"center\":[\"clock\"],\"right\":[\"notifications\",\"system\"]}",
@@ -1554,7 +1566,24 @@ Singleton {
         blockLoading: true
         watchChanges: true
         onFileChanged: reload()
-        onLoaded: root.colorMode = text().trim() === "light" ? "light" : "dark"
+        onLoaded: {
+            var mode = text().trim() === "light" ? "light" : "dark";
+            // a mode the wallpaper chose: applications follow, as they do when it is
+            // picked by hand. once browsing has settled, not on every picture passed
+            if (root.autoColorMode && root.modeLoaded && mode !== root.colorMode)
+                envModeFollow.restart();
+            root.colorMode = mode;
+            root.modeLoaded = true;
+        }
+    }
+
+    property bool modeLoaded: false
+
+    Timer {
+        id: envModeFollow
+
+        interval: 3000
+        onTriggered: root.envColorScheme = root.colorMode
     }
 
     Timer {
@@ -1632,6 +1661,7 @@ Singleton {
             property int barSideMargin: 17
             property int barSpacing: 8
             property int barHoverGrow: 3
+            property bool autoColorMode: false
             property int barZoneGap: 26
             property string systemTiles: "dnd,awake,dark,airplane,location,mic,capture,record,picker,keyboard,timer,session"
             property string barLayout: "{\"left\":[\"workspaces\",\"media\",\"tray\"],\"center\":[\"clock\"],\"right\":[\"notifications\",\"system\"]}"

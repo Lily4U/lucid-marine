@@ -281,6 +281,19 @@ Column {
         }
 
         SettingRow {
+            title: "Follow the wallpaper"
+            description: "Picks light for a bright wallpaper and dark for a dark one, every time the wallpaper changes. A hand-picked mode holds until the wallpaper changes next."
+
+            M3Switch {
+                checked: Prefs.autoColorMode
+                onToggled: (v) => {
+                    return Prefs.setAutoColorMode(v);
+                }
+            }
+
+        }
+
+        SettingRow {
             title: "Colour scheme"
             description: "Switching also swaps the wallpaper folder below to that theme's own."
             showDivider: false

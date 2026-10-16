@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# set-wallpaper.sh <path-to-image-or-video> [dark|light]
+# set-wallpaper.sh <path-to-image-or-video> [dark|light|auto]
 #
 # sets the wallpaper, then regenerates colours if the active theme derives
 # them from the image. ~/.cache/current_theme decides:
@@ -10,7 +10,9 @@
 #
 # the mode argument is remembered in ~/.cache/current_mode, so a later wallpaper
 # change keeps whichever of light/dark the desktop is currently in instead of
-# silently dropping back to dark.
+# silently dropping back to dark. auto, or no mode with Settings -> Theme ->
+# Follow the wallpaper on, picks light or dark from how bright the picture is
+# (a video's first frame), in this same run.
 #
 # the wallpaper is set first because it is the only step you actually see.
 # ~/.config/lucid/wallpaper-outputs.conf, if it exists, overrides single outputs.
@@ -27,10 +29,17 @@ LUCID_DIR="$HOME/.config/lucid"
 WALL_RULES_FILE="$LUCID_DIR/wallpaper-outputs.conf"
 
 CURRENT_THEME="$(cat "$CURRENT_THEME_FILE" 2>/dev/null || echo matugen)"
-MODE="${2:-$(cat "$CURRENT_MODE_FILE" 2>/dev/null || echo dark)}"
+MODE="${2:-}"
+if [[ -z "$MODE" ]]; then
+    if grep -qE '"autoColorMode"[[:space:]]*:[[:space:]]*true' "$HOME/.config/quickshell/lucidprefs/prefs.json" 2>/dev/null; then
+        MODE=auto
+    else
+        MODE="$(cat "$CURRENT_MODE_FILE" 2>/dev/null || echo dark)"
+    fi
+fi
 
 usage() {
-    echo "usage: $(basename "$0") <path-to-image-or-video> [dark|light]"
+    echo "usage: $(basename "$0") <path-to-image-or-video> [dark|light|auto]"
     exit 1
 }
 
@@ -40,8 +49,8 @@ WALLPAPER="${WALLPAPER/#\~/$HOME}"
 
 [[ -f "$WALLPAPER" ]] || { echo "error: file not found: $WALLPAPER" >&2; exit 1; }
 
-if [[ "$MODE" != "dark" && "$MODE" != "light" ]]; then
-    echo "error: mode must be dark or light (got: $MODE)" >&2
+if [[ "$MODE" != "dark" && "$MODE" != "light" && "$MODE" != "auto" ]]; then
+    echo "error: mode must be dark, light or auto (got: $MODE)" >&2
     usage
 fi
 
@@ -260,6 +269,15 @@ else
 fi
 
 [[ -n "${WALL_DEMO:-}" ]] && exit 0
+
+# decided here rather than by the shell afterwards: a second run to switch the
+# mode would put the picture up again, dropping a video for its frame and pulling
+# the picker back to a picture it has moved past
+if [[ "$MODE" == auto ]]; then
+    MODE=$("$LUCID_DIR/wallpaper-mode.sh" "$WALLPAPER" 2>/dev/null) || MODE=""
+    [[ "$MODE" == light || "$MODE" == dark ]] || MODE="$(cat "$CURRENT_MODE_FILE" 2>/dev/null || echo dark)"
+    [[ "$MODE" == light ]] || MODE=dark
+fi
 
 mkdir -p "$CACHE_DIR"
 # first, so whoever reads current_wallpaper on its change finds the video already.
