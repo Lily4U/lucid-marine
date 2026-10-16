@@ -838,6 +838,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     install -m755 "$SRC/support/lucid/templates.py"       "$LUCID_DIR/templates.py"
     install -m755 "$SRC/support/lucid/apply-colour.sh"    "$LUCID_DIR/apply-colour.sh"
     install -m755 "$SRC/support/lucid/wallpaper-colours.sh" "$LUCID_DIR/wallpaper-colours.sh"
+    install -m755 "$SRC/support/lucid/wallpaper-mode.sh"  "$LUCID_DIR/wallpaper-mode.sh"
     install -m644 "$SRC/support/lucid/matugen-options.sh" "$LUCID_DIR/matugen-options.sh"
     install -m755 "$SRC/support/lucid/gen-pywal-palette.py" "$LUCID_DIR/gen-pywal-palette.py"
     install -m755 "$SRC/support/lucid/add-theme.py"        "$LUCID_DIR/add-theme.py"
