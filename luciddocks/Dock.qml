@@ -1760,7 +1760,18 @@ PanelWindow {
         var lx = pinnedRow.mapFromItem(null, runningRow.pinDragCenter, 0).x;
         return Math.max(0, Math.min(appListModel.count, Math.round(lx / dockWindow.slotPitch)));
     }
-    readonly property bool pinArmed: runningRow.pinDragCenter >= 0 && pinnedRow.mapFromItem(null, runningRow.pinDragCenter, 0).x < appListModel.count * dockWindow.slotPitch
+    property bool pinArmed: false
+
+    // the slot an armed icon opens counts as pinned row, so opening it can't disarm the icon
+    function updatePinArm() {
+        if (runningRow.pinDragCenter < 0) {
+            dockWindow.pinArmed = false;
+            return;
+        }
+        var lx = pinnedRow.mapFromItem(null, runningRow.pinDragCenter, 0).x;
+        var slots = appListModel.count + (dockWindow.pinArmed ? 1 : 0);
+        dockWindow.pinArmed = lx < slots * dockWindow.slotPitch;
+    }
 
     function shQuote(v) {
         return "'" + v.split("'").join("'\\''") + "'";
@@ -2912,7 +2923,7 @@ PanelWindow {
                     ready: shell.shellReady
                     pointerInside: dockWindow.pointerOnDock
                     dropActive: shell.dropActive || dockWindow.pinArmed
-                    reserveSlot: shell.dropActive
+                    reserveSlot: shell.dropActive || dockWindow.pinArmed
                     dropIndex: shell.dropActive ? shell.pendingDropIndex : dockWindow.pinDropIndex
                     onStackPopupRequested: (view, appId, iconName, command) => dockWindow.openStackPopup(view, appId, iconName, command)
                     onContextMenuRequested: (view, appId, command) => dockWindow.openContextMenu(view, appId, true, command)
@@ -2944,6 +2955,7 @@ PanelWindow {
                         id: runningRow
 
                         x: runningGroup.lead
+                        originX: shell.x + runningGroup.x
                         dragMode: "pin"
                         model: runningAppsModel
                         clients: dockWindow.clientsData
@@ -2956,7 +2968,12 @@ PanelWindow {
                         pointerInside: dockWindow.pointerOnDock
                         pinArmed: dockWindow.pinArmed
                         dropIndex: dockWindow.pinDropIndex
-                        onPinRequested: (appId, index) => dockWindow.pinRunningApp(appId, index)
+                        onPinDragCenterChanged: dockWindow.updatePinArm()
+                        onPinRequested: (appId, index, from) => {
+                            pinnedRow.landFrom = from;
+                            dockWindow.pinRunningApp(appId, index);
+                            pinnedRow.landFrom = -1;
+                        }
                     }
 
                 }
