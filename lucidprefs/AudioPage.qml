@@ -234,7 +234,7 @@ Column {
             resetKey: "audioCombine"
             enabled: page.combineChoices.length >= 2
             disabledReason: "This needs two or more outputs."
-            description: "Tick two or more and a Combined output joins the list below, playing on all of them together. Devices that keep time apart, like the built-in card and a USB or Bluetooth one, can drift a few milliseconds from each other."
+            description: "Tick two or more and a Combined output joins the list below, playing on all of them together. Its volume leads, and each device's own volume sets how loud it is beside the others. Devices that keep time apart, like the built-in card and a USB or Bluetooth one, can drift a few milliseconds from each other."
             showDivider: false
             stacked: true
 

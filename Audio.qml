@@ -81,6 +81,11 @@ Singleton {
 
     // ticking the second device makes the combined output and plays through
     // it; unticking down to one takes it away again
+    //
+    // what comes out of a device is the combined output's volume times the
+    // device's own, so the volume is handed across each way: the combined
+    // output takes over the level and the devices open up under it, and a
+    // device leaving keeps the loudness it had inside
     function setCombineMember(name, on) {
         const list = root.combineWanted.filter((x) => {
             return x !== name;
@@ -88,10 +93,53 @@ Singleton {
         if (on)
             list.push(name);
 
+        const node = root.combinable.find((n) => {
+            return n.name === name;
+        }) || null;
         if (on && list.length >= 2 && !root.combined)
             root.combineMakeDefault = true;
-
+        else if (on && root.combined && root.levelOf(root.combined) > 0.0001)
+            root.scaleVolume(node, 1 / root.levelOf(root.combined));
+        else if (!on && root.combined && list.length >= 2 && root.combineFeeding.indexOf(name) >= 0)
+            root.scaleVolume(node, root.levelOf(root.combined));
         Prefs.audioCombine = list.join(",");
+    }
+
+    // every channel times the same factor, so the balance survives
+    function scaleVolume(node, factor) {
+        if (!node || !node.audio)
+            return ;
+
+        const v = node.audio.volumes;
+        if (!v || v.length === 0) {
+            node.audio.volume = Math.min(1, node.audio.volume * factor);
+            return ;
+        }
+        const out = [];
+        for (let i = 0; i < v.length; i++) out.push(Math.min(1, v[i] * factor))
+        node.audio.volumes = out;
+    }
+
+    // a fresh combined output starts as loud as the loudest of its devices,
+    // takes over what is playing, and only then do the devices open up
+    function combineTakeover() {
+        const c = root.combined;
+        if (!c || !c.ready || !root.combineMakeDefault)
+            return ;
+
+        root.combineMakeDefault = false;
+        const members = root.combinable.filter((n) => {
+            return root.isCombineMember(n.name);
+        });
+        let top = 0;
+        for (let i = 0; i < members.length; i++) top = Math.max(top, root.levelOf(members[i]))
+        if (top > 0.0001)
+            root.setVolume(c, top * 100);
+
+        root.setDefault(c);
+        if (top > 0.0001) {
+            for (let i = 0; i < members.length; i++) root.scaleVolume(members[i], 1 / top)
+        }
     }
 
     // the module is only ever handed devices that exist: one it waits for and
@@ -108,9 +156,15 @@ Singleton {
             });
         });
         if (wanted.length < 2 || present.length < 2) {
-            if (root.combined && wanted.length < 2)
-                root.applyCombine([]);
+            if (root.combined && wanted.length < 2) {
+                const level = root.levelOf(root.combined);
+                root.combinable.forEach((n) => {
+                    if (root.combineFeeding.indexOf(n.name) >= 0)
+                        root.scaleVolume(n, level);
 
+                });
+                root.applyCombine([]);
+            }
             return ;
         }
         const feeding = root.combineFeeding;
@@ -767,11 +821,15 @@ Singleton {
         onTriggered: root.syncCombine()
     }
 
-    onCombinedChanged: {
-        if (root.combined && root.combineMakeDefault) {
-            root.combineMakeDefault = false;
-            root.setDefault(root.combined);
+    onCombinedChanged: root.combineTakeover()
+
+    Connections {
+        function onReadyChanged() {
+            root.combineTakeover();
         }
+
+        target: root.combined
+        ignoreUnknownSignals: true
     }
 
     PwObjectTracker {
