@@ -34,6 +34,29 @@ Column {
         const detail = Audio.detailOf(page.sink);
         return Audio.label(page.sink) + (detail !== "" ? " · " + detail : "");
     }
+    // the devices on offer, plus any ticked one that is unplugged right now,
+    // so it can still be unticked
+    readonly property var combineChoices: {
+        const out = Audio.combinable.map((n) => {
+            return {
+                "name": n.name,
+                "label": Audio.label(n),
+                "present": true
+            };
+        });
+        Audio.combineWanted.forEach((name) => {
+            if (!out.some((c) => {
+                return c.name === name;
+            }))
+                out.push({
+                "name": name,
+                "label": name,
+                "present": false
+            });
+
+        });
+        return out;
+    }
     readonly property string inputSummary: {
         if (Audio.inputs.length === 0)
             return "No microphone or other input is plugged into this machine.";
@@ -196,13 +219,43 @@ Column {
             title: "Move playing apps with the output"
             resetKey: "audioMoveStreams"
             description: "Picking a different output carries anything already playing across to it. With this off, only apps that have no device of their own follow the change."
-            showDivider: false
 
             M3Switch {
                 checked: Prefs.audioMoveStreams
                 onToggled: (v) => {
                     return Prefs.audioMoveStreams = v;
                 }
+            }
+
+        }
+
+        SettingRow {
+            title: "Play through several at once"
+            resetKey: "audioCombine"
+            enabled: page.combineChoices.length >= 2
+            disabledReason: "This needs two or more outputs."
+            description: "Tick two or more and a Combined output joins the list below, playing on all of them together. Devices that keep time apart, like the built-in card and a USB or Bluetooth one, can drift a few milliseconds from each other."
+            showDivider: false
+            stacked: true
+
+            Column {
+                width: parent.width
+                spacing: Theme.dp(14)
+                visible: page.combineChoices.length >= 2
+
+                Repeater {
+                    model: page.combineChoices
+
+                    CheckLine {
+                        required property var modelData
+
+                        label: modelData.present ? modelData.label : modelData.label + " — not connected"
+                        checked: Audio.isCombineMember(modelData.name)
+                        onToggled: Audio.setCombineMember(modelData.name, !checked)
+                    }
+
+                }
+
             }
 
         }
