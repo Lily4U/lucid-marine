@@ -25,6 +25,60 @@ PanelWindow {
     readonly property bool dockRevealed: dockWindow.dockShown || dockWindow.dockBusy
     property bool launcherFromHidden: false
     readonly property bool renderAsNotch: Prefs.dockNotch || dockWindow.launcherFromHidden
+    // split: the launcher, the pins and the running apps on islands of their own, which
+    // close up into one slab as the launcher grows out of them and part again after
+    readonly property int splitPad: Theme.dp(10)
+    readonly property int splitGap: Theme.dp(Prefs.dockSplitGap)
+    // 1 while the islands stand apart, 0 once they are one slab
+    property real seam: 0
+    readonly property bool splitWanted: Prefs.dockSplit && !dockWindow.menuOpen && !dockWindow.launcherFromHidden
+    readonly property bool splitDrawn: Prefs.dockSplit && dockWindow.seam > 0.001
+
+    onSplitWantedChanged: {
+        seamApart.stop();
+        seamTogether.stop();
+        if (!Prefs.dockSplit) {
+            dockWindow.seam = 0;
+            return ;
+        }
+        if (dockWindow.splitWanted) {
+            // a launcher on its way home has most of the way to shrink first
+            seamWait.duration = shell.height > shell.implicitHeight + 1 ? Theme.ms(300) : 0;
+            seamApart.restart();
+        } else {
+            seamTogether.restart();
+        }
+    }
+
+    SequentialAnimation {
+        id: seamApart
+
+        PauseAnimation {
+            id: seamWait
+        }
+
+        NumberAnimation {
+            target: dockWindow
+            property: "seam"
+            to: 1
+            duration: Theme.durDefaultSpatial
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.curveDefaultSpatial
+        }
+
+    }
+
+    NumberAnimation {
+        id: seamTogether
+
+        target: dockWindow
+        property: "seam"
+        to: 0
+        duration: Theme.durShort
+        easing.type: Easing.Bezier
+        easing.bezierCurve: Theme.easeEmphasizedAccel
+    }
+
     readonly property int placementMargin: dockWindow.launcherFromHidden ? 0 : Prefs.effectiveDockBottomMargin
     readonly property real hiddenOffset: dockWindow.dockRevealed ? 0 : -(shell.implicitHeight + dockWindow.placementMargin - 1)
     // a disabled dock's panel exists only while the launcher is up or shrinking away
@@ -1967,6 +2021,7 @@ PanelWindow {
         if (Prefs.loaded)
             wallpaperScanner.scan(false);
 
+        dockWindow.seam = dockWindow.splitWanted ? 1 : 0;
     }
 
     Connections {
@@ -2771,7 +2826,8 @@ PanelWindow {
         width: dockWindow.menuOpen ? dockWindow.menuWidth : shell.implicitWidth
         height: dockWindow.menuOpen ? dockWindow.menuHeight : shell.implicitHeight
         radius: Math.min(Theme.rad(Prefs.dockRadius), Math.round(Theme.pill(shell.height)))
-        color: Theme.bg
+        // split, the islands below paint it
+        color: dockWindow.splitDrawn ? "transparent" : Theme.bg
         // corners meeting the screen edge square off in notch mode
         bottomLeftRadius: dockWindow.renderAsNotch ? 0 : shell.radius
         bottomRightRadius: dockWindow.renderAsNotch ? 0 : shell.radius
@@ -2822,6 +2878,93 @@ PanelWindow {
 
         }
 
+        // split: an island per group, each hugging its group at seam 1. towards 0 they
+        // spread over the shell between them and their inner corners square off, so
+        // they close up into the slab the launcher grows from
+        Item {
+            id: islands
+
+            readonly property real s: dockWindow.seam
+            readonly property real pad: dockWindow.splitPad
+            // the face's row, in the shell's coordinates
+            readonly property real fx: dockFace.x + iconRow.x
+            readonly property real lx0: islands.fx + launcherItem.x - islands.pad
+            readonly property real lx1: islands.fx + launcherItem.x + launcherItem.width + islands.pad
+            // the rows' own test, not visible: that reads false while the face is faded out
+            readonly property bool hasPins: pinnedRow.width > 0.5 || pinnedRow.dragging
+            readonly property real px0: islands.fx + pinnedRow.x - islands.pad
+            readonly property real px1: islands.fx + pinnedRow.x + pinnedRow.width + islands.pad
+            readonly property bool hasRunning: runningGroup.width > 0.5 || runningRow.dragging
+            // the running apps' island buds off the one before it as the first arrives
+            readonly property real rx0: (islands.hasPins ? islands.px1 : islands.lx1) + dockWindow.splitGap * runningGroup.fill
+            readonly property real rx1: islands.fx + runningGroup.x + runningGroup.width + islands.pad * runningGroup.fill
+            // where neighbours meet once closed up, leaving the end pieces wide enough
+            // for the shell's own corners so nothing pops as the shell takes over
+            readonly property real reach: shell.radius * 2
+            readonly property real m1: Math.min(Math.max((islands.lx1 + (islands.hasPins ? islands.px0 : islands.rx0)) / 2, islands.reach), shell.width - islands.reach)
+            readonly property real m2: Math.max(Math.min((islands.px1 + islands.rx0) / 2, shell.width - islands.reach), islands.m1)
+            // the corner an island rounds where it faces a neighbour
+            readonly property real inner: Math.min(Theme.rad(Prefs.dockRadius), Math.round(Theme.pill(shell.implicitHeight))) * islands.s
+
+            function mix(closed, apart) {
+                return closed + (apart - closed) * islands.s;
+            }
+
+            function corner(r, piece) {
+                return Math.max(0, Math.min(r, piece.width / 2, piece.height / 2));
+            }
+
+            anchors.fill: parent
+            visible: dockWindow.splitDrawn
+
+            Rectangle {
+                id: islandL
+
+                readonly property bool joined: islands.hasPins || islands.hasRunning
+
+                x: islands.mix(0, islands.lx0)
+                y: islands.mix(0, dockFace.y)
+                width: islands.mix(islandL.joined ? islands.m1 : shell.width, islands.lx1) - islandL.x
+                height: shell.height - islandL.y
+                color: Theme.bg
+                topLeftRadius: islands.corner(shell.radius, islandL)
+                bottomLeftRadius: islands.corner(shell.bottomLeftRadius, islandL)
+                topRightRadius: islands.corner(islandL.joined ? islands.inner : shell.radius, islandL)
+                bottomRightRadius: islands.corner(islandL.joined ? islands.inner : shell.bottomRightRadius, islandL)
+            }
+
+            Rectangle {
+                id: islandP
+
+                visible: islands.hasPins
+                x: islands.mix(islands.m1, islands.px0)
+                y: islandL.y
+                width: islands.mix(islands.hasRunning ? islands.m2 : shell.width, islands.px1) - islandP.x
+                height: islandL.height
+                color: Theme.bg
+                topLeftRadius: islands.corner(islands.inner, islandP)
+                bottomLeftRadius: islands.corner(islands.inner, islandP)
+                topRightRadius: islands.corner(islands.hasRunning ? islands.inner : shell.radius, islandP)
+                bottomRightRadius: islands.corner(islands.hasRunning ? islands.inner : shell.bottomRightRadius, islandP)
+            }
+
+            Rectangle {
+                id: islandR
+
+                visible: islands.hasRunning && islandR.width > 0.5
+                x: islands.mix(islands.hasPins ? islands.m2 : islands.m1, islands.rx0)
+                y: islandL.y
+                width: Math.max(0, islands.mix(shell.width, islands.rx1) - islandR.x)
+                height: islandL.height
+                color: Theme.bg
+                topLeftRadius: islands.corner(islands.inner, islandR)
+                bottomLeftRadius: islands.corner(islands.inner, islandR)
+                topRightRadius: islands.corner(shell.radius, islandR)
+                bottomRightRadius: islands.corner(shell.bottomRightRadius, islandR)
+            }
+
+        }
+
         DropArea {
             anchors.fill: parent
             keys: ["text/uri-list"]
@@ -2857,7 +3000,7 @@ PanelWindow {
         Item {
             id: dockFace
 
-            implicitWidth: iconRow.implicitWidth + Theme.dp(24)
+            implicitWidth: iconRow.implicitWidth + (Prefs.dockSplit ? dockWindow.splitPad * 2 : Theme.dp(24))
             width: shell.implicitWidth
             height: shell.implicitHeight
             anchors.left: parent.left
@@ -2878,7 +3021,7 @@ PanelWindow {
                 id: iconRow
 
                 anchors.left: parent.left
-                anchors.leftMargin: Theme.dp(12)
+                anchors.leftMargin: Prefs.dockSplit ? dockWindow.splitPad : Theme.dp(12)
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Theme.dp(10)
 
@@ -2903,10 +3046,12 @@ PanelWindow {
                     }
                 }
 
+                // split, the gap between the launcher's island and the pins'
                 Rectangle {
-                    width: 1
+                    width: Prefs.dockSplit ? dockWindow.splitGap : 1
                     height: Math.round(dockWindow.iconSlot * 0.5)
-                    color: Theme.outline
+                    color: Prefs.dockSplit ? "transparent" : Theme.outline
+                    visible: !Prefs.dockSplit || islands.hasPins
                     anchors.verticalCenter: parent.verticalCenter
                 }
 
@@ -2935,7 +3080,7 @@ PanelWindow {
                 Item {
                     id: runningGroup
 
-                    readonly property int lead: Theme.dp(21)
+                    readonly property int lead: Prefs.dockSplit ? dockWindow.splitGap + dockWindow.splitPad : Theme.dp(21)
                     readonly property real fill: Math.min(1, runningRow.width / runningGroup.lead)
 
                     width: runningRow.width > 0.5 ? runningRow.width + runningGroup.lead * runningGroup.fill : 0
@@ -2943,6 +3088,7 @@ PanelWindow {
                     visible: runningGroup.width > 0.5 || runningRow.dragging
 
                     Rectangle {
+                        visible: !Prefs.dockSplit
                         width: 1
                         height: Math.round(dockWindow.iconSlot * 0.5)
                         color: Theme.outline
@@ -3138,16 +3284,61 @@ PanelWindow {
 
     BackgroundEffect.blurRegion: (Theme.blurAmount > 0 && shell.shellReady && dockWindow.shellShown) ? dockBlurRegion : null
 
+    function regionLo(v) {
+        return Math.ceil(v - 0.002);
+    }
+
+    function regionHi(v) {
+        return Math.floor(v + 0.002);
+    }
+
+    // the shell, or while it is split, one part per island
     Region {
         id: dockBlurRegion
 
-        x: Math.ceil(shell.x - 0.002)
-        y: Math.ceil(shell.y - 0.002)
-        width: Math.max(0, Math.floor(shell.x + shell.width + 0.002) - Math.ceil(shell.x - 0.002))
-        height: Math.max(0, Math.floor(shell.y + shell.height + 0.002) - Math.ceil(shell.y - 0.002))
-        radius: shell.radius
-        bottomLeftRadius: shell.bottomLeftRadius
-        bottomRightRadius: shell.bottomRightRadius
+        Region {
+            x: dockWindow.regionLo(shell.x)
+            y: dockWindow.regionLo(shell.y)
+            width: dockWindow.splitDrawn ? 0 : Math.max(0, dockWindow.regionHi(shell.x + shell.width) - dockWindow.regionLo(shell.x))
+            height: Math.max(0, dockWindow.regionHi(shell.y + shell.height) - dockWindow.regionLo(shell.y))
+            radius: shell.radius
+            bottomLeftRadius: shell.bottomLeftRadius
+            bottomRightRadius: shell.bottomRightRadius
+        }
+
+        Region {
+            x: dockWindow.regionLo(shell.x + islandL.x)
+            y: dockWindow.regionLo(shell.y + islandL.y)
+            width: islandL.visible ? Math.max(0, dockWindow.regionHi(shell.x + islandL.x + islandL.width) - dockWindow.regionLo(shell.x + islandL.x)) : 0
+            height: Math.max(0, dockWindow.regionHi(shell.y + islandL.y + islandL.height) - dockWindow.regionLo(shell.y + islandL.y))
+            topLeftRadius: islandL.topLeftRadius
+            topRightRadius: islandL.topRightRadius
+            bottomLeftRadius: islandL.bottomLeftRadius
+            bottomRightRadius: islandL.bottomRightRadius
+        }
+
+        Region {
+            x: dockWindow.regionLo(shell.x + islandP.x)
+            y: dockWindow.regionLo(shell.y + islandP.y)
+            width: islandP.visible ? Math.max(0, dockWindow.regionHi(shell.x + islandP.x + islandP.width) - dockWindow.regionLo(shell.x + islandP.x)) : 0
+            height: Math.max(0, dockWindow.regionHi(shell.y + islandP.y + islandP.height) - dockWindow.regionLo(shell.y + islandP.y))
+            topLeftRadius: islandP.topLeftRadius
+            topRightRadius: islandP.topRightRadius
+            bottomLeftRadius: islandP.bottomLeftRadius
+            bottomRightRadius: islandP.bottomRightRadius
+        }
+
+        Region {
+            x: dockWindow.regionLo(shell.x + islandR.x)
+            y: dockWindow.regionLo(shell.y + islandR.y)
+            width: islandR.visible ? Math.max(0, dockWindow.regionHi(shell.x + islandR.x + islandR.width) - dockWindow.regionLo(shell.x + islandR.x)) : 0
+            height: Math.max(0, dockWindow.regionHi(shell.y + islandR.y + islandR.height) - dockWindow.regionLo(shell.y + islandR.y))
+            topLeftRadius: islandR.topLeftRadius
+            topRightRadius: islandR.topRightRadius
+            bottomLeftRadius: islandR.bottomLeftRadius
+            bottomRightRadius: islandR.bottomRightRadius
+        }
+
     }
 
 }

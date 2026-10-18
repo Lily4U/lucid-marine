@@ -70,6 +70,37 @@ Column {
     }
 
     SettingCard {
+        title: "STYLE"
+
+        SettingRow {
+            title: "Bar style"
+            resetKey: "barStyle"
+            description: "Islands float free of the screen edge. Notches sit flush against it, squaring off the corners that meet it. Full bar joins every module on one continuous strip across the top."
+            showDivider: false
+
+            M3Segmented {
+                width: Math.max(Theme.dp(360), fitWidth)
+                current: Prefs.barStyle
+                options: [{
+                    "key": "island",
+                    "label": "Islands"
+                }, {
+                    "key": "notch",
+                    "label": "Notches"
+                }, {
+                    "key": "full",
+                    "label": "Full bar"
+                }]
+                onChosen: (key) => {
+                    return Prefs.barStyle = key;
+                }
+            }
+
+        }
+
+    }
+
+    SettingCard {
         title: "OPENING BEHAVIOUR"
 
         SettingRow {
@@ -184,7 +215,7 @@ Column {
             resetKey: "barTopMargin"
             description: "How far the bar floats below the top edge of the screen."
             enabled: !Prefs.barFlush
-            disabledReason: "Notches and the full bar sit flush against the screen edge by definition - switch back to islands on the General page to float the bar."
+            disabledReason: "Notches and the full bar sit flush against the screen edge by definition - set Bar style back to Islands above to float the bar."
             stacked: true
 
             M3Slider {
@@ -227,7 +258,7 @@ Column {
             resetKey: "barNotchFlare"
             description: "How far notched corners sweep out: a notched module's upper corners into the top of the screen, and a panel's into the bar it hangs from. Only drawn where there is room for it - modules packed close together keep their square corners rather than leaving a spike of wallpaper between them."
             enabled: page.blendsAnything
-            disabledReason: "Nothing on the bar is notched - switch it to Notches on the General page, turn on notched pop-ups, or join two modules."
+            disabledReason: "Nothing on the bar is notched - set Bar style to Notches above, turn on notched pop-ups, or join two modules."
             stacked: true
 
             M3Slider {
@@ -250,7 +281,7 @@ Column {
             resetKey: "barFullCorner"
             description: "How far the full bar's strip curves down into the left and right screen edges, and into the sides of a panel that opens from it."
             enabled: Prefs.barFull
-            disabledReason: "Only the full bar meets the screen edges - switch the bar to Full bar on the General page."
+            disabledReason: "Only the full bar meets the screen edges - set Bar style to Full bar above."
             stacked: true
 
             M3Slider {

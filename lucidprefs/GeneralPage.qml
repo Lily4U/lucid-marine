@@ -47,6 +47,7 @@ Column {
             title: "Corner rounding"
             resetKey: "cornerScale"
             description: "How round the whole shell is: cards, panels, menus, pills and buttons. Lower squares them off, higher rounds them further; avatars, dots and the like stay round."
+            showDivider: false
             stacked: true
 
             M3Slider {
@@ -58,52 +59,6 @@ Column {
                 value: Prefs.cornerScale
                 onMoved: (v) => {
                     return Prefs.cornerScale = Math.round(v * 100) / 100;
-                }
-            }
-
-        }
-
-        SettingRow {
-            title: "Bar style"
-            description: "Islands float free of the screen edge. Notches sit flush against it, squaring off the corners that meet it. Full bar joins every module on one continuous strip across the top."
-
-            M3Segmented {
-                width: Theme.dp(360)
-                current: Prefs.barStyle
-                options: [{
-                    "key": "island",
-                    "label": "Islands"
-                }, {
-                    "key": "notch",
-                    "label": "Notches"
-                }, {
-                    "key": "full",
-                    "label": "Full bar"
-                }]
-                onChosen: (key) => {
-                    return Prefs.barStyle = key;
-                }
-            }
-
-        }
-
-        SettingRow {
-            title: "Dock style"
-            description: "The same choice for the dock, against the bottom edge."
-            showDivider: false
-
-            M3Segmented {
-                width: Theme.dp(260)
-                current: Prefs.dockStyle
-                options: [{
-                    "key": "island",
-                    "label": "Islands"
-                }, {
-                    "key": "notch",
-                    "label": "Notches"
-                }]
-                onChosen: (key) => {
-                    return Prefs.dockStyle = key;
                 }
             }
 

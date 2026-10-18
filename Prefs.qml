@@ -33,6 +33,8 @@ Singleton {
     // notches and the full bar both sit flush against the top edge
     readonly property bool barFlush: root.barNotch || root.barFull
     readonly property bool dockNotch: root.dockStyle === "notch"
+    // the launcher, the pins and the running apps each on an island of their own
+    readonly property bool dockSplit: root.dockStyle === "split"
     readonly property int barPillRadius: Math.min(Theme.rad(18), Math.round(Theme.pill(Theme.dp(root.barHeight))))
     readonly property int effectiveBarTopMargin: root.barFlush ? 0 : Theme.dp(root.barTopMargin)
     readonly property int effectiveDockBottomMargin: root.dockNotch ? 0 : Theme.dp(root.dockBottomMargin)
@@ -613,6 +615,7 @@ Singleton {
     property alias dockNotchFlare: s.dockNotchFlare
     property alias dockAutoHide: s.dockAutoHide
     property alias dockDynamicHide: s.dockDynamicHide
+    property alias dockSplitGap: s.dockSplitGap
     property alias dockShowIndicators: s.dockShowIndicators
     property alias dockShowTooltips: s.dockShowTooltips
     property alias dockShowRunning: s.dockShowRunning
@@ -1105,6 +1108,7 @@ Singleton {
         "idleDimAfter": 120,
         "idleDimLevel": 10,
         "idleDimKeyboard": true,
+        "dockSplitGap": 8,
         "idleLock": true,
         "idleLockAfter": 600,
         "idleScreenOff": true,
@@ -1826,6 +1830,7 @@ Singleton {
             property int idleDimLevel: 10
             property bool idleDimKeyboard: true
             property bool idleLock: true
+            property int dockSplitGap: 8
             property int idleLockAfter: 600
             property bool idleScreenOff: true
             property int idleScreenOffAfter: 900

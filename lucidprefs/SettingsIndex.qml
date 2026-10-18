@@ -18,12 +18,12 @@ Item {
     // words people search for that a page never uses itself
     property var keywords: ({
         "users": "password avatar picture login sign in",
-        "general": "accent animation motion rounding corners islands notches size scale zoom smaller bigger larger compact density desktop icons files folders trash recycle bin drives osd pop-up popup caps lock num lock on-screen display",
+        "general": "accent animation motion rounding corners size scale zoom smaller bigger larger compact density desktop icons files folders trash recycle bin drives osd pop-up popup caps lock num lock on-screen display",
         "glass": "blur transparency transparent opacity translucent frosted",
         "theme": "palette wallpaper background dark light matugen",
         "environment": "gtk qt cursor icon theme font",
-        "bar": "panel status tray top",
-        "dock": "taskbar pinned",
+        "bar": "panel status tray top style mode island islands notch notches full flush",
+        "dock": "taskbar pinned style mode island islands notch notches split flush",
         "launcher": "app menu start",
         "widgets": "desktop cards",
         "workspaces": "scratchpad special",

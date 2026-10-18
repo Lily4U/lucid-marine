@@ -11,6 +11,83 @@ Column {
     }
 
     SettingCard {
+        title: "STYLE"
+
+        SettingRow {
+            title: "Dock style"
+            resetKey: "dockStyle"
+            description: Prefs.dockSplit ? "The launcher, your pinned apps and the running ones each float on an island of their own, the way the bar's modules do. They close up into one as the launcher opens out of them, and part again when it closes." : (Prefs.dockNotch ? "The dock sits flush against the bottom edge, its lower corners sweeping out into it." : "The dock floats above the bottom edge as one rounded island.")
+
+            M3Segmented {
+                width: Math.max(Theme.dp(300), fitWidth)
+                current: Prefs.dockStyle
+                options: [{
+                    "key": "island",
+                    "label": "Island"
+                }, {
+                    "key": "notch",
+                    "label": "Notch"
+                }, {
+                    "key": "split",
+                    "label": "Split"
+                }]
+                onChosen: (key) => {
+                    return Prefs.dockStyle = key;
+                }
+            }
+
+        }
+
+        SettingRow {
+            title: "Edge blend"
+            resetKey: "dockNotchFlare"
+            description: "How far the dock's lower corners sweep out into the bottom of the screen, so it reads as carved out of the edge rather than resting on it."
+            enabled: Prefs.dockNotch
+            disabledReason: "Only a notch meets the screen edge, so there is nothing to blend into - set Dock style to Notch above."
+            stacked: true
+
+            M3Slider {
+                width: parent.width
+                enabled: Prefs.dockNotch
+                from: 0
+                to: 40
+                stepSize: 1
+                suffix: " px"
+                value: Prefs.dockNotchFlare
+                onMoved: (v) => {
+                    return Prefs.dockNotchFlare = v;
+                }
+            }
+
+        }
+
+        SettingRow {
+            title: "Island gap"
+            resetKey: "dockSplitGap"
+            description: "How far apart the launcher's island, the pinned apps' and the running apps' sit."
+            enabled: Prefs.dockSplit
+            disabledReason: "Only a split dock has islands to space out - set Dock style to Split above."
+            showDivider: false
+            stacked: true
+
+            M3Slider {
+                width: parent.width
+                enabled: Prefs.dockSplit
+                from: 4
+                to: 24
+                stepSize: 1
+                suffix: " px"
+                value: Prefs.dockSplitGap
+                onMoved: (v) => {
+                    return Prefs.dockSplitGap = v;
+                }
+            }
+
+        }
+
+    }
+
+    SettingCard {
         title: "SIZE & PLACEMENT"
 
         SettingRow {
@@ -98,7 +175,7 @@ Column {
             resetKey: "dockBottomMargin"
             description: "How far the dock floats above the bottom edge of the screen."
             enabled: !Prefs.dockNotch
-            disabledReason: "Notches sit flush against the screen edge by definition - switch back to islands on the General page to float the dock."
+            disabledReason: "A notch sits flush against the screen edge by definition - set Dock style to Island or Split above to float the dock."
             showDivider: false
             stacked: true
 
@@ -121,29 +198,6 @@ Column {
 
     SettingCard {
         title: "BEHAVIOUR"
-
-        SettingRow {
-            title: "Edge blend"
-            resetKey: "dockNotchFlare"
-            description: "How far the dock's lower corners sweep out into the bottom of the screen, so it reads as carved out of the edge rather than resting on it."
-            enabled: Prefs.dockNotch
-            disabledReason: "Islands float clear of the screen edge, so there is nothing to blend into - switch the dock to Notches on the General page."
-            stacked: true
-
-            M3Slider {
-                width: parent.width
-                enabled: Prefs.dockNotch
-                from: 0
-                to: 40
-                stepSize: 1
-                suffix: " px"
-                value: Prefs.dockNotchFlare
-                onMoved: (v) => {
-                    return Prefs.dockNotchFlare = v;
-                }
-            }
-
-        }
 
         SettingRow {
             title: "Hover strength"
