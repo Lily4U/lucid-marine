@@ -244,7 +244,8 @@ Column {
                 "themeName": c[i].name,
                 "tileBg": c[i].swatchBg,
                 "tileAccent": c[i].swatchAccent,
-                "isUser": c[i].user === true
+                "isUser": c[i].user === true,
+                "removable": c[i].user === true || c[i].removable === true
             });
         }
     }
@@ -328,6 +329,7 @@ Column {
                         required property string tileBg
                         required property string tileAccent
                         required property bool isUser
+                        required property bool removable
                         required property int index
 
                         readonly property bool selected: page.currentTheme === swatch.themeId
@@ -472,7 +474,7 @@ Column {
                         Rectangle {
                             id: themeDel
 
-                            readonly property bool shown: swatch.isUser && swatchHover.hovered && !themeDrag.active
+                            readonly property bool shown: swatch.removable && swatchHover.hovered && !themeDrag.active
 
                             width: Theme.dp(22)
                             height: Theme.dp(22)
@@ -523,7 +525,13 @@ Column {
 
                             TapHandler {
                                 gesturePolicy: TapHandler.ReleaseWithinBounds
-                                onTapped: Prefs.askConfirm("Remove this theme?", "\"" + swatch.themeName + "\" and its generated palette are deleted. The wallpaper folder is left alone.", "Remove", "theme:" + swatch.themeId)
+                                onTapped: {
+                                    // a built-in theme has nothing on disk to delete, it only leaves the list
+                                    if (!swatch.isUser)
+                                        Prefs.askConfirm("Remove this theme?", "\"" + swatch.themeName + "\" leaves the theme list and the launcher." + (swatch.selected ? " The palette switches to Matugen." : "") + " Use it again from Colours to bring it back.", "Remove", "theme-hide:" + swatch.themeId);
+                                    else
+                                        Prefs.askConfirm("Remove this theme?", "\"" + swatch.themeName + "\" and its generated palette are deleted. The wallpaper folder is left alone.", "Remove", "theme:" + swatch.themeId);
+                                }
                             }
 
                         }

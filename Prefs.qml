@@ -406,6 +406,8 @@ Singleton {
     property alias wallTransCustomPresets: s.wallTransCustomPresets
     // bracket writes on the adapter are dropped, so this must go through the alias
     property alias themeOrder: s.themeOrder
+    // built-in themes taken off the list, comma-separated
+    property alias hiddenThemes: s.hiddenThemes
     // how matugen builds a palette, from the wallpaper or from themeColour: its
     // scheme type, contrast from -1 to 1, and which of the wallpaper's dominant
     // colours to start from (the index holds for matugenSourceImage only; any
@@ -613,9 +615,9 @@ Singleton {
     property alias barHoverOpen: s.barHoverOpen
     property alias barAutoHide: s.barAutoHide
     property alias dockNotchFlare: s.dockNotchFlare
+    property alias dockSplitGap: s.dockSplitGap
     property alias dockAutoHide: s.dockAutoHide
     property alias dockDynamicHide: s.dockDynamicHide
-    property alias dockSplitGap: s.dockSplitGap
     property alias dockShowIndicators: s.dockShowIndicators
     property alias dockShowTooltips: s.dockShowTooltips
     property alias dockShowRunning: s.dockShowRunning
@@ -864,14 +866,17 @@ Singleton {
         { "id": "nightfox", "name": "Nightfox", "desc": "Deep navy with muted blue accents", "swatchBg": "#192330", "swatchAccent": "#719cd6" },
         { "id": "nord", "name": "Nord", "desc": "Arctic blue-grey palette", "swatchBg": "#232831", "swatchAccent": "#88c0d0" },
         { "id": "tokyo-night", "name": "Tokyo Night", "desc": "Dark blues and violets", "swatchBg": "#1a1b26", "swatchAccent": "#7aa2f7" },
-        { "id": "colour", "name": "Your colour", "desc": "A palette built from one colour you pick", "swatchBg": "#14121a", "swatchAccent": root.themeColour }
+        { "id": "colour", "name": "Your colour", "desc": "A palette built from one colour you pick", "swatchBg": "#14121a", "swatchAccent": root.themeColour, "removable": true }
     ]
     // themes imported from a scheme repo, read back from their meta.json
     property var userThemes: []
     // the order the user dragged them into; anything it does not name keeps its
     // natural place at the end, so a freshly imported theme still shows up
     readonly property var themeCatalogue: {
-        var all = root.builtinThemes.concat(root.userThemes);
+        var hidden = root.splitList(root.hiddenThemes);
+        var all = root.builtinThemes.filter((t) => {
+            return hidden.indexOf(t.id) === -1;
+        }).concat(root.userThemes);
         var order = root.themeOrder.split(",").filter((x) => {
             return x !== "";
         });
@@ -897,6 +902,33 @@ Singleton {
 
     function setThemeOrder(ids) {
         root.themeOrder = ids.join(",");
+    }
+
+    function setThemeHidden(id, on) {
+        var list = root.splitList(root.hiddenThemes).filter((x) => {
+            return x !== id;
+        });
+        if (on)
+            list.push(id);
+
+        var v = list.join(",");
+        if (v !== root.hiddenThemes)
+            root.hiddenThemes = v;
+
+    }
+
+    // a built-in theme leaves the list; the palette on screen steps back to
+    // the wallpaper's if it came from that theme
+    function removeBuiltinTheme(id) {
+        if (root.currentTheme === id)
+            root.themeChangeRequested("matugen");
+
+        root.setThemeHidden(id, true);
+    }
+
+    // using a removed theme again puts it back
+    onThemeChangeRequested: (id) => {
+        return root.setThemeHidden(id, false);
     }
 
     readonly property var defaults: ({
@@ -934,6 +966,7 @@ Singleton {
         "wallTransPreset": "soft",
         "wallTransCustomPresets": "",
         "themeOrder": "",
+        "hiddenThemes": "",
         "matugenScheme": "scheme-tonal-spot",
         "matugenContrast": 0,
         "matugenSourceImage": "",
@@ -1075,6 +1108,7 @@ Singleton {
         "barHoverOpen": false,
         "barAutoHide": false,
         "dockNotchFlare": 14,
+        "dockSplitGap": 8,
         "dockAutoHide": false,
         "dockDynamicHide": false,
         "dockShowIndicators": true,
@@ -1108,7 +1142,6 @@ Singleton {
         "idleDimAfter": 120,
         "idleDimLevel": 10,
         "idleDimKeyboard": true,
-        "dockSplitGap": 8,
         "idleLock": true,
         "idleLockAfter": 600,
         "idleScreenOff": true,
@@ -1655,6 +1688,7 @@ Singleton {
             property string wallTransPreset: "soft"
             property string wallTransCustomPresets: ""
             property string themeOrder: ""
+            property string hiddenThemes: ""
             property string matugenScheme: "scheme-tonal-spot"
             property real matugenContrast: 0
             property string matugenSourceImage: ""
@@ -1796,6 +1830,7 @@ Singleton {
             property bool barHoverOpen: false
             property bool barAutoHide: false
             property int dockNotchFlare: 14
+            property int dockSplitGap: 8
             property bool dockAutoHide: false
             property bool dockDynamicHide: false
             property bool dockShowIndicators: true
@@ -1830,7 +1865,6 @@ Singleton {
             property int idleDimLevel: 10
             property bool idleDimKeyboard: true
             property bool idleLock: true
-            property int dockSplitGap: 8
             property int idleLockAfter: 600
             property bool idleScreenOff: true
             property int idleScreenOffAfter: 900

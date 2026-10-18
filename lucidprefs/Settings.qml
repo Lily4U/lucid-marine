@@ -376,6 +376,8 @@ FloatingWindow {
                 Prefs.wallpaperDeleteRequested(action.substring(10));
             else if (action.indexOf("theme:") === 0)
                 Prefs.themeDeleteRequested(action.substring(6));
+            else if (action.indexOf("theme-hide:") === 0)
+                Prefs.removeBuiltinTheme(action.substring(11));
             else if (action.indexOf("widget-preset:") === 0)
                 Widgets.deletePreset(action.substring(14));
             else if (action.indexOf("storage-clean:") === 0)
