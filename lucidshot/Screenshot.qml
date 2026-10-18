@@ -268,28 +268,14 @@ PanelWindow {
         return "#" + flashWindow.hex2(parseFloat(n[0])) + flashWindow.hex2(parseFloat(n[1])) + flashWindow.hex2(parseFloat(n[2]));
     }
 
-    // hyprpicker formats in the mode the user chose, so its zoom lens, the
-    // clipboard and the toast all show the same string. -a is deliberately not
-    // used: the wl-copy it forks would inherit stdout and hold the pipe open
     function pickColor(format) {
         if (colorProcess.running)
             return;
         var fmt = (format === "rgb" || format === "hsl") ? format : "hex";
-        var tmpl = "";
-        if (fmt === "rgb")
-            tmpl = " -o 'rgb({0}, {1}, {2})'";
-        else if (fmt === "hsl")
-            tmpl = " -o 'hsl({0}, {1}%, {2}%)'";
         colorProcess.format = fmt;
-        colorProcess.command = ["sh", "-c",
-            "command -v hyprpicker >/dev/null 2>&1 || { echo NOTOOL; exit 0; }; " +
-            // -q is deliberately absent: it suppresses the picked colour itself,
-            // not just the logs. -b stops the ansi-wrapped "fancy" output. the -o
-            // templates are needed because hyprpicker's own defaults are unusable
-            // here: rgb gives a bare "15 15 15" and hsl drops a component ("0 0%").
-            // they drive the zoom lens too, so it reads the same as the clipboard
-            "hyprpicker -f " + fmt + " -b" + tmpl
-        ];
+        
+        // simplified by using pure C colorpicker
+        colorProcess.command = ["colorpicker", "-f", fmt, "-l", "-a"];
         colorProcess.running = true;
     }
 
