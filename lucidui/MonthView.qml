@@ -75,8 +75,11 @@ Item {
         slideIn.restart();
     }
 
+    // header and weekday row, which do not grow with the cell
+    readonly property int chromeHeight: (month.showHeader ? Theme.dp(36) + Theme.dp(6) : 0) + Theme.dp(22)
+
     implicitWidth: month.cell * 7
-    implicitHeight: (month.showHeader ? head.height + Theme.dp(6) : 0) + weekRow.height + month.cell * 6
+    implicitHeight: month.chromeHeight + month.cell * 6
 
     // a view left on this month follows midnight into the next one
     Connections {

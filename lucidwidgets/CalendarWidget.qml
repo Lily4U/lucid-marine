@@ -40,9 +40,12 @@ WidgetBody {
 
     // month: a date picker's grid, today in lucid's pentagon
     MonthView {
+        id: monthView
+
         visible: w.variant === "month"
         anchors.centerIn: parent
-        cell: Math.floor((w.width - Theme.dp(28)) / 7)
+        // fit both ways so the grid keeps its inset top and bottom too
+        cell: Math.floor(Math.min((w.width - Theme.dp(28)) / 7, (w.height - Theme.dp(20) - monthView.chromeHeight) / 6))
         mondayFirst: w.mondayFirst
         showHeader: w.opt("showMonthName") !== false
         showNav: w.hovered

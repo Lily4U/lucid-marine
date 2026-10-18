@@ -114,7 +114,7 @@ WidgetBody {
         readonly property int dateSize: Math.max(Theme.dp(11), Math.round(stack.height * 0.06))
         readonly property int dateBox: w.showDate ? Math.round(stack.dateSize * 1.45) : 0
         // the lock screen's proportions: a line box of 0.82 units, two of them
-        readonly property int unit: Math.max(Theme.dp(24), Math.min((stack.height - Theme.dp(52) - stack.dateBox) / 1.64, (stack.width - Theme.dp(56)) / 1.35))
+        readonly property int unit: Math.max(Theme.dp(24), Math.min((stack.height - Theme.dp(64) - stack.dateBox) / 1.64, (stack.width - Theme.dp(64)) / 1.35))
 
         visible: w.variant === "stack"
         anchors.fill: parent

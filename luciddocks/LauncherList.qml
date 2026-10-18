@@ -429,9 +429,6 @@ Item {
             readonly property color content: list.mix(Theme.text, Theme.fgPrimaryContainer, rowItem.lit)
             readonly property color support: list.mix(Theme.subtext, Theme.alpha(Theme.fgPrimaryContainer, 0.76), rowItem.lit)
             readonly property color mark: list.mix(Theme.primary, Theme.fgPrimaryContainer, rowItem.lit)
-            // a symbol needs a container to sit on; an application icon brings its own
-            readonly property bool needsTile: rowItem.glyph !== "" || rowItem.emoji !== ""
-            readonly property color tile: list.mix(Theme.withBlur(Theme.bgTile), Theme.alpha(Theme.fgPrimaryContainer, 0.14), rowItem.lit)
             readonly property bool showsDrop: rowItem.kind === "clip" && (rowItem.hovering || rowItem.selected)
             // an application the pointer is on can be sent out of the launcher
             readonly property bool showsHide: rowItem.kind === "app" && rowItem.hovering
@@ -581,13 +578,6 @@ Item {
                 width: list.leadSlot
                 height: list.leadSlot
                 visible: !rowItem.isHeader && !rowItem.isCalc && rowItem.hasLead
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Math.round(parent.width * 0.35)
-                    color: rowItem.tile
-                    visible: rowItem.needsTile
-                }
 
                 // an application icon is already a shape and a colour of its
                 // own; standing it on a tile only muddies both
