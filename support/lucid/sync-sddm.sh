@@ -96,6 +96,12 @@ if grep -q '^Theme-Id=lucid$' "$DIR/metadata.desktop" 2>/dev/null; then
     ok "ok lucid $THEME"
     [[ $MISSING -eq 1 && -s "$OUT/theme.conf" ]] && exit 0
 
+    # one at a time: a live wallpaper's copy finishes in the background and
+    # runs this again, maybe while a wallpaper change is painting
+    mkdir -p "$HOME/.cache/lucid"
+    exec 7>"$HOME/.cache/lucid/sddm-sync.lock"
+    flock -w 60 7 || true
+
     if [[ $SHARED -eq 0 ]]; then
         mkdir "$OUT" 2>/dev/null || true
         # checked again: another account could have taken the name in between
@@ -137,25 +143,64 @@ if grep -q '^Theme-Id=lucid$' "$DIR/metadata.desktop" 2>/dev/null; then
     # a live wallpaper moves on the login screen too. the copy is made the way
     # background.jpg is: 480 wide, blurred there and grown back by the greeter,
     # and without its sound, so a cold gpu at boot decodes a few hundred lines
-    # rather than 1080. it only changes with the video, so it is made once
+    # rather than 1080. each video's copy is kept in VID_DIR, and a missing one
+    # is made in the background: a 4k clip is ~35 s of cpu, and this runs inside
+    # set-wallpaper.sh's colour lock, so the next wallpaper's colours waited on it
     VIDEO=""
+    VID_DIR="$HOME/.cache/lucid/sddm-video"
+
+    # one at a time, at the lowest priority, and only while the video is still
+    # the wallpaper, so a browse past several clips makes the last one's copy.
+    # runs this script again once it is ready, to put it up
+    make_video() {
+        local live="$1" key="$2" tmp low=(nice -n 19)
+        command -v ionice &>/dev/null && low+=(ionice -c 3)
+        exec 6>"$VID_DIR/.lock"
+        flock 6
+        [[ "$(head -n1 "$HOME/.cache/current_live_wallpaper" 2>/dev/null || true)" == "$live" ]] || return 0
+        if [[ ! -s "$VID_DIR/$key.mp4" ]]; then
+            tmp="$VID_DIR/.$key.$BASHPID.mp4"
+            # -threads ahead of -i caps the decoder too, which otherwise takes every core
+            if "${low[@]}" ffmpeg -v error -y -threads 2 -i "$live" -an -sn -dn \
+                   -filter_threads 1 -vf "scale=480:-2,gblur=sigma=3.4" \
+                   -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p \
+                   -movflags +faststart -threads 2 "$tmp"; then
+                mv -f "$tmp" "$VID_DIR/$key.mp4"
+            else
+                rm -f "$tmp"
+                : > "$VID_DIR/$key.fail"
+                return 0
+            fi
+            find "$VID_DIR" -type f ! -name .lock -mtime +60 -delete 2>/dev/null || true
+        fi
+        exec 6>&-
+        [[ "$(head -n1 "$HOME/.cache/current_live_wallpaper" 2>/dev/null || true)" == "$live" ]] \
+            && "${BASH_SOURCE[0]}"
+        return 0
+    }
+
     LIVE=$(head -n1 "$HOME/.cache/current_live_wallpaper" 2>/dev/null || true)
     if [[ -n "$LIVE" && -f "$LIVE" ]] && command -v ffmpeg &>/dev/null; then
         KEY=$(printf '%s|%s' "$LIVE" "$(stat -c %Y "$LIVE" 2>/dev/null || echo 0)" | sha1sum | cut -c1-16)
+        mkdir -p "$VID_DIR"
         if [[ -s "$OUT/background.mp4" && "$(cat "$OUT/background.key" 2>/dev/null)" == "$KEY" ]]; then
             VIDEO=background.mp4
-        else
-            TMPV=$(mktemp --suffix=.mp4 "$OUT/.background.XXXXXX")
-            if ffmpeg -v error -y -i "$LIVE" -an -sn -dn \
-                   -vf "scale=480:-2,gblur=sigma=3.4" \
-                   -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p \
-                   -movflags +faststart -threads 2 "$TMPV" </dev/null; then
-                chmod 644 "$TMPV"
-                mv -f "$TMPV" "$OUT/background.mp4"
-                echo "$KEY" > "$OUT/background.key"
-                chmod 644 "$OUT/background.key"
-                VIDEO=background.mp4
+            # a copy made before VID_DIR existed counts too
+            if [[ ! -s "$VID_DIR/$KEY.mp4" ]] && cp "$OUT/background.mp4" "$VID_DIR/.$KEY.$$.mp4" 2>/dev/null; then
+                mv -f "$VID_DIR/.$KEY.$$.mp4" "$VID_DIR/$KEY.mp4"
             fi
+        elif [[ -s "$VID_DIR/$KEY.mp4" ]]; then
+            TMPV=$(mktemp --suffix=.mp4 "$OUT/.background.XXXXXX")
+            cp "$VID_DIR/$KEY.mp4" "$TMPV"
+            chmod 644 "$TMPV"
+            mv -f "$TMPV" "$OUT/background.mp4"
+            echo "$KEY" > "$OUT/background.key"
+            chmod 644 "$OUT/background.key"
+            touch "$VID_DIR/$KEY.mp4"
+            VIDEO=background.mp4
+        elif [[ ! -e "$VID_DIR/$KEY.fail" ]]; then
+            # closes both locks, this script's and set-wallpaper.sh's colour lock
+            make_video "$LIVE" "$KEY" </dev/null &>/dev/null 7>&- 9>&- &
         fi
     fi
 
