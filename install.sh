@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Lucid installer — Arch Linux + Hyprland
+# Lucid installer — Ultramarine Linux (Fedora) + Hyprland
 #
-# installs dependencies, places the shell at ~/.config/quickshell, and sets up
+# installs dependencies (dnf, COPR, Flatpak), places the shell at ~/.config/quickshell, and sets up
 # the full bundle: the Hyprland config (binds, window rules, blur, autostart),
 # the theming layer, the Lucid look, and the apps the dock ships pinned.
 # safe to re-run: existing config and personal state are backed up, never
@@ -53,7 +53,7 @@ ${b}Lucid $VERSION installer${r}
   --no-hypr      keep your Hyprland config; Lucid's binds, window
                  rules and blur are not installed
   --no-apps      don't install the apps pinned to the dock by
-                 default (Zen, VSCodium, Spotify, Steam, ...)
+                 default (Zen, VSCodium, Spotify, Steam, ... as Flatpaks)
   --no-wallpapers
                  don't copy the bundled wallpapers to
                  ~/Pictures/wallpapers
@@ -96,21 +96,34 @@ ask() {
 
 step "Checking the system"
 
-[[ -f /etc/arch-release ]] || die "this installer is Arch-only. see the README for a manual install."
-command -v pacman &>/dev/null || die "pacman not found"
+# Ultramarine reports ID=ultramarine, ID_LIKE=fedora. Fedora itself and other
+# derivatives (Nobara, ...) pass the same check.
+OS_ID=""; OS_LIKE=""; OS_VERSION=""
+if [[ -r /etc/os-release ]]; then
+    OS_ID=$(. /etc/os-release; printf '%s' "${ID:-}")
+    OS_LIKE=$(. /etc/os-release; printf '%s' "${ID_LIKE:-}")
+    OS_VERSION=$(. /etc/os-release; printf '%s' "${VERSION_ID:-}")
+fi
+[[ "$OS_ID" == fedora || "$OS_ID" == ultramarine || " $OS_LIKE " == *" fedora "* ]] \
+    || die "this installer targets Ultramarine / Fedora. see the README for a manual install."
+command -v dnf &>/dev/null || die "dnf not found"
 [[ $EUID -ne 0 ]] || die "don't run this as root — it installs into your home directory"
 [[ -f "$SRC/shell.qml" ]] || die "run this from inside the Lucid repo (no shell.qml next to install.sh)"
 
 command -v Hyprland &>/dev/null || command -v hyprctl &>/dev/null \
-    || warn "Hyprland not found. Lucid uses Hyprland-specific APIs and will not work under another compositor."
+    || warn "Hyprland not found yet. Lucid uses Hyprland-specific APIs and will not work under another compositor."
 
-AUR=""
-for helper in paru yay; do
-    command -v "$helper" &>/dev/null && { AUR="$helper"; break; }
-done
+# dnf5 (Fedora 41+, Ultramarine 41+) has COPR built in and spells "skip what
+# does not exist" differently from dnf4
+DNF5=0
+[[ "$(dnf --version 2>/dev/null)" == *dnf5* ]] && DNF5=1
+if [[ $DNF5 -eq 1 ]]; then
+    DNF_SKIP=(--skip-unavailable)
+else
+    DNF_SKIP=(--setopt=strict=0)
+fi
 
-say "  arch linux      ${grn}ok${r}"
-say "  aur helper      ${AUR:-${ylw}none${r}}"
+say "  ${OS_ID:-fedora} ${OS_VERSION}  ${grn}ok${r}  (dnf$([[ $DNF5 -eq 1 ]] && echo 5 || echo ''))"
 say "  install target  $SHELL_DIR"
 say "  theming layer   $([[ $WITH_THEMING -eq 1 ]] && echo yes || echo 'no (--no-theming)')"
 say "  hyprland config $([[ $WITH_HYPR   -eq 1 ]] && echo yes || echo 'no (--no-hypr)')"
@@ -119,19 +132,27 @@ say "  wallpapers      $([[ $WITH_WALLPAPERS -eq 1 ]] && echo yes || echo 'no (-
 
 # ------------------------------------------------------------- dependencies
 
+# COPR repositories are unofficial and maintained by individuals. They are only
+# enabled after asking, and only when something is still missing from the
+# official repos (Fedora, RPM Fusion and Terra, which Ultramarine ships).
+# Names live here so they are one edit away if a maintainer moves.
+COPR_QUICKSHELL="errornointernet/quickshell"   # quickshell (documented upstream)
+COPR_EXTRAS="avengemedia/danklinux"            # matugen, cliphist and friends
+COPR_HYPRLAND="ashbuk/Hyprland-Fedora"         # Hyprland: not in Fedora's own repos
+
 # required — the shell will not start or will visibly break without these
-PKG_REQUIRED=(quickshell qt6-5compat qt6-declarative qt6-multimedia)
+PKG_REQUIRED=(quickshell qt6-qt5compat qt6-qtdeclarative qt6-qtmultimedia)
 # each of these backs one feature; missing ones degrade that feature only
 PKG_FEATURES=(
-    matugen jq imagemagick
-    networkmanager qrencode bluez bluez-utils bluez-obex
-    kdeconnect sshfs python-gobject
-    libpulse wireplumber brightnessctl upower hypridle hyprsunset
-    grim wf-recorder ffmpeg wl-clipboard wtype cliphist
-    tesseract tesseract-data-eng hyprpicker
-    python-pillow python-numpy python-fonttools
+    matugen jq ImageMagick
+    NetworkManager qrencode bluez bluez-obexd
+    kde-connect fuse-sshfs python3-gobject
+    pulseaudio-utils wireplumber brightnessctl upower hypridle hyprsunset
+    grim wf-recorder ffmpeg-free wl-clipboard wtype cliphist
+    tesseract tesseract-langpack-eng hyprpicker
+    python3-pillow python3-numpy python3-fonttools
     cava songrec curl libnotify awww fastfetch
-    python-pywal noto-fonts-emoji
+    python3-pywal google-noto-color-emoji-fonts
     # the shell is the session's own polkit agent; polkitd and its setuid
     # helper are the backend it drives
     xdg-utils zenity swappy polkit
@@ -140,106 +161,94 @@ PKG_FEATURES=(
     accountsservice
     # the environment page writes the desktop's appearance through these, and
     # the file chooser kde connect sends files with comes from the gtk portal.
-    # librsvg renders a cursor theme again when its shadow is turned off
-    gsettings-desktop-schemas qt6ct xdg-desktop-portal-gtk librsvg
+    # librsvg2 renders a cursor theme again when its shadow is turned off
+    gsettings-desktop-schemas qt6ct xdg-desktop-portal-gtk librsvg2 gtk-update-icon-cache
     # the launcher's $ mode runs a command in the user's terminal through this
     xdg-terminal-exec
     # the camera on/off toast hears /dev/video* opened and closed through this
     inotify-tools
     # the Sound page's Left/Right test: pw-play, and the voice that names each side
-    pipewire-audio sound-theme-freedesktop
+    pipewire-utils sound-theme-freedesktop
     # the Storage page: a drive's health, and mounting or ejecting one
     smartmontools udisks2
     # the desktop icons: video and music thumbnails, and the drives and trash they show
     ffmpegthumbnailer gvfs
+    # Compile tools (for C colorpicker)
+    clang make wayland-protocols-devel 
 )
 # invoked by the shipped Hyprland binds and the Lucid look. without these the
-# config installs fine but its keys do nothing and the prompt renders as boxes
+# config installs fine but its keys do nothing and the prompt renders as boxes.
+# (the JetBrainsMono Nerd Font is not packaged for Fedora; it is fetched below)
 PKG_HYPR=(
     kitty nautilus playerctl gnome-calculator
-    starship fish ttf-jetbrains-mono-nerd adw-gtk-theme papirus-icon-theme
+    starship fish adw-gtk3-theme papirus-icon-theme
 )
-# the dock's default pins. these are the apps Lucid ships pinned, so the dock
-# is not a row of blank letter tiles on a fresh install. --no-apps skips them.
-# order matches the dock; steam is filtered out below unless multilib is on
-PKG_DOCK=(
-    zen-browser-bin vscodium-bin vesktop
-    spotify proton-vpn-gtk-app steam
+# the dock's default pins, installed as Flatpaks from Flathub: none of them is
+# in Fedora's repos, and Flatpak keeps them out of the way of the system. the
+# dock detects them through the flatpak export dirs. --no-apps skips them.
+# (Proton VPN has no Flathub build: add Proton's own repo if you want it)
+DOCK_FLATPAKS=(
+    app.zen_browser.zen com.vscodium.codium dev.vencord.Vesktop
+    com.spotify.Client com.valvesoftware.Steam
 )
 # a package already covered by an equivalent one the user chose themselves.
-# without this a re-run keeps trying to install vscodium-bin over vscodium
+# without this a re-run keeps trying to install ffmpeg-free over ffmpeg
 declare -A PKG_ALTS=(
-    [vscodium-bin]="vscodium vscodium-git visual-studio-code-bin code"
-    [zen-browser-bin]="zen-browser zen-browser-avx2-bin"
-    [vesktop]="vesktop-bin discord"
-    [spotify]="spotify-launcher"
-    [ttf-jetbrains-mono-nerd]="nerd-fonts ttf-jetbrains-mono"
-    [adw-gtk-theme]="adw-gtk3 adw-gtk3-git"
+    [ffmpeg-free]="ffmpeg"
     [qt6ct]="qt6ct-kde"
     [xdg-desktop-portal-gtk]="xdg-desktop-portal-gnome xdg-desktop-portal-kde"
+    [adw-gtk3-theme]="adw-gtk3"
+)
+# same idea for the dock apps: an RPM or binary the user already has counts
+declare -A DOCK_ALTS=(
+    [app.zen_browser.zen]="zen-browser zen"
+    [com.vscodium.codium]="codium vscodium code visual-studio-code"
+    [dev.vencord.Vesktop]="vesktop discord"
+    [com.spotify.Client]="spotify spotify-launcher"
+    [com.valvesoftware.Steam]="steam"
 )
 
-# a couple of the dock's AUR packages need something in place before the build
-# will even start. without this the package silently drops out of the install
-# with a warning, and the dock is left drawing a blank letter tile for it.
-SPOTIFY_KEY=E1096BCBFF6D418796DE78515384CE82BA52C83A
-aur_prepare() {
-    # the spotify PKGBUILD verifies its .deb against Spotify's own signing
-    # key. that key ships in nobody's keyring, so a fresh machine fails with
-    # "unknown public key" every time. import it first; the download server is
-    # the PKGBUILD's own, with a keyserver as the fallback
-    [[ "$1" == spotify ]] || return 0
-    gpg --list-keys "$SPOTIFY_KEY" &>/dev/null && return 0
-    say "  importing Spotify's package signing key"
-    if curl -sS https://download.spotify.com/debian/pubkey_5384CE82BA52C83A.gpg 2>/dev/null \
-         | gpg --import - &>/dev/null; then
-        return 0
-    fi
-    gpg --keyserver keyserver.ubuntu.com --recv-keys "$SPOTIFY_KEY" &>/dev/null \
-        || warn "  could not import Spotify's signing key — the build may fail"
-}
-
-# true when the package, or anything standing in for it, is installed
+# true when the package, or anything standing in for it, is installed. the
+# whatprovides form also accepts capability names
 have_pkg() {
-    pacman -Qq "$1" &>/dev/null && return 0
+    rpm -q --whatprovides "$1" &>/dev/null && return 0
     local alt
     for alt in ${PKG_ALTS[$1]:-}; do
-        pacman -Qq "$alt" &>/dev/null && return 0
+        rpm -q --whatprovides "$alt" &>/dev/null && return 0
     done
     return 1
 }
 
-# the vulkan drivers, 64 and 32-bit, for the gpus this machine actually has.
-# steam's are virtual dependencies, and --noconfirm settles each one with its
-# first provider: nvidia-utils and lib32-nvidia-utils. on an intel or amd box
-# with no 32-bit driver yet, that leaves the client and every 32-bit game
-# without vulkan, and nvidia's userspace on a machine with no nvidia card
-steam_drivers() {
-    local card vendor out="" seen=" " known=0
-    for card in /sys/class/drm/card*; do
-        [[ ${card##*/} =~ ^card[0-9]+$ && -r $card/device/vendor ]] || continue
-        vendor=$(< "$card/device/vendor")
-        [[ $seen == *" $vendor "* ]] && continue
-        seen+="$vendor "
-        case $vendor in
-            0x1002) out+=" vulkan-radeon lib32-vulkan-radeon" ;;
-            0x8086) out+=" vulkan-intel lib32-vulkan-intel" ;;
-            0x1af4) out+=" vulkan-virtio lib32-vulkan-virtio" ;;
-            # the 32-bit half has to match nvidia-utils, so it is named only
-            # beside that exact package; a legacy branch keeps its own, and
-            # with no proprietary driver at all the card runs nouveau
-            0x10de)
-                known=1
-                if pacman -Qq nvidia-utils &>/dev/null; then
-                    out+=" lib32-nvidia-utils"
-                elif [[ ! -r /proc/driver/nvidia/version ]]; then
-                    out+=" vulkan-nouveau lib32-vulkan-nouveau"
-                fi ;;
-        esac
+dock_have() {
+    command -v flatpak &>/dev/null && flatpak info "$1" &>/dev/null && return 0
+    local alt
+    for alt in ${DOCK_ALTS[$1]:-}; do
+        command -v "$alt" &>/dev/null && return 0
+        rpm -q "$alt" &>/dev/null && return 0
     done
-    # a vm or anything unrecognised gets the software driver, never nvidia's
-    [[ -n $out || $known -eq 1 ]] || out=" vulkan-swrast lib32-vulkan-swrast"
-    printf '%s\n' "${out# }"
+    return 1
+}
+
+# enable a COPR, with the plugin dnf4 needs for it
+copr_enable() {
+    if [[ $DNF5 -eq 0 ]] && ! rpm -q dnf-plugins-core &>/dev/null; then
+        sudo dnf install -y dnf-plugins-core || return 1
+    fi
+    sudo dnf copr enable -y "$1"
+}
+
+# which of the wanted packages are still not installed
+compute_missing() {
+    missing=()
+    local p
+    for p in "${WANTED[@]}"; do
+        have_pkg "$p" || missing+=("$p")
+    done
+}
+
+# a second, third... call must not trip over an empty result under set -e
+dnf_install() {
+    sudo dnf install -y "${DNF_SKIP[@]}" "$@"
 }
 
 missing=()
@@ -247,43 +256,9 @@ DEPS_OK=1
 
 step "Resolving dependencies"
 
-# a never-synced pacman database makes every -Si lookup fail, so real repo
-# packages get misread as AUR and nothing installs. check against a package
-# that is guaranteed present rather than trusting the db exists.
-if ! pacman -Si bash &>/dev/null; then
-    warn "your pacman database is empty or stale — package lookups will fail."
-    warn "run this first, then re-run the installer:"
-    warn "    sudo pacman -Syu"
-    if ! ask "  Continue anyway (dependencies will likely be skipped)?"; then
-        die "stopped. run 'sudo pacman -Syu' and try again."
-    fi
-fi
-
 WANTED=("${PKG_REQUIRED[@]}" "${PKG_FEATURES[@]}")
 [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && WANTED+=("${PKG_HYPR[@]}")
-
-if [[ $WITH_APPS -eq 1 ]]; then
-    for p in "${PKG_DOCK[@]}"; do
-        # steam lives in multilib. with that repo off the lookup fails, the
-        # name gets misread as an AUR package and the build fails much later
-        if [[ "$p" == steam ]] && ! grep -q '^\[multilib\]' /etc/pacman.conf 2>/dev/null; then
-            say "  ${dim}skipping steam — the multilib repo is not enabled${r}"
-            continue
-        fi
-        WANTED+=("$p")
-    done
-fi
-
-# named in the same transaction as steam, so pacman never has to pick. a re-run
-# adds what an earlier install left out (its only 32-bit driver nvidia's)
-if [[ " ${WANTED[*]} " == *" steam "* ]]; then
-    read -ra STEAM_DRIVERS <<< "$(steam_drivers)"
-    WANTED+=("${STEAM_DRIVERS[@]}")
-fi
-
-for p in "${WANTED[@]}"; do
-    have_pkg "$p" || missing+=("$p")
-done
+compute_missing
 
 if [[ ${#missing[@]} -eq 0 ]]; then
     say "  everything is already installed"
@@ -292,53 +267,153 @@ elif [[ $SKIP_DEPS -eq 1 ]]; then
     say "  ${ylw}missing (--skip-deps, not installing):${r}"
     printf '    %s\n' "${missing[@]}"
 else
-    # split by what the configured repos actually carry, so one unresolvable
-    # name can never take the whole batch down with it
-    from_repo=(); from_aur=()
-    for p in "${missing[@]}"; do
-        if pacman -Si "$p" &>/dev/null; then from_repo+=("$p"); else from_aur+=("$p"); fi
-    done
+    say "  missing: ${missing[*]}"
 
-    [[ ${#from_repo[@]} -gt 0 ]] && say "  from the repos: ${from_repo[*]}"
-    [[ ${#from_aur[@]}  -gt 0 ]] && say "  not in your repos, will try the aur: ${from_aur[*]}"
+    if ask "  install these now (official repos first)?"; then
+        # pass 1: whatever Fedora, RPM Fusion and Terra carry. unknown names
+        # are skipped, so one unresolvable package never sinks the batch
+        dnf_install "${missing[@]}" || warn "dnf reported problems — checking what is left"
+        compute_missing
 
-    # the dock apps are the bulk of the download and the part people are most
-    # likely to want out of, so name them rather than burying them in the list
-    dock_missing=()
-    for p in "${PKG_DOCK[@]}"; do
-        for m in "${missing[@]}"; do [[ "$m" == "$p" ]] && dock_missing+=("$p") && break; done
-    done
-    if (( ${#dock_missing[@]} )); then
-        say "  ${dim}of those, the dock's default apps: ${dock_missing[*]}${r}"
-        say "  ${dim}(several GB, mostly from the aur — pass --no-apps to skip them)${r}"
-    fi
-
-    if ask "  install these now?"; then
-        if [[ ${#from_repo[@]} -gt 0 ]]; then
-            if sudo pacman -S --needed --noconfirm "${from_repo[@]}"; then
-                say "  repo packages installed"
-            else
-                DEPS_OK=0
-                warn "some repo packages failed to install — continuing anyway"
+        # pass 2: quickshell has no official package outside Rawhide
+        if [[ " ${missing[*]} " == *" quickshell "* ]]; then
+            say "  quickshell is not in the official repos; it comes from the"
+            say "  ${COPR_QUICKSHELL} COPR (unofficial, community-maintained)"
+            if ask "  Enable that COPR?"; then
+                copr_enable "$COPR_QUICKSHELL" && dnf_install quickshell \
+                    || warn "could not install quickshell from the COPR"
+                compute_missing
             fi
         fi
-        if [[ ${#from_aur[@]} -gt 0 ]]; then
-            if [[ -n "$AUR" ]]; then
-                # one at a time: a single bad name shouldn't block the rest
-                for p in "${from_aur[@]}"; do
-                    aur_prepare "$p"
-                    "$AUR" -S --needed --noconfirm "$p" || {
-                        DEPS_OK=0; warn "could not install $p"
-                    }
-                done
-            else
-                DEPS_OK=0
-                warn "no AUR helper (paru/yay) — install manually: ${from_aur[*]}"
+
+        # pass 3: the helpers that are packaged only outside Fedora
+        extras_missing=()
+        for p in matugen cliphist hyprsunset hyprpicker hypridle cava; do
+            [[ " ${missing[*]} " == *" $p "* ]] && extras_missing+=("$p")
+        done
+        if (( ${#extras_missing[@]} )); then
+            say "  still missing, packaged by a COPR: ${extras_missing[*]}"
+            if ask "  Enable ${COPR_EXTRAS} (unofficial) and try again?"; then
+                copr_enable "$COPR_EXTRAS" && dnf_install "${extras_missing[@]}" \
+                    || warn "the COPR could not provide all of them"
+                compute_missing
             fi
+        fi
+
+        # pass 4: matugen is the palette engine, so it gets one more chance
+        # built from source (crates.io) when no repo had it
+        if [[ " ${missing[*]} " == *" matugen "* ]] && ! command -v matugen &>/dev/null; then
+            say "  matugen is the palette engine; building it from crates.io instead"
+            if ask "  Install rust + cargo and build matugen (a few minutes)?"; then
+                dnf_install cargo rust gcc pkgconf-pkg-config || true
+                if command -v cargo &>/dev/null \
+                   && cargo install matugen --locked; then
+                    say "  matugen -> ~/.cargo/bin/matugen"
+                    case ":$PATH:" in
+                        *":$HOME/.cargo/bin:"*) ;;
+                        *) warn "  add ~/.cargo/bin to your PATH so Lucid can find matugen" ;;
+                    esac
+                else
+                    warn "could not build matugen — the theme engine will not work"
+                fi
+                compute_missing
+            fi
+        fi
+
+        # whatever is left degrades only its own feature
+        if (( ${#missing[@]} )); then
+            DEPS_OK=0
+            warn "not available on this system, so these features stay off:"
+            warn "    ${missing[*]}"
+            for p in "${missing[@]}"; do
+                case "$p" in
+                    awww)          warn "  awww (wallpaper daemon) has no Fedora package: build it from source and put it on PATH" ;;
+                    songrec)       warn "  songrec (music recognition) has no Fedora package: optional, 'cargo install songrec' works" ;;
+                    xdg-terminal-exec) warn "  xdg-terminal-exec: optional, the launcher's \$ mode falls back to your terminal" ;;
+                esac
+            done
+        else
+            say "  all packages installed"
         fi
     else
         DEPS_OK=0
         warn "skipping. features backed by the missing packages will not work."
+    fi
+fi
+
+# --- Hyprland itself ---------------------------------------------------------
+# Fedora does not ship it. Lucid is useless without it, so it is offered
+# rather than assumed, and never touched when it is already there
+if [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && [[ $SKIP_DEPS -eq 0 ]] \
+   && ! command -v Hyprland &>/dev/null; then
+    say "  Hyprland is not installed. Fedora has no official package; the"
+    say "  ${COPR_HYPRLAND} COPR builds the stable releases. Lucid's lua"
+    say "  config needs Hyprland 0.55 or newer."
+    if ask "  Enable that COPR and install hyprland?"; then
+        copr_enable "$COPR_HYPRLAND" && dnf_install hyprland xdg-desktop-portal-hyprland \
+            || { DEPS_OK=0; warn "could not install hyprland — do it by hand before logging in"; }
+    else
+        DEPS_OK=0
+    fi
+fi
+
+# --- JetBrainsMono Nerd Font -------------------------------------------------
+# the prompt and kitty.conf are drawn with its glyphs, and Fedora does not
+# package it. fetched from the Nerd Fonts release, user-local, once
+if [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && [[ $SKIP_DEPS -eq 0 ]] \
+   && ! { fc-list 2>/dev/null | grep -i 'JetBrainsMono Nerd Font' >/dev/null; }; then
+    if command -v curl &>/dev/null && command -v tar &>/dev/null; then
+        NF_DIR="$HOME/.local/share/fonts/JetBrainsMonoNerd"
+        NF_TMP=$(mktemp -d)
+        say "  fetching JetBrainsMono Nerd Font (one-time)"
+        if curl -fsSL "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.tar.xz" \
+               -o "$NF_TMP/jbm.tar.xz" \
+           && mkdir -p "$NF_DIR" \
+           && tar -xJf "$NF_TMP/jbm.tar.xz" -C "$NF_DIR" --wildcards '*.ttf' 2>/dev/null; then
+            fc-cache -f "$NF_DIR" &>/dev/null || true
+            say "  JetBrainsMono Nerd Font -> $NF_DIR"
+        else
+            warn "  could not fetch the Nerd Font — the prompt will show boxes"
+        fi
+        rm -rf "$NF_TMP"
+    else
+        warn "  curl/tar missing — skipping the Nerd Font download"
+    fi
+fi
+
+# --- the dock's default apps, from Flathub -----------------------------------
+if [[ $WITH_APPS -eq 1 ]]; then
+    dock_missing=()
+    for id in "${DOCK_FLATPAKS[@]}"; do
+        dock_have "$id" || dock_missing+=("$id")
+    done
+
+    if (( ${#dock_missing[@]} == 0 )); then
+        say "  dock apps are already installed"
+    elif [[ $SKIP_DEPS -eq 1 ]]; then
+        say "  ${ylw}dock apps missing (--skip-deps, not installing):${r} ${dock_missing[*]}"
+    else
+        say "  ${dim}the dock's default apps, as Flatpaks: ${dock_missing[*]}${r}"
+        say "  ${dim}(several GB — pass --no-apps to skip them)${r}"
+        if ask "  install them now?"; then
+            if ! command -v flatpak &>/dev/null; then
+                dnf_install flatpak || warn "could not install flatpak"
+            fi
+            if command -v flatpak &>/dev/null; then
+                flatpak remote-add --if-not-exists flathub \
+                    https://dl.flathub.org/repo/flathub.flatpakrepo \
+                    || warn "could not add the Flathub remote"
+                for id in "${dock_missing[@]}"; do
+                    flatpak install -y --noninteractive flathub "$id" \
+                        || { DEPS_OK=0; warn "could not install $id"; }
+                done
+            else
+                DEPS_OK=0
+            fi
+        else
+            DEPS_OK=0
+            warn "skipping the dock apps — the dock will pin whatever equivalents you have"
+        fi
     fi
 fi
 
@@ -434,7 +509,7 @@ detect_pinned() {
     # slot filled by whatever equivalent it does have
     local slots=(
         "zen zen-browser app.zen_browser.zen firefox librewolf chromium brave-browser google-chrome-stable"
-        "vscodium codium code code-oss com.visualstudio.code zed dev.zed.Zed"
+        "vscodium codium com.vscodium.codium code code-oss com.visualstudio.code zed dev.zed.Zed"
         "spotify com.spotify.Client spotify-launcher"
         "vesktop dev.vencord.Vesktop discord com.discordapp.Discord webcord"
         "org.gnome.Nautilus nautilus org.kde.dolphin dolphin thunar nemo pcmanfm-qt pcmanfm"
@@ -620,6 +695,9 @@ fi
 HYPR_DIR="$HOME/.config/hypr"
 HYPR_LUA_INSTALLED=0
 
+# ----- FORK NOTICE ------ #
+# I did not fix the mouse, i would accept pull requests
+
 # the cursor that tilts as it moves is a Hyprland plugin (hypr-dynamic-cursors).
 # scripts/cursor-plugin.sh compiles it against the headers the hyprland package
 # itself installs, so the build always matches the Hyprland it is for, and
@@ -658,14 +736,16 @@ setup_cursor_plugin() {
 
     # the plugin's makefile, and the clone before it
     local need=() p
-    { command -v make && command -v g++ && command -v pkg-config; } &>/dev/null || need+=(base-devel)
+    { command -v make && command -v g++ && command -v pkg-config; } &>/dev/null || need+=(gcc-c++ make pkgconf-pkg-config)
+    # the plugin compiles against the compositor's headers
+    rpm -q hyprland-devel &>/dev/null || need+=(hyprland-devel)
     command -v git &>/dev/null || need+=(git)
     if (( ${#need[@]} )); then
         if [[ $SKIP_DEPS -eq 1 ]]; then
             warn "  the cursor plugin needs ${need[*]} (--skip-deps, not installing)"
             return 0
         fi
-        sudo pacman -S --needed --noconfirm "${need[@]}" || {
+        sudo dnf install -y "${need[@]}" || {
             warn "  could not install ${need[*]} — the cursor plugin is left out"
             return 0
         }
@@ -838,7 +918,6 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     install -m755 "$SRC/support/lucid/templates.py"       "$LUCID_DIR/templates.py"
     install -m755 "$SRC/support/lucid/apply-colour.sh"    "$LUCID_DIR/apply-colour.sh"
     install -m755 "$SRC/support/lucid/wallpaper-colours.sh" "$LUCID_DIR/wallpaper-colours.sh"
-    install -m755 "$SRC/support/lucid/wallpaper-mode.sh"  "$LUCID_DIR/wallpaper-mode.sh"
     install -m644 "$SRC/support/lucid/matugen-options.sh" "$LUCID_DIR/matugen-options.sh"
     install -m755 "$SRC/support/lucid/gen-pywal-palette.py" "$LUCID_DIR/gen-pywal-palette.py"
     install -m755 "$SRC/support/lucid/add-theme.py"        "$LUCID_DIR/add-theme.py"
@@ -849,8 +928,6 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     install -m755 "$SRC/support/lucid/set-mode.sh"         "$LUCID_DIR/set-mode.sh"
     install -m755 "$SRC/support/lucid/sync-sddm.sh"        "$LUCID_DIR/sync-sddm.sh"
     install -m755 "$SRC/support/lucid/sync-starship.sh"    "$LUCID_DIR/sync-starship.sh"
-    install -m755 "$SRC/support/lucid/setup-zen.sh"        "$LUCID_DIR/setup-zen.sh"
-    mkdir -p "$LUCID_DIR/zen" && cp -r "$SRC/support/zen/." "$LUCID_DIR/zen/"
     install -m644 "$SRC/support/lucid/lucid_palette.py"    "$LUCID_DIR/lucid_palette.py"
     install -m755 "$SRC/support/wallpaper/set-wallpaper.sh" "$WALL_SCRIPT_DIR/set-wallpaper.sh"
     # rules you wrote are yours: only ever placed when there are none
@@ -864,7 +941,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         # a fingerprint at the login screen needs two lines in sddm's pam
         # service, so it is asked for once and then kept on every re-run
         SDDM_FINGER=()
-        if [[ -e /usr/lib/security/pam_fprintd.so ]]; then
+        if [[ -e /usr/lib64/security/pam_fprintd.so || -e /usr/lib/security/pam_fprintd.so ]]; then
             if grep -q '^# >>> lucid: fingerprint login' /etc/pam.d/sddm 2>/dev/null; then
                 SDDM_FINGER=(--fingerprint)
             elif ask "  Let the login screen take a fingerprint too? (two lines in /etc/pam.d/sddm, backed up first)"; then
@@ -910,34 +987,6 @@ if [[ $WITH_THEMING -eq 1 ]]; then
             function flush() { if (!(inblk && lucid)) printf "%s", blk; blk = ""; inblk = 0; lucid = 0 }
             /^\[/ { flush(); if ($0 ~ /^\[templates\.starship\]/) inblk = 1 }
             { blk = blk $0 "\n"; if (inblk && $0 ~ /starship-colors\.toml/) lucid = 1 }
-            END { flush() }
-        ' "$MATUGEN_CFG" > "$MATUGEN_CFG.lucid-tmp" && cat "$MATUGEN_CFG.lucid-tmp" > "$MATUGEN_CFG"
-        rm -f "$MATUGEN_CFG.lucid-tmp"
-    fi
-
-    # firefox and zen keep their chrome css inside a generated profile dir, so
-    # the path has to be discovered rather than assumed. zen's comes from its
-    # installs.ini: an empty *.Default* folder it never opens often sorts first
-    FF_PROFILE=$(find "$HOME/.mozilla/firefox" -maxdepth 1 -type d -name '*.default-release' 2>/dev/null | head -1 || true)
-    ZEN_PROFILE=$("$LUCID_DIR/setup-zen.sh" profile 2>/dev/null || true)
-
-    # zen's colours used to be rendered straight into userChrome.css, which
-    # replaced anything the user kept there, and sometimes into the wrong
-    # profile. Lucid's block now writes lucid-zen.css in the profile zen
-    # starts with, and userChrome.css imports it (setup-zen.sh)
-    if grep -q '^\[templates\.zen\]' "$MATUGEN_CFG"; then
-        LUCID_ZEN_OUT="${ZEN_PROFILE:+$ZEN_PROFILE/chrome/lucid-zen.css}" awk '
-            function flush() {
-                if (inblk && lucid) {
-                    if (ENVIRON["LUCID_ZEN_OUT"] != "")
-                        sub(/\noutput_path *= *[^\n]*/, "\noutput_path = \047" ENVIRON["LUCID_ZEN_OUT"] "\047", blk)
-                    else
-                        sub(/\/chrome\/userChrome\.css/, "/chrome/lucid-zen.css", blk)
-                }
-                printf "%s", blk; blk = ""; inblk = 0; lucid = 0
-            }
-            /^\[/ { flush(); if ($0 ~ /^\[templates\.zen\]/) inblk = 1 }
-            { blk = blk $0 "\n"; if (inblk && $0 ~ /zen-userchrome\.css/) lucid = 1 }
             END { flush() }
         ' "$MATUGEN_CFG" > "$MATUGEN_CFG.lucid-tmp" && cat "$MATUGEN_CFG.lucid-tmp" > "$MATUGEN_CFG"
         rm -f "$MATUGEN_CFG.lucid-tmp"
@@ -995,23 +1044,17 @@ if [[ $WITH_THEMING -eq 1 ]]; then
                                 'touch -c ~/.config/qt6ct/qt6ct.conf'
     add_template kde            "$TPL/kde-colors.colors"       '~/.local/share/color-schemes/Lucid.colors' "cmd:qt6ct"
 
+    # firefox and zen keep their chrome css inside a generated profile dir, so
+    # the path has to be discovered rather than assumed
+    FF_PROFILE=$(find "$HOME/.mozilla/firefox" -maxdepth 1 -type d -name '*.default-release' 2>/dev/null | head -1 || true)
+    ZEN_PROFILE=$(find "$HOME/.config/zen" -maxdepth 1 -type d -name '*.Default*' 2>/dev/null | head -1 || true)
     if [[ -n "$FF_PROFILE" ]]; then
         add_template firefox-website-colors "$TPL/firefox-colors.css" "$FF_PROFILE/chrome/colors.css"
     else
         MG_SKIPPED+=(firefox-website-colors)
     fi
     if [[ -n "$ZEN_PROFILE" ]]; then
-        add_template zen "$TPL/zen-userchrome.css" "$ZEN_PROFILE/chrome/lucid-zen.css"
-        add_template zen-sites "$TPL/zen-sites.css" "$ZEN_PROFILE/chrome/lucid-sites.css"
-        "$LUCID_DIR/setup-zen.sh" install || warn "could not point zen's userChrome.css at Lucid's colours"
-        # colours that change while zen runs need fx-autoconfig's loader in
-        # zen's own folder. it runs whatever lands in the profile's chrome/JS
-        # with the browser's rights, so it is asked for
-        "$LUCID_DIR/setup-zen.sh" program --check && ZEN_LOADER=0 || ZEN_LOADER=$?
-        if (( ZEN_LOADER == 1 )) \
-            && ask "  Let Zen change colours while it runs? (puts fx-autoconfig's loader in Zen's folder, needs sudo)"; then
-            "$LUCID_DIR/setup-zen.sh" program || warn "could not add zen's loader; its colours change when it restarts"
-        fi
+        add_template zen "$TPL/zen-userchrome.css" "$ZEN_PROFILE/chrome/userChrome.css"
     else
         MG_SKIPPED+=(zen)
     fi
@@ -1107,7 +1150,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
             fi
         }
 
-        # FairyWren is not in the repos and the AUR build slices it into 52
+        # FairyWren is not in the repos and distro packages slice it into 52
         # per-colour themes with different names, so take it from upstream:
         # the two directories there are exactly the theme names set below
         ICONS_DIR="$HOME/.local/share/icons"
@@ -1143,7 +1186,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         # adw-gtk3-dark ships inside adw-gtk-theme rather than as its own
         # package, so check the theme directory, not the package name
         if [[ ! -d /usr/share/themes/$GTK_THEME_NAME && ! -d "$HOME/.themes/$GTK_THEME_NAME" ]]; then
-            warn "  $GTK_THEME_NAME is not installed — install adw-gtk-theme"
+            warn "  $GTK_THEME_NAME is not installed — install adw-gtk3-theme"
         fi
 
         for gtkver in 3.0 4.0; do
@@ -1544,6 +1587,15 @@ else
   Or run ${b}./install.sh --with-hypr${r} to take Lucid's config wholesale.
 
 EOF
+fi
+
+# --- Compile the colorpicker ---
+if [[ -f "$SRC/colorpicker/Makefile" ]]; then
+    step "Building the pure C colorpicker"
+    make -C "$SRC/colorpicker"
+    mkdir -p "$HOME/.local/bin"
+    cp "$SRC/colorpicker/colorpicker" "$HOME/.local/bin/colorpicker"
+    say "  colorpicker -> ~/.local/bin/colorpicker"
 fi
 
 if [[ $DEPS_OK -eq 0 ]]; then
