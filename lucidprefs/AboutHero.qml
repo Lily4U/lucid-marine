@@ -25,6 +25,8 @@ Rectangle {
     property real px: hero.follow ? Math.max(-1, Math.min(1, (hov.point.position.x - hero.width / 2) / (hero.width / 2))) : 0
     property real py: hero.follow ? Math.max(-1, Math.min(1, (hov.point.position.y - hero.height / 2) / (hero.height / 2))) : 0
     property bool copied: false
+    // main between releases; false in a release commit
+    readonly property bool beta: true
     // radius, stroke, alpha, turn direction, ms per turn, companion radius, colour
     readonly property var orbits: [{
         "r": 74,
@@ -659,6 +661,35 @@ Rectangle {
 
                 transform: Translate {
                     y: 10 * (1 - hero.outBack(versionChip.k))
+                }
+
+            }
+
+            // a tag, not a chip: nothing to click
+            Rectangle {
+                id: betaTag
+
+                readonly property real k: hero.phase(0.535, 0.4)
+
+                visible: hero.beta
+                width: Math.ceil(betaLabel.implicitWidth) + Theme.dp(28)
+                height: Theme.dp(30)
+                radius: Theme.rad(8)
+                color: Theme.tertiaryContainer
+                opacity: hero.outCubic(betaTag.k)
+
+                LText {
+                    id: betaLabel
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    x: Theme.dp(14)
+                    role: "labelLarge"
+                    text: "Beta"
+                    color: Theme.fgTertiaryContainer
+                }
+
+                transform: Translate {
+                    y: 10 * (1 - hero.outBack(betaTag.k))
                 }
 
             }
