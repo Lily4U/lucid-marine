@@ -33,6 +33,7 @@ CFG = HOME / ".config/matugen/config.toml"
 TEMPLATE_DIR = HOME / ".config/matugen/templates"
 STATE = HOME / ".cache/lucid/templates.json"
 COLOURS = HOME / ".cache/lucid/colours.json"
+ZEN_SETUP = HOME / ".config/lucid/setup-zen.sh"
 OFF = "#lucid-off# "
 
 HEADER = re.compile(r"^\s*\[\[?\s*([^\]]*?)\s*\]\]?\s*(#.*)?$")
@@ -48,11 +49,46 @@ def profile(base, pattern):
     return found[0] if found else None
 
 
+def zen_profile():
+    """the profile zen starts with, as setup-zen.sh reads it from installs.ini"""
+    try:
+        r = subprocess.run([str(ZEN_SETUP), "profile"], capture_output=True, text=True, timeout=10)
+    except OSError:
+        return None
+    path = Path(r.stdout.strip())
+    return path if r.returncode == 0 and path.is_dir() else None
+
+
+ZEN_TEMPLATES = ("zen", "zen-sites")
+
+
+def wire(name):
+    """zen only reads the colours once userChrome.css and userContent.css import them"""
+    if name in ZEN_TEMPLATES:
+        try:
+            subprocess.run([str(ZEN_SETUP), "install"], capture_output=True, timeout=10)
+        except OSError:
+            pass
+
+
+def unwire(name, blocks):
+    """a zen template switched off takes its colours back: the live loader
+    drops a sheet once its file is gone"""
+    if name not in ZEN_TEMPLATES:
+        return
+    for t in templates(blocks):
+        if t["name"] == name and t["output_path"]:
+            try:
+                expand(t["output_path"]).unlink(missing_ok=True)
+            except OSError:
+                pass
+
+
 def catalog():
     """what the installer can wire, with the same guards: each entry is only
     offered while its app is there. keep in step with install.sh"""
     ff = profile(".mozilla/firefox", "*.default-release")
-    zen = profile(".config/zen", "*.Default*")
+    zen = zen_profile()
     starship_hook = 'for sh in fish bash zsh; do pkill -WINCH -x "$sh" 2>/dev/null; done; true'
     entries = [
         ("quickshell", "Lucid's own palette", "quickshell-colors.json", "~/.cache/quickshell/matugen.json", "always", ""),
@@ -82,7 +118,9 @@ def catalog():
         ("firefox-website-colors", "Firefox", "firefox-colors.css",
          str(ff / "chrome/colors.css") if ff else "", "profile" if ff else "never", ""),
         ("zen", "Zen Browser", "zen-userchrome.css",
-         str(zen / "chrome/userChrome.css") if zen else "", "profile" if zen else "never", ""),
+         str(zen / "chrome/lucid-zen.css") if zen else "", "profile" if zen else "never", ""),
+        ("zen-sites", "Websites in Zen (GitHub)", "zen-sites.css",
+         str(zen / "chrome/lucid-sites.css") if zen else "", "profile" if zen else "never", ""),
     ]
     out = []
     for name, app, src, output, guard, hook in entries:
@@ -254,6 +292,10 @@ def cmd_set(name, state):
             elif state == "on" and lines[i].startswith(OFF):
                 lines[i] = lines[i][len(OFF):]
     write(lines)
+    if state == "on":
+        wire(name)
+    else:
+        unwire(name, blocks)
     done(name=name, enabled=state == "on")
 
 
@@ -315,6 +357,7 @@ def cmd_add(name, src, output, hook):
     if not lines:
         lines = ["[config]"]
     write(lines + block + [""])
+    wire(name)
     done(name=name, input=src)
 
 
@@ -332,6 +375,7 @@ def cmd_remove(name):
     while kept and kept[-1].strip() == "":
         kept.pop()
     write(kept + [""])
+    unwire(name, blocks)
     done(name=name)
 
 

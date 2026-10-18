@@ -849,6 +849,8 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     install -m755 "$SRC/support/lucid/set-mode.sh"         "$LUCID_DIR/set-mode.sh"
     install -m755 "$SRC/support/lucid/sync-sddm.sh"        "$LUCID_DIR/sync-sddm.sh"
     install -m755 "$SRC/support/lucid/sync-starship.sh"    "$LUCID_DIR/sync-starship.sh"
+    install -m755 "$SRC/support/lucid/setup-zen.sh"        "$LUCID_DIR/setup-zen.sh"
+    mkdir -p "$LUCID_DIR/zen" && cp -r "$SRC/support/zen/." "$LUCID_DIR/zen/"
     install -m644 "$SRC/support/lucid/lucid_palette.py"    "$LUCID_DIR/lucid_palette.py"
     install -m755 "$SRC/support/wallpaper/set-wallpaper.sh" "$WALL_SCRIPT_DIR/set-wallpaper.sh"
     # rules you wrote are yours: only ever placed when there are none
@@ -913,6 +915,34 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         rm -f "$MATUGEN_CFG.lucid-tmp"
     fi
 
+    # firefox and zen keep their chrome css inside a generated profile dir, so
+    # the path has to be discovered rather than assumed. zen's comes from its
+    # installs.ini: an empty *.Default* folder it never opens often sorts first
+    FF_PROFILE=$(find "$HOME/.mozilla/firefox" -maxdepth 1 -type d -name '*.default-release' 2>/dev/null | head -1 || true)
+    ZEN_PROFILE=$("$LUCID_DIR/setup-zen.sh" profile 2>/dev/null || true)
+
+    # zen's colours used to be rendered straight into userChrome.css, which
+    # replaced anything the user kept there, and sometimes into the wrong
+    # profile. Lucid's block now writes lucid-zen.css in the profile zen
+    # starts with, and userChrome.css imports it (setup-zen.sh)
+    if grep -q '^\[templates\.zen\]' "$MATUGEN_CFG"; then
+        LUCID_ZEN_OUT="${ZEN_PROFILE:+$ZEN_PROFILE/chrome/lucid-zen.css}" awk '
+            function flush() {
+                if (inblk && lucid) {
+                    if (ENVIRON["LUCID_ZEN_OUT"] != "")
+                        sub(/\noutput_path *= *[^\n]*/, "\noutput_path = \047" ENVIRON["LUCID_ZEN_OUT"] "\047", blk)
+                    else
+                        sub(/\/chrome\/userChrome\.css/, "/chrome/lucid-zen.css", blk)
+                }
+                printf "%s", blk; blk = ""; inblk = 0; lucid = 0
+            }
+            /^\[/ { flush(); if ($0 ~ /^\[templates\.zen\]/) inblk = 1 }
+            { blk = blk $0 "\n"; if (inblk && $0 ~ /zen-userchrome\.css/) lucid = 1 }
+            END { flush() }
+        ' "$MATUGEN_CFG" > "$MATUGEN_CFG.lucid-tmp" && cat "$MATUGEN_CFG.lucid-tmp" > "$MATUGEN_CFG"
+        rm -f "$MATUGEN_CFG.lucid-tmp"
+    fi
+
     # a block is only added when the app it themes is actually present, so
     # matugen never writes colours into a config directory that isn't there.
     # an existing block is always left alone - this config is the user's.
@@ -965,17 +995,23 @@ if [[ $WITH_THEMING -eq 1 ]]; then
                                 'touch -c ~/.config/qt6ct/qt6ct.conf'
     add_template kde            "$TPL/kde-colors.colors"       '~/.local/share/color-schemes/Lucid.colors' "cmd:qt6ct"
 
-    # firefox and zen keep their chrome css inside a generated profile dir, so
-    # the path has to be discovered rather than assumed
-    FF_PROFILE=$(find "$HOME/.mozilla/firefox" -maxdepth 1 -type d -name '*.default-release' 2>/dev/null | head -1 || true)
-    ZEN_PROFILE=$(find "$HOME/.config/zen" -maxdepth 1 -type d -name '*.Default*' 2>/dev/null | head -1 || true)
     if [[ -n "$FF_PROFILE" ]]; then
         add_template firefox-website-colors "$TPL/firefox-colors.css" "$FF_PROFILE/chrome/colors.css"
     else
         MG_SKIPPED+=(firefox-website-colors)
     fi
     if [[ -n "$ZEN_PROFILE" ]]; then
-        add_template zen "$TPL/zen-userchrome.css" "$ZEN_PROFILE/chrome/userChrome.css"
+        add_template zen "$TPL/zen-userchrome.css" "$ZEN_PROFILE/chrome/lucid-zen.css"
+        add_template zen-sites "$TPL/zen-sites.css" "$ZEN_PROFILE/chrome/lucid-sites.css"
+        "$LUCID_DIR/setup-zen.sh" install || warn "could not point zen's userChrome.css at Lucid's colours"
+        # colours that change while zen runs need fx-autoconfig's loader in
+        # zen's own folder. it runs whatever lands in the profile's chrome/JS
+        # with the browser's rights, so it is asked for
+        "$LUCID_DIR/setup-zen.sh" program --check && ZEN_LOADER=0 || ZEN_LOADER=$?
+        if (( ZEN_LOADER == 1 )) \
+            && ask "  Let Zen change colours while it runs? (puts fx-autoconfig's loader in Zen's folder, needs sudo)"; then
+            "$LUCID_DIR/setup-zen.sh" program || warn "could not add zen's loader; its colours change when it restarts"
+        fi
     else
         MG_SKIPPED+=(zen)
     fi
