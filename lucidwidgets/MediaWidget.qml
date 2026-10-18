@@ -456,14 +456,15 @@ WidgetBody {
     Item {
         visible: w.variant === "card"
         anchors.fill: parent
-        anchors.margins: Theme.dp(14)
+        anchors.margins: Theme.dp(18)
 
         Cover {
             id: cardArt
 
             width: parent.width
             height: width
-            corner: Theme.dp(22)
+            // follows the card's own corner, so the corner dial rounds both
+            corner: Math.round(w.corner * 0.85)
         }
 
         Rectangle {
@@ -522,6 +523,8 @@ WidgetBody {
             position: w.livePos
             length: w.length
             interactive: w.canSeek
+            playing: w.playing
+            flowing: !w.preview
             jumpDuration: w.jumpDuration
             accent: w.inkAccent
             trackColor: Theme.alpha(w.ink, 0.16)

@@ -9,6 +9,10 @@ Item {
     property real position: 0
     property real length: 0
     property bool interactive: true
+    // the wave flows while the track plays and lies flat once paused, as on the bar
+    property bool playing: true
+    // false holds it still, for previews
+    property bool flowing: true
     property bool showTimes: true
     // set while the owner is animating a jump so the handle glides instead of snapping
     property int jumpDuration: 0
@@ -48,7 +52,7 @@ Item {
 
         property real animatedProgress: seek.shownProgress
         property real handleHeight: (seek.hovering || seek.dragging) ? Theme.dp(18) : Theme.dp(14)
-        property real amplitude: (seek.hovering || seek.dragging) ? 4.5 : 3.5
+        property real amplitude: !seek.playing ? 0 : ((seek.hovering || seek.dragging) ? 4.5 : 3.5)
 
         readonly property real trackThickness: Theme.dp(4)
         readonly property real handleWidth: Theme.dp(4)
@@ -94,6 +98,8 @@ Item {
             const activeEnd = handleX - trackGap - handleWidth / 2;
             const inactiveStart = handleX + trackGap + handleWidth / 2;
             const rampLen = wavelength * 1.4;
+            // half a wavelength a second; 600s is a whole number of waves, so the wrap is seamless
+            const shift = seek.flowing ? (Date.now() % 600000) / 1000 * wavelength * 0.5 : 0;
             ctx.lineCap = "round";
             ctx.lineJoin = "round";
             if (activeEnd - inset > trackThickness) {
@@ -101,7 +107,7 @@ Item {
                 ctx.lineWidth = trackThickness;
                 ctx.beginPath();
                 for (let x = inset; x <= activeEnd; x++) {
-                    const y = midY + Math.sin((x / wavelength) * Math.PI * 2) * amplitude * envelope(x, inset, rampLen, activeEnd);
+                    const y = midY + Math.sin(((x - shift) / wavelength) * Math.PI * 2) * amplitude * envelope(x, inset, rampLen, activeEnd);
                     if (x === inset)
                         ctx.moveTo(x, y);
                     else
@@ -125,6 +131,12 @@ Item {
             ctx.fill();
             ctx.globalAlpha = 1;
             roundedBar(ctx, handleX - handleWidth / 2, midY - handleHeight / 2, handleWidth, handleHeight, seek.accent);
+        }
+
+        // the position alone moves too little a frame to carry the wave
+        FrameAnimation {
+            running: seek.flowing && seek.playing && seek.visible
+            onTriggered: waveCanvas.requestPaint()
         }
 
         Behavior on animatedProgress {

@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Hyprland._FocusGrab
 import Quickshell.Io
 import Quickshell.Services.Mpris
+import Quickshell.Services.Pipewire
 import Quickshell.Widgets
 import qs
 import qs.lucidui
@@ -15,7 +16,9 @@ BarPill {
     readonly property var easeStandard: [0.2, 0, 0, 1, 1, 1]
     readonly property var easeEmphasized: [0.05, 0.7, 0.1, 1, 1, 1]
     readonly property real screenW: root.hostWindow ? root.hostWindow.screen.width : 1600
-    readonly property int contentWidth: root.panelWidth - Theme.dp(28)
+    readonly property int pad: Theme.dp(16)
+    readonly property int contentWidth: root.panelWidth - root.pad * 2
+    readonly property int artSize: Theme.dp(96)
     readonly property var mprisPlayers: {
         const out = [];
         const list = Mpris.players.values;
@@ -55,6 +58,10 @@ BarPill {
     readonly property string title: root.player ? (root.player.trackTitle || "Unknown") : "Nothing playing"
     readonly property string artist: root.player ? root.player.trackArtist : ""
     readonly property string artUrl: root.player ? root.player.trackArtUrl : ""
+    readonly property string sourceName: root.player ? (root.player.identity || "Media player") : ""
+    readonly property bool heroLayout: root.coverPanel && root.player !== null
+    // concentric with the panel's own corner
+    readonly property int innerRadius: Math.max(Theme.shapeMd, root.expandedRadius - root.pad)
     readonly property string displayTitle: (root.player && root.artist && Prefs.mediaArtist) ? root.artist + "  -  " + root.title : root.title
     // the looks picked on the module's card
     readonly property bool coverFace: Prefs.mediaStyle === "cover"
@@ -76,6 +83,8 @@ BarPill {
     readonly property bool volumeSupported: root.player ? root.player.volumeSupported : false
     readonly property real playerVolume: root.player ? root.player.volume : 0
     property bool volumeFlash: false
+    // what a second click on the volume icon brings back
+    property real unmuteVolume: 0.5
     property var bars: []
     // a single value means cava is not emitting raw ascii frames; fall back
     // rather than stretch one bar across the whole strip
@@ -85,6 +94,16 @@ BarPill {
     property string shazamError: ""
     property int listenElapsed: 0
     readonly property int listenLimit: 30
+    // what the microphone itself hears while identify listens to it; cava only
+    // ever hears the computer's own output, so its bars sat flat in the room
+    readonly property bool micMetering: root.expanded && root.listenSource === "mic" && root.shazamState === "listening"
+    property real micLevel: 0
+    // the loudest it got during this listen, on the same -60..0 dB scale
+    property real micHeard: 0
+    property real micPhase: 0
+    // under about -42 dB a fingerprint has nothing to hold on to
+    readonly property bool micQuiet: root.listenSource === "mic" && root.micHeard < 0.3 && ((root.shazamState === "listening" && root.listenElapsed >= 4) || root.shazamState === "nomatch")
+    readonly property int micVolume: Audio.source ? Audio.volumeOf(Audio.source) : 0
     property string listenSource: "system"
     property string monitorDevice: ""
     property string micDevice: ""
@@ -156,12 +175,6 @@ BarPill {
         return Math.min(1, peak / 72);
     }
 
-    function barColor(level) {
-        const floor = 0.62;
-        const k = floor + (1 - floor) * Math.min(1, level * 1.25);
-        return Qt.rgba(Theme.accent.r * k, Theme.accent.g * k, Theme.accent.b * k, 1);
-    }
-
     function openPanel(target) {
         if (root.expanded)
             root.setPage(target);
@@ -219,6 +232,28 @@ BarPill {
         root.player.volume = Math.max(0, Math.min(1, root.player.volume + delta));
         root.volumeFlash = true;
         volumeFlashTimer.restart();
+    }
+
+    function toggleMute() {
+        if (!root.player || !root.player.volumeSupported)
+            return ;
+
+        if (root.player.volume > 0) {
+            root.unmuteVolume = root.player.volume;
+            root.player.volume = 0;
+        } else {
+            root.player.volume = root.unmuteVolume > 0 ? root.unmuteVolume : 0.5;
+        }
+        root.volumeFlash = true;
+        volumeFlashTimer.restart();
+    }
+
+    // the player's own window, or play and pause when it has none to show
+    function raisePlayer() {
+        if (root.player && root.player.canRaise)
+            root.player.raise();
+        else
+            root.togglePlay();
     }
 
     function cyclePlayer() {
@@ -346,10 +381,17 @@ BarPill {
         console.log("[mpris-shazam]", line.trim());
     }
 
+    // five bars from one level, each its own height and sway
+    function micBar(index) {
+        const shape = [0.55, 0.85, 1, 0.8, 0.5];
+        return root.micLevel * shape[index] * (0.8 + 0.2 * Math.sin(root.micPhase + index * 1.7));
+    }
+
     function startListening() {
         root.shazamError = "";
         root.shazamResult = null;
         root.listenElapsed = 0;
+        root.micHeard = 0;
         root.shazamState = "listening";
         sinkProc.running = true;
         sourceProc.running = true;
@@ -424,9 +466,10 @@ BarPill {
     }
 
     shown: Prefs.barHas("media") && !(Prefs.mediaHideIdle && root.player === null)
+
     compactWidth: compactRow.implicitWidth + Theme.dp(20)
     panelWidth: Math.min(Theme.dp(400), root.screenW - Theme.dp(34))
-    panelHeight: Theme.dp(28) + (root.page === "player" ? playerColumn.implicitHeight : shazamColumn.implicitHeight)
+    panelHeight: root.pad * 2 + (root.page === "player" ? playerColumn.implicitHeight : shazamColumn.implicitHeight)
     expandedRadius: Theme.radiusXl
     compactCollapseScale: 0.94
     compactInteractive: false
@@ -487,6 +530,27 @@ BarPill {
         onTriggered: root.volumeFlash = false
     }
 
+    PwNodePeakMonitor {
+        id: micPeak
+
+        node: root.micMetering ? Audio.source : null
+        enabled: root.micMetering
+    }
+
+    // the settings level meter's scale: linear peaks sit near zero until it is loud
+    Timer {
+        interval: 33
+        repeat: true
+        running: root.micMetering
+        onTriggered: {
+            const p = micPeak.peak;
+            const target = p > 0.001 ? Math.max(0, Math.min(1, (20 * Math.log10(p) + 60) / 60)) : 0;
+            root.micLevel = target > root.micLevel ? target : Math.max(target, root.micLevel - 0.04);
+            root.micHeard = Math.max(root.micHeard, target);
+            root.micPhase += 0.35;
+        }
+    }
+
     Timer {
         id: listenTickTimer
 
@@ -528,8 +592,8 @@ BarPill {
         id: cavaProc
 
         // silence costs the same as sound to capture and parse, so only listen
-        // while something is actually playing or the panel is open on the strip
-        running: root.isPlaying || root.expanded
+        // while the pill's bars can dance or the panel is open on the waveform
+        running: (root.isPlaying && compactBars.visible) || root.expanded
         command: ["cava", "-p", Quickshell.env('HOME') + "/.config/cava/quickshell.conf"]
         onRunningChanged: {
             if (!cavaProc.running && root.bars.length > 0)
@@ -712,6 +776,8 @@ BarPill {
                 }
 
                 Row {
+                    id: compactBars
+
                     anchors.centerIn: parent
                     spacing: Theme.dp(2)
                     visible: root.player !== null && !compactArt.visible && !coverArt.visible
@@ -817,7 +883,7 @@ BarPill {
 
             Rectangle {
                 visible: Prefs.mediaPlayButton
-                width: Theme.dp(24)
+                width: Math.round(Theme.dp(24) * 1.3)
                 height: Theme.dp(24)
                 radius: playArea.pressed ? Theme.dp(8) : Theme.dp(12)
                 anchors.verticalCenter: parent.verticalCenter
@@ -880,36 +946,36 @@ BarPill {
         Column {
             id: playerColumn
 
-            x: Theme.dp(14)
-            y: Theme.dp(14)
+            x: root.pad
+            y: root.pad
             width: root.contentWidth
-            spacing: Theme.dp(10)
+            spacing: Theme.dp(12)
 
-            // the cover beside the track, or across the top above it
-            Grid {
+            // large cover: the art across the panel, where it plays from on a chip
+            Item {
+                id: heroCover
+
                 width: root.contentWidth
-                columns: root.coverPanel ? 1 : 2
-                columnSpacing: Theme.dp(12)
-                rowSpacing: Theme.dp(12)
+                height: Math.round(root.contentWidth * 0.56)
+                visible: root.heroLayout
 
+                // the cover with its hover hint; a click raises the player, or plays and pauses
                 Item {
-                    id: artwork
-
-                    width: root.coverPanel ? root.contentWidth : Theme.dp(84)
-                    height: root.coverPanel ? Math.round(root.contentWidth * 0.62) : Theme.dp(84)
+                    anchors.fill: parent
 
                     RoundedArt {
                         anchors.fill: parent
                         source: root.artUrl
-                        shapeRadius: Theme.radiusLg
-                        fallbackGlyph: Theme.dp(30)
+                        shapeRadius: root.innerRadius
+                        decode: Theme.dp(512)
+                        fallbackGlyph: Math.round(Math.min(parent.width, parent.height) * 0.32)
                     }
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: Theme.radiusLg
+                        radius: root.innerRadius
                         color: "black"
-                        opacity: artArea.containsMouse ? 0.4 : 0
+                        opacity: heroArtArea.containsMouse ? 0.35 : 0
 
                         Behavior on opacity {
                             NumberAnimation {
@@ -921,12 +987,13 @@ BarPill {
 
                     }
 
-                    SvgIcon {
+                    Icon {
                         anchors.centerIn: parent
-                        opacity: artArea.containsMouse ? 1 : 0
-                        path: root.isPlaying ? root.pauseGlyph : root.playGlyph
-                        tint: "white"
-                        glyphSize: Theme.dp(32)
+                        name: root.player && root.player.canRaise ? root.openGlyph : (root.isPlaying ? root.pauseGlyph : root.playGlyph)
+                        size: Theme.dp(24)
+                        fill: 1
+                        color: "white"
+                        opacity: heroArtArea.containsMouse ? 1 : 0
 
                         Behavior on opacity {
                             NumberAnimation {
@@ -939,76 +1006,68 @@ BarPill {
                     }
 
                     MouseArea {
-                        id: artArea
+                        id: heroArtArea
 
                         anchors.fill: parent
+                        enabled: root.player !== null
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: root.togglePlay()
+                        onClicked: root.raisePlayer()
                     }
 
                 }
 
-                Item {
-                    width: root.coverPanel ? root.contentWidth : root.contentWidth - Theme.dp(84) - Theme.dp(12)
-                    height: root.coverPanel ? Theme.dp(78) : Theme.dp(84)
+                // the wheel over the cover sets the player's volume
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    onWheel: (wheel) => {
+                        return root.nudgeVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
+                    }
+                }
 
-                    Column {
-                        anchors.top: parent.top
-                        width: parent.width
-                        spacing: 1
+                // with several players a click on it moves to the next
+                Rectangle {
+                    id: sourceChip
 
-                        Marquee {
-                            width: parent.width
-                            content: root.title
-                            scrolling: root.isPlaying
-                            bold: true
-                            pixelSize: Theme.fontHeadline
+                    readonly property bool many: root.mprisPlayers.length > 1
+
+                    x: Theme.dp(10)
+                    y: Theme.dp(10)
+                    width: chipRow.implicitWidth + Theme.dp(20)
+                    height: Theme.dp(26)
+                    radius: height / 2
+                    color: Theme.alpha(Theme.bg, 0.88)
+                    visible: root.sourceName !== ""
+
+                    Row {
+                        id: chipRow
+
+                        anchors.centerIn: parent
+                        spacing: Theme.dp(4)
+
+                        LText {
+                            anchors.verticalCenter: parent.verticalCenter
+                            role: "labelMedium"
+                            color: Theme.text
+                            text: root.sourceName
                         }
 
-                        Marquee {
-                            width: parent.width
-                            visible: root.artist !== ""
-                            content: root.artist
-                            scrolling: root.isPlaying
-                            textColor: Theme.subtext
-                            pixelSize: Theme.fontBody
+                        Icon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: sourceChip.many
+                            name: root.swapGlyph
+                            size: Theme.dp(14)
+                            color: Theme.text
                         }
 
                     }
 
-                    Row {
-                        id: volumeRow
-
-                        anchors.bottom: parent.bottom
-                        anchors.left: parent.left
-                        width: parent.width
-                        height: Theme.dp(22)
-                        spacing: Theme.dp(8)
-                        visible: root.volumeSupported
-
-                        SvgIcon {
-                            anchors.verticalCenter: parent.verticalCenter
-                            path: root.volumeGlyphFor(root.playerVolume)
-                            tint: Theme.subtext
-                            glyphSize: Theme.dp(14)
-                        }
-
-                        Slider {
-                            id: volTrack
-
-                            width: parent.width - Theme.dp(22)
-                            anchors.verticalCenter: parent.verticalCenter
-                            value: root.playerVolume
-                            showValue: false
-                            inactiveColor: Theme.withBlur(Theme.surfaceHighest)
-                            onMoved: (v) => {
-                                if (root.player)
-                                    root.player.volume = v;
-
-                            }
-                        }
-
+                    StateLayer {
+                        radius: parent.radius
+                        tint: Theme.text
+                        disabled: !sourceChip.many
+                        onClicked: root.cyclePlayer()
                     }
 
                 }
@@ -1016,15 +1075,370 @@ BarPill {
             }
 
             Item {
-                id: vizStrip
+                id: heroInfo
 
                 width: root.contentWidth
-                height: Theme.dp(20)
-                opacity: root.isPlaying ? 1 : 0.75
+                height: Theme.dp(46)
+                visible: root.heroLayout
+
+                Column {
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: parent.width - Theme.dp(62)
+                    spacing: Theme.dp(1)
+                    opacity: heroVol.open ? 0 : 1
+
+                    Marquee {
+                        width: parent.width
+                        content: root.title
+                        scrolling: root.isPlaying
+                        bold: true
+                        weight: 600
+                        textColor: Theme.text
+                        pixelSize: Theme.typeSize("titleLarge")
+                    }
+
+                    Marquee {
+                        width: parent.width
+                        visible: content !== ""
+                        content: root.artist
+                        scrolling: root.isPlaying
+                        textColor: Theme.subtext
+                        pixelSize: Theme.typeSize("bodyMedium")
+                    }
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Theme.barDurShort
+                        }
+
+                    }
+
+                }
+
+                IconButton {
+                    anchors.right: heroVol.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    size: "xs"
+                    icon: root.identifyGlyph
+                    tintOverride: Theme.subtext
+                    opacity: heroVol.open ? 0 : 1
+                    visible: opacity > 0.01
+                    onClicked: root.openPanel("shazam")
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Theme.barDurShort
+                        }
+
+                    }
+
+                }
+
+                // the slider slides out of its icon over the track while the pointer or the wheel wants it
+                Item {
+                    id: heroVol
+
+                    readonly property bool open: root.volumeSupported && (heroVolHover.hovered || heroVolSlider.dragging || root.volumeFlash)
+
+                    anchors.right: parent.right
+                    anchors.rightMargin: -Theme.dp(6)
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: heroVolSlot.width + heroVolBtn.width
+                    height: Theme.dp(30)
+                    visible: root.volumeSupported
+
+                    HoverHandler {
+                        id: heroVolHover
+                    }
+
+                    Item {
+                        id: heroVolSlot
+
+                        anchors.right: heroVolBtn.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: heroVol.open ? heroInfo.width - heroVolBtn.width + Theme.dp(6) : 0
+                        height: parent.height
+                        clip: true
+
+                        Slider {
+                            id: heroVolSlider
+
+                            anchors.right: parent.right
+                            anchors.rightMargin: Theme.dp(6)
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: heroInfo.width - heroVolBtn.width
+                            trackH: Theme.dp(8)
+                            handleH: Theme.dp(22)
+                            value: root.playerVolume
+                            showValue: false
+                            activeColor: Theme.accent
+                            inactiveColor: Theme.withBlur(Theme.bgHigh)
+                            opacity: heroVol.open ? 1 : 0
+                            onMoved: (v) => {
+                                if (root.player)
+                                    root.player.volume = v;
+
+                            }
+
+                            Behavior on opacity {
+                                NumberAnimation {
+                                    duration: Theme.barDurShort
+                                }
+
+                            }
+
+                        }
+
+                        Behavior on width {
+                            NumberAnimation {
+                                duration: Theme.barDurMedium
+                                easing.type: Easing.Bezier
+                                easing.bezierCurve: root.easeEmphasized
+                            }
+
+                        }
+
+                    }
+
+                    IconButton {
+                        id: heroVolBtn
+
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        size: "xs"
+                        icon: root.playerVolume <= 0 ? "volume_off" : root.volumeGlyphFor(root.playerVolume)
+                        tintOverride: heroVol.open ? Theme.accent : Theme.subtext
+                        onClicked: root.toggleMute()
+                    }
+
+                }
+
+            }
+
+            // side by side: the cover beside the track, where it plays from and the volume
+            Item {
+                id: trackHeader
+
+                readonly property int infoX: root.artSize + Theme.dp(14)
+
+                width: root.contentWidth
+                height: root.artSize
+                visible: !root.heroLayout
+
+                // the wheel anywhere over the track sets the player's volume
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    onWheel: (wheel) => {
+                        return root.nudgeVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
+                    }
+                }
+
+                // the cover with its hover hint; a click raises the player, or plays and pauses
+                Item {
+                    width: root.artSize
+                    height: root.artSize
+
+                    RoundedArt {
+                        anchors.fill: parent
+                        source: root.artUrl
+                        shapeRadius: Theme.shapeLg
+                        fallbackGlyph: Math.round(Math.min(parent.width, parent.height) * 0.32)
+                    }
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.shapeLg
+                        color: "black"
+                        opacity: sideArtArea.containsMouse ? 0.35 : 0
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: Theme.barMs(150)
+                                easing.type: Easing.OutCubic
+                            }
+
+                        }
+
+                    }
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: root.player && root.player.canRaise ? root.openGlyph : (root.isPlaying ? root.pauseGlyph : root.playGlyph)
+                        size: Theme.dp(24)
+                        fill: 1
+                        color: "white"
+                        opacity: sideArtArea.containsMouse ? 1 : 0
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: Theme.barMs(150)
+                                easing.type: Easing.OutCubic
+                            }
+
+                        }
+
+                    }
+
+                    MouseArea {
+                        id: sideArtArea
+
+                        anchors.fill: parent
+                        enabled: root.player !== null
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.raisePlayer()
+                    }
+
+                }
+
+                Column {
+                    x: trackHeader.infoX
+                    y: root.player !== null ? Theme.dp(2) : Math.round((root.artSize - height) / 2)
+                    width: root.contentWidth - trackHeader.infoX - Theme.dp(28)
+                    spacing: Theme.dp(1)
+
+                    Marquee {
+                        width: parent.width
+                        content: root.title
+                        scrolling: root.isPlaying
+                        bold: true
+                        weight: 600
+                        textColor: Theme.text
+                        pixelSize: Theme.typeSize("titleMedium")
+                    }
+
+                    Marquee {
+                        width: parent.width
+                        visible: content !== ""
+                        content: root.player !== null ? root.artist : "Start something and it lands here"
+                        scrolling: root.isPlaying
+                        textColor: Theme.subtext
+                        pixelSize: Theme.typeSize("bodyMedium")
+                    }
+
+                    // where it plays from; with several players a click moves to the next
+                    Item {
+                        id: sourceBtn
+
+                        readonly property bool many: root.mprisPlayers.length > 1
+
+                        x: -Theme.dp(6)
+                        width: sourceRow.implicitWidth + Theme.dp(12)
+                        height: Theme.dp(22)
+                        visible: root.player !== null
+
+                        StateLayer {
+                            radius: height / 2
+                            tint: Theme.text
+                            disabled: !sourceBtn.many
+                            onClicked: root.cyclePlayer()
+                        }
+
+                        Row {
+                            id: sourceRow
+
+                            x: Theme.dp(6)
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: Theme.dp(4)
+
+                            LText {
+                                id: sourceLabel
+
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: Math.min(Math.ceil(sourceMetrics.advanceWidth), root.contentWidth - trackHeader.infoX - Theme.dp(60))
+                                role: "labelMedium"
+                                color: Theme.subtextDim
+                                text: root.sourceName
+                                elide: Text.ElideRight
+                            }
+
+                            Icon {
+                                anchors.verticalCenter: parent.verticalCenter
+                                visible: sourceBtn.many
+                                name: root.swapGlyph
+                                size: Theme.dp(14)
+                                color: Theme.subtextDim
+                            }
+
+                        }
+
+                        TextMetrics {
+                            id: sourceMetrics
+
+                            font: sourceLabel.font
+                            text: root.sourceName
+                        }
+
+                    }
+
+                }
+
+                IconButton {
+                    anchors.right: parent.right
+                    anchors.rightMargin: -Theme.dp(6)
+                    anchors.top: parent.top
+                    size: "xs"
+                    visible: root.player !== null
+                    icon: root.identifyGlyph
+                    tintOverride: Theme.subtext
+                    onClicked: root.openPanel("shazam")
+                }
+
+                // the player's own volume; its icon mutes and unmutes
+                Item {
+                    x: trackHeader.infoX - Theme.dp(6)
+                    y: trackHeader.height - height
+                    width: root.contentWidth - trackHeader.infoX + Theme.dp(6)
+                    height: Theme.dp(30)
+                    visible: root.player !== null && root.volumeSupported
+
+                    IconButton {
+                        id: volBtn
+
+                        anchors.left: parent.left
+                        anchors.verticalCenter: parent.verticalCenter
+                        size: "xs"
+                        icon: root.playerVolume <= 0 ? "volume_off" : root.volumeGlyphFor(root.playerVolume)
+                        tintOverride: Theme.subtext
+                        onClicked: root.toggleMute()
+                    }
+
+                    Slider {
+                        anchors.left: volBtn.right
+                        anchors.leftMargin: Theme.dp(4)
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        trackH: Theme.dp(8)
+                        handleH: Theme.dp(22)
+                        value: root.playerVolume
+                        showValue: false
+                        activeColor: Theme.accent
+                        inactiveColor: Theme.withBlur(Theme.bgHigh)
+                        onMoved: (v) => {
+                            if (root.player)
+                                root.player.volume = v;
+
+                        }
+                    }
+
+                }
+
+            }
+
+            // the cava feed as a waveform: a dotted line at rest, rounded bars once there is sound
+            Item {
+                id: vizStrip
+
+                readonly property real barW: Theme.dp(5)
+
+                width: root.contentWidth
+                height: Theme.dp(24)
+                visible: root.player !== null
 
                 Row {
-                    anchors.fill: parent
-                    spacing: Theme.dp(3)
+                    anchors.centerIn: parent
+                    spacing: root.barCount > 1 ? (vizStrip.width - root.barCount * vizStrip.barW) / (root.barCount - 1) : 0
 
                     Repeater {
                         model: root.barCount
@@ -1034,13 +1448,12 @@ BarPill {
 
                             readonly property real level: root.barLevel(index)
 
-                            width: (vizStrip.width - (root.barCount - 1) * 3) / root.barCount
-                            // width is only the dot-minimum for a thin bar, so cap it:
-                            // a wide bar must not drag the height up with it
-                            height: Math.min(vizStrip.height, Math.max(width, level * vizStrip.height))
-                            anchors.bottom: parent.bottom
-                            radius: Theme.dp(999)
-                            color: root.barColor(level)
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: vizStrip.barW
+                            height: Math.max(vizStrip.barW, level * vizStrip.height)
+                            radius: width / 2
+                            color: Theme.accent
+                            opacity: 0.3 + 0.7 * Math.min(1, level * 2)
 
                             Behavior on height {
                                 NumberAnimation {
@@ -1056,23 +1469,18 @@ BarPill {
 
                 }
 
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: Theme.barMs(220)
-                        easing.type: Easing.OutCubic
-                    }
-
-                }
-
             }
 
+            // reaches into the padding by the handle's inset, so the wave and its times line up with the cover
             Item {
-                width: root.contentWidth
+                x: -Theme.dp(8)
+                width: root.contentWidth + Theme.dp(16)
                 height: Theme.dp(40)
+                visible: root.player !== null
 
                 Column {
                     width: parent.width
-                    spacing: Theme.dp(4)
+                    spacing: Theme.dp(2)
                     visible: root.hasDuration
 
                     Item {
@@ -1087,6 +1495,7 @@ BarPill {
                         width: parent.width
                         height: Theme.dp(22)
 
+                        // the m3 wavy indicator: it flows while the track plays and lies flat once paused
                         Canvas {
                             id: waveCanvas
 
@@ -1094,7 +1503,7 @@ BarPill {
                             readonly property real trackThickness: Theme.dp(4)
                             readonly property real handleWidth: Theme.dp(4)
                             property real handleHeight: trackHitArea.hovering || trackHitArea.dragging ? Theme.dp(18) : Theme.dp(14)
-                            property real amplitude: trackHitArea.hovering || trackHitArea.dragging ? 4.5 : 3.5
+                            property real amplitude: !root.isPlaying ? 0 : (trackHitArea.hovering || trackHitArea.dragging ? 4.5 : 3.5)
                             readonly property real trackGap: Theme.dp(6)
                             readonly property real stopIndicator: Theme.dp(4)
                             readonly property real wavelength: Theme.dp(26)
@@ -1133,6 +1542,8 @@ BarPill {
                                 const activeEnd = handleX - trackGap - handleWidth / 2;
                                 const inactiveStart = handleX + trackGap + handleWidth / 2;
                                 const rampLen = wavelength * 1.4;
+                                // half a wavelength a second; 600s is a whole number of waves, so the wrap is seamless
+                                const shift = (Date.now() % 600000) / 1000 * wavelength * 0.5;
                                 ctx.lineCap = "round";
                                 ctx.lineJoin = "round";
                                 if (activeEnd - inset > trackThickness) {
@@ -1140,7 +1551,7 @@ BarPill {
                                     ctx.lineWidth = trackThickness;
                                     ctx.beginPath();
                                     for (let x = inset; x <= activeEnd; x++) {
-                                        const y = midY + Math.sin((x / wavelength) * Math.PI * 2) * amplitude * envelope(x, inset, rampLen, activeEnd);
+                                        const y = midY + Math.sin(((x - shift) / wavelength) * Math.PI * 2) * amplitude * envelope(x, inset, rampLen, activeEnd);
                                         if (x === inset)
                                             ctx.moveTo(x, y);
                                         else
@@ -1238,28 +1649,26 @@ BarPill {
                         width: parent.width
                         height: posLabel.implicitHeight
 
-                        Text {
+                        LText {
                             id: posLabel
 
                             anchors.left: parent.left
                             anchors.leftMargin: trackHitArea.trackInset
-                            text: root.fmt(root.livePosSec)
+                            role: "bodySmall"
+                            tabular: true
                             color: Theme.subtext
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontLabel
-                            font.variableAxes: Theme.axes(Theme.fontLabel, 420, 0)
+                            text: root.fmt(trackHitArea.dragging ? trackHitArea.dragProgress * root.lenSec : root.livePosSec)
                         }
 
-                        Text {
+                        LText {
                             id: lenLabel
 
                             anchors.right: parent.right
                             anchors.rightMargin: trackHitArea.trackInset
-                            text: root.showRemaining ? "-" + root.fmt(root.lenSec - root.livePosSec) : root.fmt(root.lenSec)
+                            role: "bodySmall"
+                            tabular: true
                             color: lenArea.containsMouse ? Theme.text : Theme.subtext
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontLabel
-                            font.variableAxes: Theme.axes(Theme.fontLabel, 420, 0)
+                            text: root.showRemaining ? "-" + root.fmt(root.lenSec - root.livePosSec) : root.fmt(root.lenSec)
 
                             MouseArea {
                                 id: lenArea
@@ -1279,7 +1688,7 @@ BarPill {
 
                 Row {
                     anchors.centerIn: parent
-                    spacing: Theme.dp(7)
+                    spacing: Theme.dp(8)
                     visible: !root.hasDuration
 
                     Rectangle {
@@ -1312,142 +1721,147 @@ BarPill {
 
                     }
 
-                    Text {
+                    LText {
                         anchors.verticalCenter: parent.verticalCenter
-                        text: root.player ? "LIVE  ·  " + root.fmt(root.livePosSec) : "NOTHING QUEUED"
+                        role: "labelMedium"
+                        tabular: true
                         color: Theme.subtext
-                        font.family: Theme.fontFamily
-                        font.bold: true
-                        font.pixelSize: Theme.fontLabel
-                        font.variableAxes: Theme.axes(Theme.fontLabel, 640, 0)
-                        font.letterSpacing: 0.5
+                        text: "Live  ·  " + root.fmt(root.livePosSec)
                     }
 
                 }
 
             }
 
+            // the transport, as the media widget draws it: bare skips either side of a wide play pill
             Item {
                 width: root.contentWidth
-                height: Theme.dp(40)
+                height: Theme.dp(52)
+                visible: root.player !== null
 
-                Row {
+                IconButton {
                     anchors.left: parent.left
+                    anchors.leftMargin: -Theme.dp(6)
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.dp(2)
+                    size: "xs"
+                    visible: root.player !== null && root.player.shuffleSupported
+                    icon: root.shuffleGlyph
+                    checkable: true
+                    checked: root.player !== null && root.player.shuffle
+                    iconFill: checked ? 1 : 0
+                    tintOverride: checked ? Theme.accent : Theme.subtext
+                    onClicked: {
+                        if (root.player)
+                            root.player.shuffle = !root.player.shuffle;
 
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(28)
-                        glyphSize: Theme.dp(15)
-                        visible: root.mprisPlayers.length > 1
-                        path: root.swapGlyph
-                        tint: Theme.subtextDim
-                        onActivated: root.cyclePlayer()
                     }
-
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(28)
-                        glyphSize: Theme.dp(16)
-                        path: root.identifyGlyph
-                        tint: Theme.subtextDim
-                        onActivated: root.openPanel("shazam")
-                    }
-
                 }
 
                 Row {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.dp(2)
-
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(28)
-                        glyphSize: Theme.dp(14)
-                        visible: root.player !== null && root.player.canRaise
-                        path: root.openGlyph
-                        tint: Theme.subtextDim
-                        onActivated: {
-                            if (root.player)
-                                root.player.raise();
-
-                        }
-                    }
-
-                }
-
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.dp(10)
-                    visible: root.player !== null
-
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(26)
-                        glyphSize: Theme.dp(14)
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: root.player !== null && root.player.shuffleSupported
-                        path: root.shuffleGlyph
-                        tint: (root.player && root.player.shuffle) ? Theme.accent : Theme.subtextDim
-                        onActivated: {
-                            if (root.player)
-                                root.player.shuffle = !root.player.shuffle;
-
-                        }
-                    }
-
-                    IconBtn {
-                        diameter: Theme.dp(30)
-                        glyphSize: Theme.dp(15)
-                        anchors.verticalCenter: parent.verticalCenter
-                        path: root.prevGlyph
-                        enabledAction: root.player !== null && root.player.canGoPrevious
-                        onActivated: root.skip(-1)
-                    }
-
-                    IconBtn {
-                        diameter: Theme.dp(40)
-                        glyphSize: Theme.dp(19)
-                        filled: true
-                        anchors.verticalCenter: parent.verticalCenter
-                        path: root.isPlaying ? root.pauseGlyph : root.playGlyph
-                        tint: Theme.fgAccent
-                        enabledAction: root.player !== null && root.player.canTogglePlaying
-                        onActivated: root.togglePlay()
-                    }
-
-                    IconBtn {
-                        diameter: Theme.dp(30)
-                        glyphSize: Theme.dp(15)
-                        anchors.verticalCenter: parent.verticalCenter
-                        path: root.nextGlyph
-                        enabledAction: root.player !== null && root.player.canGoNext
-                        onActivated: root.skip(1)
-                    }
-
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(26)
-                        glyphSize: Theme.dp(14)
-                        anchors.verticalCenter: parent.verticalCenter
-                        visible: root.player !== null && root.player.loopSupported
-                        path: (root.player && root.player.loopState === MprisLoopState.Track) ? root.repeatOneGlyph : root.repeatGlyph
-                        tint: (root.player && root.player.loopState !== MprisLoopState.None) ? Theme.accent : Theme.subtextDim
-                        onActivated: root.cycleLoop()
-                    }
-
-                }
-
-                PillBtn {
                     anchors.centerIn: parent
-                    visible: root.player === null
-                    label: "Identify what's playing"
-                    path: root.identifyGlyph
-                    accented: true
-                    onActivated: root.openPanel("shazam")
+                    spacing: Theme.dp(8)
+
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: root.prevGlyph
+                        iconFill: 1
+                        tintOverride: Theme.text
+                        disabled: !(root.player !== null && root.player.canGoPrevious)
+                        opacity: disabled ? Theme.disabledContent : 1
+                        onClicked: root.skip(-1)
+                    }
+
+                    Rectangle {
+                        id: playPill
+
+                        readonly property real big: Theme.dp(52)
+                        readonly property bool able: root.player !== null && root.player.canTogglePlaying
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: Math.round(playPill.big * 1.3)
+                        height: playPill.big
+                        radius: playTap.pressed ? playPill.big * 0.28 : playPill.big / 2
+                        color: Theme.accent
+                        opacity: playPill.able ? 1 : 0.4
+                        // the state layer alone barely shows on a saturated fill, so the pill
+                        // swells under the pointer as well
+                        scale: playTap.pressed ? 0.96 : (playTap.containsMouse ? 1.05 : 1)
+
+                        Icon {
+                            anchors.centerIn: parent
+                            name: root.isPlaying ? root.pauseGlyph : root.playGlyph
+                            size: Math.round(playPill.big * 0.5)
+                            fill: 1
+                            color: Theme.fgAccent
+                        }
+
+                        StateLayer {
+                            id: playTap
+
+                            radius: parent.radius
+                            tint: Theme.fgAccent
+                            disabled: !playPill.able
+                            onClicked: root.togglePlay()
+                        }
+
+                        Behavior on scale {
+                            NumberAnimation {
+                                duration: Theme.durFastSpatial
+                                easing.type: Easing.Bezier
+                                easing.bezierCurve: Theme.curveFastSpatial
+                            }
+
+                        }
+
+                        Behavior on radius {
+                            NumberAnimation {
+                                duration: Theme.durFastSpatial
+                                easing.type: Easing.Bezier
+                                easing.bezierCurve: Theme.curveDefaultSpatial
+                            }
+
+                        }
+
+                    }
+
+                    IconButton {
+                        anchors.verticalCenter: parent.verticalCenter
+                        icon: root.nextGlyph
+                        iconFill: 1
+                        tintOverride: Theme.text
+                        disabled: !(root.player !== null && root.player.canGoNext)
+                        opacity: disabled ? Theme.disabledContent : 1
+                        onClicked: root.skip(1)
+                    }
+
+                }
+
+                IconButton {
+                    anchors.right: parent.right
+                    anchors.rightMargin: -Theme.dp(6)
+                    anchors.verticalCenter: parent.verticalCenter
+                    size: "xs"
+                    visible: root.player !== null && root.player.loopSupported
+                    icon: (root.player && root.player.loopState === MprisLoopState.Track) ? root.repeatOneGlyph : root.repeatGlyph
+                    checkable: true
+                    checked: root.player !== null && root.player.loopState !== MprisLoopState.None
+                    iconFill: checked ? 1 : 0
+                    tintOverride: checked ? Theme.accent : Theme.subtext
+                    onClicked: root.cycleLoop()
+                }
+
+            }
+
+            Item {
+                width: root.contentWidth
+                height: Theme.dp(44)
+                visible: root.player === null
+
+                Button {
+                    anchors.centerIn: parent
+                    text: "Identify what's playing"
+                    icon: root.identifyGlyph
+                    onClicked: root.openPanel("shazam")
                 }
 
             }
@@ -1479,67 +1893,63 @@ BarPill {
         Column {
             id: shazamColumn
 
-            x: Theme.dp(14)
-            y: Theme.dp(14)
+            x: root.pad
+            y: root.pad
             width: root.contentWidth
             spacing: Theme.dp(12)
 
             Item {
                 width: root.contentWidth
-                height: Theme.dp(30)
+                height: Theme.dp(36)
 
-                Row {
+                IconButton {
+                    id: backBtn
+
                     anchors.left: parent.left
+                    anchors.leftMargin: -Theme.dp(8)
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: Theme.dp(4)
-
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(26)
-                        glyphSize: Theme.dp(15)
-                        anchors.verticalCenter: parent.verticalCenter
-                        path: root.backGlyph
-                        tint: Theme.subtext
-                        onActivated: root.setPage("player")
-                    }
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "IDENTIFY"
-                        color: Theme.subtextDim
-                        font.family: Theme.fontFamily
-                        font.bold: true
-                        font.pixelSize: Theme.fontLabel
-                        font.variableAxes: Theme.axes(Theme.fontLabel, 640, 0)
-                        font.letterSpacing: 0.5
-                    }
-
+                    icon: root.backGlyph
+                    tintOverride: Theme.text
+                    onClicked: root.setPage("player")
                 }
 
+                LText {
+                    anchors.left: backBtn.right
+                    anchors.leftMargin: Theme.dp(4)
+                    anchors.verticalCenter: parent.verticalCenter
+                    role: "titleMedium"
+                    color: Theme.text
+                    text: "Identify"
+                }
+
+                // what it listens to: this computer's own sound, or the microphone
                 Row {
                     anchors.right: parent.right
+                    anchors.rightMargin: -Theme.dp(6)
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: Theme.dp(2)
 
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(28)
-                        glyphSize: Theme.dp(16)
-                        path: root.volumeGlyphs[root.volumeGlyphs.length - 1].path
-                        tint: root.listenSource === "system" ? Theme.accent : Theme.subtextDim
-                        onActivated: {
+                    IconButton {
+                        size: "xs"
+                        icon: root.volumeGlyphs[root.volumeGlyphs.length - 1].path
+                        checkable: true
+                        checked: root.listenSource === "system"
+                        iconFill: checked ? 1 : 0
+                        tintOverride: checked ? Theme.accent : Theme.subtext
+                        onClicked: {
                             root.listenSource = "system";
                             root.cancelListening();
                         }
                     }
 
-                    IconBtn {
-                        ghost: true
-                        diameter: Theme.dp(28)
-                        glyphSize: Theme.dp(16)
-                        path: root.micGlyph
-                        tint: root.listenSource === "mic" ? Theme.accent : Theme.subtextDim
-                        onActivated: {
+                    IconButton {
+                        size: "xs"
+                        icon: root.micGlyph
+                        checkable: true
+                        checked: root.listenSource === "mic"
+                        iconFill: checked ? 1 : 0
+                        tintOverride: checked ? Theme.accent : Theme.subtext
+                        onClicked: {
                             root.listenSource = "mic";
                             root.cancelListening();
                         }
@@ -1553,7 +1963,7 @@ BarPill {
                 id: shazamHero
 
                 width: root.contentWidth
-                height: root.shazamState === "match" ? Theme.dp(84) : Theme.dp(136)
+                height: root.shazamState === "match" ? Theme.dp(88) : Theme.dp(root.micQuiet && root.micVolume < 100 ? 186 : 148)
 
                 Column {
                     anchors.centerIn: parent
@@ -1561,57 +1971,73 @@ BarPill {
                     visible: root.shazamState !== "match"
 
                     Item {
-                        width: Theme.dp(116)
-                        height: Theme.dp(74)
+                        id: listenBtn
+
+                        readonly property bool listening: root.shazamState === "listening"
+
                         anchors.horizontalCenter: parent.horizontalCenter
+                        width: Theme.dp(80)
+                        height: Theme.dp(80)
+                        scale: listenArea.pressed ? 0.94 : (listenArea.containsMouse ? 1.05 : 1)
+                        onListeningChanged: {
+                            if (!listenBtn.listening)
+                                settleTurn.restart();
 
-                        Repeater {
-                            model: 3
+                        }
 
-                            Rectangle {
-                                id: ring
+                        // an m3 expressive cookie that turns while it listens
+                        MaterialShape {
+                            id: listenShape
 
-                                required property int index
+                            property real turn: 0
 
-                                anchors.centerIn: parent
-                                width: Theme.dp(64)
-                                height: Theme.dp(64)
-                                radius: Theme.dp(999)
-                                color: "transparent"
-                                border.width: 2
-                                border.color: Theme.accent
-                                opacity: 0
-                                visible: root.shazamState === "listening"
+                            anchors.fill: parent
+                            shape: "cookie9"
+                            color: Theme.accent
+                            rotation: listenShape.turn
 
-                                SequentialAnimation {
-                                    running: root.shazamState === "listening"
+                            NumberAnimation on turn {
+                                running: listenBtn.listening && shazamPage.visible
+                                from: 0
+                                to: 360
+                                duration: Theme.barMs(7200)
+                                loops: Animation.Infinite
+                            }
 
-                                    PauseAnimation {
-                                        duration: Theme.barMs(ring.index * 620)
-                                    }
+                        }
 
-                                    SequentialAnimation {
-                                        loops: Animation.Infinite
+                        // nine lobes repeat every 40 degrees, so it rests where the next spin starts
+                        NumberAnimation {
+                            id: settleTurn
 
-                                        ParallelAnimation {
-                                            NumberAnimation {
-                                                target: ring
-                                                property: "scale"
-                                                from: 0.75
-                                                to: 1.9
-                                                duration: Theme.barMs(1860)
-                                                easing.type: Easing.OutCubic
-                                            }
+                            target: listenShape
+                            property: "turn"
+                            to: Math.ceil(listenShape.turn / 40) * 40
+                            duration: Theme.barDurMedium
+                            easing.type: Easing.OutCubic
+                        }
 
-                                            NumberAnimation {
-                                                target: ring
-                                                property: "opacity"
-                                                from: 0.5
-                                                to: 0
-                                                duration: Theme.barMs(1860)
-                                                easing.type: Easing.OutCubic
-                                            }
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: Theme.dp(3)
+                            visible: listenBtn.listening
 
+                            Repeater {
+                                model: 5
+
+                                Rectangle {
+                                    required property int index
+
+                                    width: Theme.dp(4)
+                                    radius: width / 2
+                                    color: Theme.fgAccent
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    height: Math.max(Theme.dp(4), (root.listenSource === "mic" ? root.micBar(index) : root.bandLevel(1 + index * 7, 7 + index * 7)) * Theme.dp(28))
+
+                                    Behavior on height {
+                                        NumberAnimation {
+                                            duration: Theme.barMs(90)
+                                            easing.type: Easing.OutCubic
                                         }
 
                                     }
@@ -1622,93 +2048,34 @@ BarPill {
 
                         }
 
-                        Rectangle {
-                            id: listenBtn
-
+                        Icon {
                             anchors.centerIn: parent
-                            width: Theme.dp(64)
-                            height: Theme.dp(64)
-                            radius: Theme.dp(999)
-                            color: Theme.accent
-                            scale: listenArea.pressed ? 0.94 : (listenArea.containsMouse ? 1.05 : 1)
+                            visible: !listenBtn.listening
+                            name: root.shazamState === "idle" ? root.identifyGlyph : root.retryGlyph
+                            size: Theme.dp(30)
+                            fill: 1
+                            color: Theme.fgAccent
+                        }
 
-                            SequentialAnimation on opacity {
-                                running: root.shazamState === "listening"
-                                loops: Animation.Infinite
+                        MouseArea {
+                            id: listenArea
 
-                                NumberAnimation {
-                                    to: 0.75
-                                    duration: Theme.barMs(780)
-                                    easing.type: Easing.InOutSine
-                                }
-
-                                NumberAnimation {
-                                    to: 1
-                                    duration: Theme.barMs(780)
-                                    easing.type: Easing.InOutSine
-                                }
-
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                if (listenBtn.listening)
+                                    root.cancelListening();
+                                else
+                                    root.startListening();
                             }
+                        }
 
-                            Row {
-                                anchors.centerIn: parent
-                                spacing: Theme.dp(3)
-                                visible: root.shazamState === "listening"
-
-                                Repeater {
-                                    model: 5
-
-                                    Rectangle {
-                                        required property int index
-
-                                        width: Theme.dp(3)
-                                        radius: Theme.dp(999)
-                                        color: Theme.fgAccent
-                                        anchors.verticalCenter: parent.verticalCenter
-                                        height: Math.max(Theme.dp(4), root.bandLevel(1 + index * 7, 7 + index * 7) * 26)
-
-                                        Behavior on height {
-                                            NumberAnimation {
-                                                duration: Theme.barMs(90)
-                                                easing.type: Easing.OutCubic
-                                            }
-
-                                        }
-
-                                    }
-
-                                }
-
-                            }
-
-                            SvgIcon {
-                                anchors.centerIn: parent
-                                visible: root.shazamState !== "listening"
-                                path: root.shazamState === "idle" ? root.identifyGlyph : root.retryGlyph
-                                tint: Theme.fgAccent
-                                glyphSize: Theme.dp(26)
-                            }
-
-                            MouseArea {
-                                id: listenArea
-
-                                anchors.fill: parent
-                                hoverEnabled: true
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: {
-                                    if (root.shazamState === "listening")
-                                        root.cancelListening();
-                                    else
-                                        root.startListening();
-                                }
-                            }
-
-                            Behavior on scale {
-                                NumberAnimation {
-                                    duration: Theme.barMs(140)
-                                    easing.type: Easing.OutCubic
-                                }
-
+                        Behavior on scale {
+                            NumberAnimation {
+                                duration: Theme.durFastSpatial
+                                easing.type: Easing.Bezier
+                                easing.bezierCurve: Theme.curveFastSpatial
                             }
 
                         }
@@ -1717,11 +2084,13 @@ BarPill {
 
                     Column {
                         width: root.contentWidth
-                        spacing: Theme.dp(3)
+                        spacing: Theme.dp(2)
 
-                        Text {
+                        LText {
                             width: parent.width
                             horizontalAlignment: Text.AlignHCenter
+                            role: "titleMedium"
+                            color: Theme.text
                             text: {
                                 switch (root.shazamState) {
                                 case "listening":
@@ -1734,33 +2103,48 @@ BarPill {
                                     return root.listenSource === "mic" ? "Identify what's in the room" : "Identify what's playing here";
                                 }
                             }
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.bold: true
-                            font.pixelSize: Theme.fontTitle
-                            font.variableAxes: Theme.axes(Theme.fontTitle, 640, 0)
                         }
 
-                        Text {
+                        LText {
                             width: parent.width
                             horizontalAlignment: Text.AlignHCenter
+                            role: "bodySmall"
+                            color: Theme.subtext
+                            elide: Text.ElideRight
                             text: {
+                                if (root.micQuiet)
+                                    return root.shazamState === "nomatch" ? "The microphone was too quiet to hear it" : root.listenElapsed + "s  ·  the microphone barely hears it";
+
                                 switch (root.shazamState) {
                                 case "listening":
                                     return root.listenElapsed + "s  ·  tap to stop";
                                 case "nomatch":
-                                    return "Nothing recognisable in the last " + root.listenLimit + "s — tap to try again";
+                                    return "Nothing recognisable in the last " + root.listenLimit + "s, tap to try again";
                                 case "error":
                                     return "songrec couldn't reach the mic, the device or Shazam";
                                 default:
+                                    if (root.listenSource === "mic")
+                                        return "via songrec  ·  microphone at " + root.micVolume + "%";
+
                                     return "via songrec  ·  " + (root.listenDevice === "" ? "default device" : "takes about 10s");
                                 }
                             }
-                            color: Theme.subtextDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontLabel
-                            font.variableAxes: Theme.axes(Theme.fontLabel, 420, 0)
-                            elide: Text.ElideRight
+                        }
+
+                        Item {
+                            width: parent.width
+                            height: Theme.dp(36)
+                            visible: root.micQuiet && root.micVolume < 100
+
+                            Button {
+                                anchors.centerIn: parent
+                                variant: "text"
+                                size: "xs"
+                                text: "Turn the mic up"
+                                icon: root.micGlyph
+                                onClicked: Audio.setVolume(Audio.source, 100)
+                            }
+
                         }
 
                     }
@@ -1774,38 +2158,43 @@ BarPill {
                     visible: root.shazamState === "match"
 
                     RoundedArt {
-                        width: Theme.dp(76)
-                        height: Theme.dp(76)
+                        width: Theme.dp(88)
+                        height: Theme.dp(88)
                         source: root.shazamResult ? root.shazamResult.art : ""
-                        shapeRadius: Theme.radiusMd
-                        fallbackGlyph: Theme.dp(28)
+                        shapeRadius: Theme.shapeLg
+                        fallbackGlyph: Theme.dp(30)
                     }
 
                     Item {
-                        width: root.contentWidth - Theme.dp(76) - Theme.dp(14)
-                        height: Theme.dp(76)
+                        width: root.contentWidth - Theme.dp(88) - Theme.dp(14)
+                        height: Theme.dp(88)
 
                         Column {
                             anchors.top: parent.top
                             width: parent.width
-                            spacing: 1
+                            spacing: Theme.dp(1)
 
                             Marquee {
                                 width: parent.width
                                 content: root.shazamResult ? root.shazamResult.title : ""
                                 bold: true
-                                pixelSize: Theme.fontHeadline
+                                weight: 600
+                                textColor: Theme.text
+                                pixelSize: Theme.typeSize("titleMedium")
                             }
 
                             Marquee {
                                 width: parent.width
                                 content: root.shazamResult ? root.shazamResult.artist : ""
                                 textColor: Theme.subtext
-                                pixelSize: Theme.fontBody
+                                pixelSize: Theme.typeSize("bodyMedium")
                             }
 
-                            Text {
+                            LText {
                                 width: parent.width
+                                role: "bodySmall"
+                                color: Theme.subtextDim
+                                elide: Text.ElideRight
                                 text: {
                                     if (!root.shazamResult)
                                         return "";
@@ -1822,11 +2211,6 @@ BarPill {
 
                                     return parts.join("  ·  ");
                                 }
-                                color: Theme.subtextDim
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontLabel
-                                font.variableAxes: Theme.axes(Theme.fontLabel, 420, 0)
-                                elide: Text.ElideRight
                             }
 
                         }
@@ -1834,36 +2218,45 @@ BarPill {
                         Row {
                             anchors.bottom: parent.bottom
                             anchors.left: parent.left
-                            spacing: Theme.dp(6)
+                            spacing: Theme.dp(2)
 
-                            PillBtn {
-                                label: "Shazam"
-                                path: root.openGlyph
-                                onActivated: root.openUrl(root.shazamResult ? root.shazamResult.url : "")
+                            Button {
+                                anchors.verticalCenter: parent.verticalCenter
+                                size: "xs"
+                                text: "Shazam"
+                                icon: root.openGlyph
+                                containerOverride: Theme.accent
+                                contentOverride: Theme.fgAccent
+                                onClicked: root.openUrl(root.shazamResult ? root.shazamResult.url : "")
                             }
 
-                            IconBtn {
-                                diameter: Theme.dp(28)
-                                glyphSize: Theme.dp(14)
-                                anchors.verticalCenter: parent.verticalCenter
-                                path: root.searchGlyph
-                                onActivated: root.searchOnline(root.shazamResult)
+                            Item {
+                                width: Theme.dp(4)
+                                height: 1
                             }
 
-                            IconBtn {
-                                diameter: Theme.dp(28)
-                                glyphSize: Theme.dp(14)
+                            IconButton {
                                 anchors.verticalCenter: parent.verticalCenter
-                                path: root.copyGlyph
-                                onActivated: root.copyText(root.shazamResult ? root.shazamResult.title + " — " + root.shazamResult.artist : "")
+                                size: "xs"
+                                icon: root.searchGlyph
+                                tintOverride: Theme.subtext
+                                onClicked: root.searchOnline(root.shazamResult)
                             }
 
-                            IconBtn {
-                                diameter: Theme.dp(28)
-                                glyphSize: Theme.dp(14)
+                            IconButton {
                                 anchors.verticalCenter: parent.verticalCenter
-                                path: root.retryGlyph
-                                onActivated: root.startListening()
+                                size: "xs"
+                                icon: root.copyGlyph
+                                tintOverride: Theme.subtext
+                                onClicked: root.copyText(root.shazamResult ? root.shazamResult.title + " — " + root.shazamResult.artist : "")
+                            }
+
+                            IconButton {
+                                anchors.verticalCenter: parent.verticalCenter
+                                size: "xs"
+                                icon: root.retryGlyph
+                                tintOverride: Theme.subtext
+                                onClicked: root.startListening()
                             }
 
                         }
@@ -1885,34 +2278,29 @@ BarPill {
 
             Column {
                 width: root.contentWidth
-                spacing: Theme.dp(6)
+                spacing: 0
                 visible: historyAdapter.items.length > 0
 
                 Item {
                     width: parent.width
-                    height: Theme.dp(14)
+                    height: Theme.dp(30)
 
-                    Text {
+                    LText {
                         anchors.left: parent.left
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "RECENT"
-                        color: Theme.subtextDim
-                        font.family: Theme.fontFamily
-                        font.bold: true
-                        font.pixelSize: Theme.fontLabel
-                        font.variableAxes: Theme.axes(Theme.fontLabel, 640, 0)
-                        font.letterSpacing: 0.5
+                        role: "titleSmall"
+                        color: Theme.accent
+                        text: "Recent"
                     }
 
-                    IconBtn {
-                        ghost: true
+                    IconButton {
                         anchors.right: parent.right
+                        anchors.rightMargin: -Theme.dp(6)
                         anchors.verticalCenter: parent.verticalCenter
-                        diameter: Theme.dp(22)
-                        glyphSize: Theme.dp(13)
-                        path: root.trashGlyph
-                        tint: Theme.subtextDim
-                        onActivated: root.clearHistory()
+                        size: "xs"
+                        icon: root.trashGlyph
+                        tintOverride: Theme.subtext
+                        onClicked: root.clearHistory()
                     }
 
                 }
@@ -1926,12 +2314,13 @@ BarPill {
                         required property var modelData
 
                         width: root.contentWidth
-                        height: Theme.dp(38)
+                        height: Theme.dp(52)
 
                         Rectangle {
                             anchors.fill: parent
-                            anchors.margins: -Theme.dp(4)
-                            radius: Theme.radiusSm
+                            anchors.leftMargin: -Theme.dp(8)
+                            anchors.rightMargin: -Theme.dp(8)
+                            radius: Theme.shapeMd
                             color: Theme.text
                             opacity: histArea.pressed ? Theme.statePressed : (histArea.containsMouse ? Theme.stateHover : 0)
 
@@ -1949,54 +2338,49 @@ BarPill {
 
                             anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
-                            width: Theme.dp(32)
-                            height: Theme.dp(32)
+                            width: Theme.dp(40)
+                            height: Theme.dp(40)
                             source: histRow.modelData.art
-                            shapeRadius: Theme.radiusXs
-                            fallbackGlyph: Theme.dp(16)
+                            shapeRadius: Theme.shapeSm
+                            fallbackGlyph: Theme.dp(18)
                         }
 
                         Column {
                             anchors.left: histArt.right
-                            anchors.leftMargin: Theme.dp(10)
+                            anchors.leftMargin: Theme.dp(12)
                             anchors.right: histAgo.left
                             anchors.rightMargin: Theme.dp(10)
                             anchors.verticalCenter: parent.verticalCenter
-                            spacing: 1
+                            spacing: Theme.dp(1)
 
-                            Text {
+                            LText {
                                 width: parent.width
-                                text: histRow.modelData.title
+                                role: "bodyMedium"
+                                weight: 560
                                 color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.bold: true
-                                font.pixelSize: Theme.fontBody
-                                font.variableAxes: Theme.axes(Theme.fontBody, 640, 0)
                                 elide: Text.ElideRight
+                                text: histRow.modelData.title
                             }
 
-                            Text {
+                            LText {
                                 width: parent.width
-                                text: histRow.modelData.artist
+                                role: "bodySmall"
                                 color: Theme.subtext
-                                font.family: Theme.fontFamily
-                                font.pixelSize: Theme.fontLabel
-                                font.variableAxes: Theme.axes(Theme.fontLabel, 420, 0)
                                 elide: Text.ElideRight
+                                text: histRow.modelData.artist
                             }
 
                         }
 
-                        Text {
+                        LText {
                             id: histAgo
 
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
-                            text: root.agoText(histRow.modelData.at, root.nowMs)
+                            role: "labelSmall"
+                            weight: 420
                             color: Theme.subtextDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: Theme.fontLabel
-                            font.variableAxes: Theme.axes(Theme.fontLabel, 420, 0)
+                            text: root.agoText(histRow.modelData.at, root.nowMs)
                         }
 
                         MouseArea {
@@ -2027,12 +2411,28 @@ BarPill {
         property string source: ""
         property int shapeRadius: Theme.radiusMd
         property int fallbackGlyph: Theme.dp(28)
+        property int decode: Theme.dp(256)
         readonly property bool ready: artSource.status === Image.Ready
+        // the last cover that loaded stays up while the next one does, so a player
+        // that rewrites its art file every few seconds does not blink
+        readonly property bool holding: !art.ready && art.source !== "" && artHeld.status === Image.Ready
 
         ClippingRectangle {
             anchors.fill: parent
             radius: art.shapeRadius
-            color: Theme.withBlur(Theme.bgActive)
+            color: Theme.withBlur(Theme.surfaceHighest)
+
+            Image {
+                id: artHeld
+
+                anchors.fill: parent
+                fillMode: Image.PreserveAspectCrop
+                asynchronous: true
+                cache: true
+                sourceSize.width: art.decode
+                sourceSize.height: art.decode
+                visible: art.holding
+            }
 
             Image {
                 id: artSource
@@ -2042,41 +2442,25 @@ BarPill {
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: true
-                sourceSize.width: Theme.dp(256)
-                sourceSize.height: Theme.dp(256)
+                sourceSize.width: art.decode
+                sourceSize.height: art.decode
                 visible: art.ready
+                onStatusChanged: {
+                    if (artSource.status === Image.Ready)
+                        artHeld.source = artSource.source;
+
+                }
             }
 
         }
 
-        SvgIcon {
-            anchors.centerIn: parent
-            visible: !art.ready
-            path: root.noteGlyph
-            tint: Theme.bgHigh
-            glyphSize: art.fallbackGlyph
-        }
-
-    }
-
-    component SvgIcon: Item {
-        id: icon
-
-        property string path: ""
-        property color tint: Theme.text
-        property int glyphSize: Theme.dp(16)
-
-        width: icon.glyphSize
-        height: icon.glyphSize
-
-        property real fill: 1
-
         Icon {
             anchors.centerIn: parent
-            name: icon.path
-            size: Math.round(icon.glyphSize * 1.15)
-            fill: icon.fill
-            color: icon.tint
+            visible: !art.ready && !art.holding
+            name: "music_note"
+            size: art.fallbackGlyph
+            fill: 1
+            color: Theme.subtext
         }
 
     }
@@ -2087,6 +2471,7 @@ BarPill {
         property string content: ""
         property color textColor: Theme.text
         property bool bold: false
+        property int weight: mq.bold ? 640 : 420
         property int pixelSize: Theme.fs(13)
         property bool scrolling: true
         readonly property int sliceCount: 7
@@ -2123,7 +2508,7 @@ BarPill {
             font.family: Theme.fontFamily
             font.bold: mq.bold
             font.pixelSize: mq.pixelSize
-            font.variableAxes: Theme.axes(mq.pixelSize, (mq.bold) ? 640 : 420, 0)
+            font.variableAxes: Theme.axes(mq.pixelSize, mq.weight, 0)
         }
 
         Text {
@@ -2134,7 +2519,7 @@ BarPill {
             font.family: Theme.fontFamily
             font.bold: mq.bold
             font.pixelSize: mq.pixelSize
-            font.variableAxes: Theme.axes(mq.pixelSize, (mq.bold) ? 640 : 420, 0)
+            font.variableAxes: Theme.axes(mq.pixelSize, mq.weight, 0)
         }
 
         SequentialAnimation {
@@ -2195,7 +2580,7 @@ BarPill {
                         font.family: Theme.fontFamily
                         font.bold: mq.bold
                         font.pixelSize: mq.pixelSize
-                        font.variableAxes: Theme.axes(mq.pixelSize, (mq.bold) ? 640 : 420, 0)
+                        font.variableAxes: Theme.axes(mq.pixelSize, mq.weight, 0)
                     }
 
                     Text {
@@ -2204,7 +2589,7 @@ BarPill {
                         font.family: Theme.fontFamily
                         font.bold: mq.bold
                         font.pixelSize: mq.pixelSize
-                        font.variableAxes: Theme.axes(mq.pixelSize, (mq.bold) ? 640 : 420, 0)
+                        font.variableAxes: Theme.axes(mq.pixelSize, mq.weight, 0)
                         visible: mq.overflowing
                     }
 
@@ -2221,161 +2606,6 @@ BarPill {
                 duration: Theme.barDurLong
                 easing.type: Easing.Bezier
                 easing.bezierCurve: root.easeStandard
-            }
-
-        }
-
-    }
-
-    component IconBtn: Rectangle {
-        id: btn
-
-        property string path: ""
-        property int diameter: Theme.dp(28)
-        property int glyphSize: Theme.dp(14)
-        property color tint: Theme.text
-        property bool filled: false
-        property bool ghost: false
-        property bool enabledAction: true
-
-        signal activated()
-
-        width: btn.diameter
-        height: btn.diameter
-        radius: Theme.dp(999)
-        color: btn.filled ? Theme.accent : (btn.ghost ? "transparent" : Theme.withBlur(Theme.bgHigh))
-        opacity: btn.enabledAction ? 1 : 0.3
-        scale: btnArea.pressed ? 0.9 : (btnArea.containsMouse ? 1.07 : 1)
-
-        SvgIcon {
-            anchors.centerIn: parent
-            path: btn.path
-            tint: btn.tint
-            glyphSize: btn.glyphSize
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            color: btn.filled ? Theme.fgAccent : Theme.text
-            opacity: !btn.enabledAction ? 0 : (btnArea.pressed ? Theme.statePressed : (btnArea.containsMouse ? Theme.stateHover : 0))
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.barDurQuick
-                    easing.type: Theme.easeStandard
-                }
-
-            }
-
-        }
-
-        MouseArea {
-            id: btnArea
-
-            anchors.fill: parent
-            hoverEnabled: true
-            enabled: btn.enabledAction
-            cursorShape: Qt.PointingHandCursor
-            onClicked: btn.activated()
-        }
-
-        Behavior on scale {
-            NumberAnimation {
-                duration: Theme.barDurQuick
-                easing.type: Theme.easeStandard
-            }
-
-        }
-
-        Behavior on color {
-            ColorAnimation {
-                duration: Theme.barDurShort
-            }
-
-        }
-
-        Behavior on opacity {
-            NumberAnimation {
-                duration: Theme.barDurQuick
-            }
-
-        }
-
-    }
-
-    component PillBtn: Rectangle {
-        id: pill
-
-        property string label: ""
-        property string path: ""
-        property bool accented: false
-        readonly property color onColor: pill.accented ? Theme.fgAccent : Theme.text
-
-        signal activated()
-
-        implicitWidth: pillRow.implicitWidth + Theme.dp(26)
-        height: Theme.dp(30)
-        radius: Theme.dp(999)
-        color: pill.accented ? Theme.accent : Theme.withBlur(Theme.bgHigh)
-        scale: pillArea.pressed ? 0.94 : (pillArea.containsMouse ? 1.04 : 1)
-
-        Row {
-            id: pillRow
-
-            anchors.centerIn: parent
-            spacing: Theme.dp(7)
-
-            SvgIcon {
-                anchors.verticalCenter: parent.verticalCenter
-                visible: pill.path !== ""
-                path: pill.path
-                tint: pill.onColor
-                glyphSize: Theme.dp(14)
-            }
-
-            Text {
-                anchors.verticalCenter: parent.verticalCenter
-                text: pill.label
-                color: pill.onColor
-                font.family: Theme.fontFamily
-                font.bold: true
-                font.pixelSize: Theme.fontLabel
-                font.variableAxes: Theme.axes(Theme.fontLabel, 640, 0)
-                font.letterSpacing: 0.1
-            }
-
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            radius: parent.radius
-            color: pill.onColor
-            opacity: pillArea.pressed ? Theme.statePressed : (pillArea.containsMouse ? Theme.stateHover : 0)
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.barDurQuick
-                    easing.type: Theme.easeStandard
-                }
-
-            }
-
-        }
-
-        MouseArea {
-            id: pillArea
-
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: pill.activated()
-        }
-
-        Behavior on scale {
-            NumberAnimation {
-                duration: Theme.barDurQuick
-                easing.type: Theme.easeStandard
             }
 
         }
