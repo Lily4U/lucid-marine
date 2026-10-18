@@ -174,16 +174,31 @@ Item {
         anchors.fill: parent
         visible: !surface.paperHidden
 
-        Image {
+        // settles out of a push-in on the way in, and falls away on the way out
+        Item {
             anchors.fill: parent
-            // encoded, or a wallpaper with a space in its name never loads
-            source: "file://" + encodeURI(Lockscreen.wallpaper)
-            fillMode: Image.PreserveAspectCrop
-            // a dive uncovers it within a few frames
-            asynchronous: !surface.dive
-            cache: true
-            // settles out of a push-in on the way in, and falls away on the way out
             scale: 1.07 - 0.07 * (surface.dive ? surface.sink : surface.e) + surface.focusK * 0.02 + (1 - surface.out) * 0.06
+
+            Image {
+                anchors.fill: parent
+                // encoded, or a wallpaper with a space in its name never loads
+                source: "file://" + encodeURI(Lockscreen.wallpaper)
+                fillMode: Image.PreserveAspectCrop
+                // a dive uncovers it within a few frames
+                asynchronous: !surface.dive
+                cache: true
+            }
+
+            // a live wallpaper keeps moving behind the blur
+            Loader {
+                anchors.fill: parent
+                active: LiveWall.wanted && LiveWall.lockVideo !== ""
+                source: Qt.resolvedUrl("LockLive.qml")
+                onLoaded: item.source = Qt.binding(() => {
+                    return LiveWall.lockVideo;
+                })
+            }
+
         }
 
     }

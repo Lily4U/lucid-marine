@@ -69,6 +69,11 @@ Singleton {
         "changed": root.changed
     })
     property int failures: 0
+    // the lock screen plays a small, silent copy behind its blur rather than
+    // decode the full video in the shell: made once per video, in the background
+    readonly property string lockSource: Prefs.liveWallpapers ? root.video : ""
+    property string lockVideo: ""
+    property string lockMaking: ""
 
     function isVideo(path) {
         const dot = path.lastIndexOf(".");
@@ -77,6 +82,16 @@ Singleton {
 
     function writeState() {
         stateView.setText(root.state);
+    }
+
+    function makeLockCopy() {
+        root.lockVideo = "";
+        lockCopy.running = false;
+        if (root.lockSource === "")
+            return ;
+
+        root.lockMaking = root.lockSource;
+        lockCopy.running = true;
     }
 
     function sync() {
@@ -96,6 +111,7 @@ Singleton {
     }
 
     onWantedChanged: root.sync()
+    onLockSourceChanged: Qt.callLater(root.makeLockCopy)
     // the fields of one change land together, in one write
     onStateChanged: Qt.callLater(root.writeState)
     // a new decoder needs a new process
@@ -211,6 +227,27 @@ Singleton {
             else
                 console.warn("LiveWall: the player stopped", root.failures, "times; leaving the still frame");
         }
+    }
+
+    // keyed on the video's path and mtime like the login screen's copy; 640 wide
+    // and 30 frames a second is plenty under a blur that heavy
+    Process {
+        id: lockCopy
+
+        command: ["sh", "-c", "v=\"$1\"; d=\"$HOME/.cache/lucid/live-lock\"; mkdir -p \"$d\"; find \"$d\" -name '*.mp4' -mtime +14 -delete 2>/dev/null; find \"$d\" -name '.*.mp4' -mmin +10 -delete 2>/dev/null; k=$(printf '%s|%s' \"$v\" \"$(stat -c %Y \"$v\")\" | sha1sum | cut -c1-16); f=\"$d/$k.mp4\"; if [ ! -s \"$f\" ]; then command -v ffmpeg >/dev/null || exit 1; t=\"$d/.$k.$$.mp4\"; nice -n 19 ffmpeg -v error -y -threads 2 -i \"$v\" -an -sn -dn -filter_threads 1 -vf 'scale=640:-2,fps=30' -c:v libx264 -preset veryfast -crf 28 -pix_fmt yuv420p -movflags +faststart -threads 2 \"$t\" </dev/null && mv -f \"$t\" \"$f\" || { rm -f \"$t\"; exit 1; }; fi; printf '%s\\n' \"$f\"", "sh", root.lockMaking]
+
+        stdout: StdioCollector {
+            id: lockCopyOut
+
+            onStreamFinished: {
+                const f = lockCopyOut.text.trim();
+                // a copy for a video that has since been replaced is not this one's
+                if (f !== "" && root.lockMaking === root.lockSource)
+                    root.lockVideo = "file://" + f.split("/").map(encodeURIComponent).join("/");
+
+            }
+        }
+
     }
 
     Timer {
