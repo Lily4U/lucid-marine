@@ -1231,6 +1231,10 @@ Item {
             id: gridSample
 
             readonly property int pad: 0
+            readonly property int dot: {
+                const d = Math.round(gridSample.glyph * 0.16);
+                return (sample.stripHeight - 3 * d) % 2 === 0 ? d : d + 1;
+            }
             readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
 
             implicitWidth: sample.stripHeight
@@ -1247,7 +1251,7 @@ Item {
                     Rectangle {
                         required property int index
 
-                        width: Math.round(gridSample.glyph * 0.16)
+                        width: gridSample.dot
                         height: width
                         radius: Theme.pill(height)
                         color: index === 4 ? Theme.accent : Theme.text
