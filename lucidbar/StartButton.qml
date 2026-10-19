@@ -37,12 +37,11 @@ BarPill {
     // chip is hugged as closely at its ends as at its top and bottom
     readonly property int chipWidth: Math.ceil(startLabel.implicitWidth) + Theme.dp(20)
     readonly property int chipHeight: Math.min(Theme.dp(24), root.compactHeight - Theme.dp(8))
-    // the grid's dots go a pixel bigger when its width and the circle's differ
-    // odd from even, so it sits dead centre in whole pixels
-    readonly property int gridGap: Math.round(root.glyph * 0.1)
-    readonly property int gridDot: {
-        const d = Math.round(root.glyph * 0.16);
-        return (root.compactHeight - 3 * d) % 2 === 0 ? d : d + 1;
+    // the grid of nine, dots twice their gaps: as wide as the circle is odd or
+    // even, so its edges land on whole pixels with the same clear all round
+    readonly property int gridSize: {
+        const s = Math.round(root.glyph * 0.78);
+        return (root.compactHeight - s) % 2 === 0 ? s : s - 1;
     }
 
     opensOnHover: false
@@ -126,13 +125,13 @@ BarPill {
             visible: root.gridFace
             anchors.centerIn: parent
             columns: 3
-            spacing: root.gridGap
+            spacing: root.gridSize / 8
 
             Repeater {
                 model: 9
 
                 Rectangle {
-                    width: root.gridDot
+                    width: root.gridSize / 4
                     height: width
                     radius: Theme.pill(height)
                     color: index === 4 ? Theme.accent : Theme.text

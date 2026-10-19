@@ -1231,9 +1231,9 @@ Item {
             id: gridSample
 
             readonly property int pad: 0
-            readonly property int dot: {
-                const d = Math.round(gridSample.glyph * 0.16);
-                return (sample.stripHeight - 3 * d) % 2 === 0 ? d : d + 1;
+            readonly property int size: {
+                const s = Math.round(gridSample.glyph * 0.78);
+                return (sample.stripHeight - s) % 2 === 0 ? s : s - 1;
             }
             readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
 
@@ -1243,7 +1243,7 @@ Item {
             Grid {
                 anchors.centerIn: parent
                 columns: 3
-                spacing: Math.round(gridSample.glyph * 0.1)
+                spacing: gridSample.size / 8
 
                 Repeater {
                     model: 9
@@ -1251,7 +1251,7 @@ Item {
                     Rectangle {
                         required property int index
 
-                        width: gridSample.dot
+                        width: gridSample.size / 4
                         height: width
                         radius: Theme.pill(height)
                         color: index === 4 ? Theme.accent : Theme.text
