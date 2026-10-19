@@ -148,6 +148,8 @@ if grep -q '^Theme-Id=lucid$' "$DIR/metadata.desktop" 2>/dev/null; then
     # set-wallpaper.sh's colour lock, so the next wallpaper's colours waited on it
     VIDEO=""
     VID_DIR="$HOME/.cache/lucid/sddm-video"
+    # the still's blur, below, for the video; part of the key, so a change remakes the copies
+    VF="scale=480:-2,gblur=sigma=1.85"
 
     # one at a time, at the lowest priority, and only while the video is still
     # the wallpaper, so a browse past several clips makes the last one's copy.
@@ -162,7 +164,7 @@ if grep -q '^Theme-Id=lucid$' "$DIR/metadata.desktop" 2>/dev/null; then
             tmp="$VID_DIR/.$key.$BASHPID.mp4"
             # -threads ahead of -i caps the decoder too, which otherwise takes every core
             if "${low[@]}" ffmpeg -v error -y -threads 2 -i "$live" -an -sn -dn \
-                   -filter_threads 1 -vf "scale=480:-2,gblur=sigma=3.4" \
+                   -filter_threads 1 -vf "$VF" \
                    -c:v libx264 -preset veryfast -crf 26 -pix_fmt yuv420p \
                    -movflags +faststart -threads 2 "$tmp"; then
                 mv -f "$tmp" "$VID_DIR/$key.mp4"
@@ -181,7 +183,7 @@ if grep -q '^Theme-Id=lucid$' "$DIR/metadata.desktop" 2>/dev/null; then
 
     LIVE=$(head -n1 "$HOME/.cache/current_live_wallpaper" 2>/dev/null || true)
     if [[ -n "$LIVE" && -f "$LIVE" ]] && command -v ffmpeg &>/dev/null; then
-        KEY=$(printf '%s|%s' "$LIVE" "$(stat -c %Y "$LIVE" 2>/dev/null || echo 0)" | sha1sum | cut -c1-16)
+        KEY=$(printf '%s|%s|%s' "$LIVE" "$(stat -c %Y "$LIVE" 2>/dev/null || echo 0)" "$VF" | sha1sum | cut -c1-16)
         mkdir -p "$VID_DIR"
         if [[ -s "$OUT/background.mp4" && "$(cat "$OUT/background.key" 2>/dev/null)" == "$KEY" ]]; then
             VIDEO=background.mp4
@@ -231,7 +233,9 @@ PY
     # the same look for a fraction of the work, and jpeg:size lets libjpeg do
     # the first downscale while it decodes. this runs on every wallpaper change,
     # and at the source's own size it cost ~4 s of cpu across every core - the
-    # picture is blurred, so 1920 wide is as much as the login screen can show
+    # picture is blurred, so 1920 wide is as much as the login screen can show.
+    # 1.75 at 480 wide is the lock's resting blur (0.5 of 64, about sigma 7 at
+    # 1080p) once grown back, measured; 3.4 was twice that, the lock focused
     WALL=$(cat "$HOME/.cache/current_wallpaper" 2>/dev/null || true)
     if [[ -n "$WALL" && -f "$WALL" ]]; then
         TMPJ=$(mktemp --suffix=.jpg "$OUT/.background.XXXXXX")
@@ -239,7 +243,7 @@ PY
         if [[ -n "$IM" ]]; then
             MAGICK_THREAD_LIMIT="${MAGICK_THREAD_LIMIT:-2}" \
                 "$IM" -define jpeg:size=1920x1920 "$WALL" -strip \
-                  -resize 480x480 -blur 0x3.4 -resize 1920x1920 \
+                  -resize 480x480 -blur 0x1.75 -resize 1920x1920 \
                   -quality 88 "$TMPJ"
         else
             cp "$WALL" "$TMPJ"
