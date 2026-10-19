@@ -62,18 +62,21 @@ Item {
         const t = now.toLocaleTimeString(Qt.locale(), "h:mm AP");
         return t.replace(now.toLocaleTimeString(Qt.locale(), "AP"), "").trim();
     }
-    readonly property string dateText: {
+    // the day's name and the date, apart, as the clock shows them
+    readonly property var dateParts: {
         switch (Prefs.clockDateFormat) {
         case "short":
-            return Loc.now().toLocaleDateString(Qt.locale(), "ddd d");
+            return ["ddd", "d"];
         case "long":
-            return Loc.now().toLocaleDateString(Qt.locale(), "ddd d MMM");
+            return ["ddd", "d MMM"];
         case "numeric":
-            return Loc.now().toLocaleDateString(Qt.locale(), Qt.locale().dateFormat(Locale.ShortFormat));
+            return ["", Qt.locale().dateFormat(Locale.ShortFormat)];
         default:
-            return Loc.now().toLocaleDateString(Qt.locale(), "ddd, dd/MM");
+            return ["ddd,", "dd/MM"];
         }
     }
+    readonly property string dayText: sample.dateParts[0] === "" ? "" : Loc.now().toLocaleDateString(Qt.locale(), sample.dateParts[0])
+    readonly property string dayDateText: Loc.now().toLocaleDateString(Qt.locale(), sample.dateParts[1])
 
     // the strip of bar behind it, and how far the module's own pill pads it
     readonly property int stripHeight: Math.min(Theme.dp(34), Theme.dp(Prefs.barHeight))
@@ -110,10 +113,21 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            BarText {
+            Row {
                 visible: Prefs.clockShowDate
-                text: sample.dateText
-                color: Theme.subtextDim
+                spacing: Theme.dp(4)
+
+                BarText {
+                    visible: sample.dayText !== ""
+                    text: sample.dayText
+                    color: Theme.subtextDim
+                }
+
+                BarText {
+                    text: sample.dayDateText
+                    color: Theme.accent
+                }
+
             }
 
         }
@@ -132,12 +146,24 @@ Item {
                 font.pixelSize: Theme.fs(12)
             }
 
-            BarText {
+            Row {
                 visible: Prefs.clockShowDate
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: sample.dateText
-                color: Theme.subtextDim
-                font.pixelSize: Theme.fs(10)
+                spacing: Theme.dp(3)
+
+                BarText {
+                    visible: sample.dayText !== ""
+                    text: sample.dayText
+                    color: Theme.subtextDim
+                    font.pixelSize: Theme.fs(10)
+                }
+
+                BarText {
+                    text: sample.dayDateText
+                    color: Theme.accent
+                    font.pixelSize: Theme.fs(10)
+                }
+
             }
 
         }
@@ -150,11 +176,22 @@ Item {
         Row {
             spacing: Theme.dp(8)
 
-            BarText {
+            Row {
                 visible: Prefs.clockShowDate
                 anchors.verticalCenter: parent.verticalCenter
-                text: sample.dateText
-                color: Theme.subtext
+                spacing: Theme.dp(4)
+
+                BarText {
+                    visible: sample.dayText !== ""
+                    text: sample.dayText
+                    color: Theme.subtext
+                }
+
+                BarText {
+                    text: sample.dayDateText
+                    color: Theme.accent
+                }
+
             }
 
             Rectangle {
