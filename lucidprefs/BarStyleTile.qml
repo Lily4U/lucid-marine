@@ -17,8 +17,12 @@ Item {
     readonly property string key: tile.style ? tile.style.key : ""
     readonly property bool picked: tile.prefKey !== "" && Prefs[tile.prefKey] === tile.key
 
-    // wider for a sample that needs it, so nothing of it is cut off
-    implicitWidth: Math.max(Theme.dp(172), (tile.panel ? 0 : sample.implicitWidth + sample.pad * 2) + Theme.dp(20))
+    // the strip as its pill pads the sample, and the least it can be: hugging it
+    readonly property int stripWidth: Math.ceil(sample.implicitWidth) + sample.pad * 2
+    readonly property int hugWidth: Math.ceil(sample.implicitWidth) + Math.min(sample.pad, Theme.dp(4)) * 2
+
+    // wider only for a sample that would not fit even hugged, so none is cut off
+    implicitWidth: Math.max(Theme.dp(172), (tile.panel ? 0 : tile.hugWidth) + Theme.dp(10) * 2)
     implicitHeight: tile.panel ? Theme.dp(196) : Theme.dp(144)
 
     Rectangle {
@@ -62,7 +66,7 @@ Item {
             Rectangle {
                 visible: !tile.panel
                 anchors.centerIn: parent
-                width: sample.implicitWidth + sample.pad * 2
+                width: Math.min(parent.width, tile.stripWidth)
                 height: sample.stripHeight
                 radius: height / 2
                 color: Theme.bg
