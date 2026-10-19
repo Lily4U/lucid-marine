@@ -27,6 +27,11 @@ Item {
         "media/compact": mediaCompact,
         "media/panel/side": mediaPanelSide,
         "media/panel/cover": mediaPanelCover,
+        "media/progress": mediaProgress,
+        "media/controls": mediaControls,
+        "media/panel/vinyl": mediaPanelVinyl,
+        "media/panel/backdrop": mediaPanelBackdrop,
+        "media/panel/mini": mediaPanelMini,
         "workspaces/dots": workspacesDots,
         "workspaces/numbers": workspacesNumbers,
         "notifications/badge": notificationsBadge,
@@ -395,6 +400,203 @@ Item {
                     width: parent.width
                 }
 
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaProgress
+
+        Item {
+            implicitWidth: progressRow.implicitWidth + Theme.dp(16)
+            implicitHeight: Theme.dp(28)
+
+            Rectangle {
+                width: parent.width * 0.45
+                height: parent.height
+                radius: height / 2
+                color: Theme.alpha(Theme.accent, 0.28)
+            }
+
+            Row {
+                id: progressRow
+
+                anchors.centerIn: parent
+                spacing: Theme.dp(8)
+
+                Rectangle {
+                    width: Theme.dp(16)
+                    height: Theme.dp(16)
+                    radius: height / 2
+                    color: Theme.accentContainer
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                BarText {
+                    text: "Artist  -  Song"
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaControls
+
+        Row {
+            spacing: Theme.dp(6)
+
+            MiniGlyph {
+                name: "skip_previous"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            MiniPlay {
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            MiniGlyph {
+                name: "skip_next"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            BarText {
+                text: "Artist  -  Song"
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelVinyl
+
+        MiniPanel {
+            height: Theme.dp(104)
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: Theme.dp(8)
+                spacing: Theme.dp(6)
+
+                Item {
+                    width: parent.width
+                    height: Theme.dp(52)
+
+                    CircularProgress {
+                        anchors.centerIn: parent
+                        width: parent.height
+                        height: width
+                        thickness: Theme.dp(3)
+                        value: 0.4
+                        color: Theme.accent
+                        trackColor: Theme.alpha(Theme.text, 0.14)
+                    }
+
+                    ShapedImage {
+                        anchors.centerIn: parent
+                        width: parent.height - Theme.dp(12)
+                        height: width
+                        shape: "cookie12"
+                        fallbackColor: Theme.accentContainer
+                    }
+
+                }
+
+                MiniLines {
+                    width: parent.width
+                }
+
+                MiniTrack {
+                    width: parent.width
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelBackdrop
+
+        MiniPanel {
+            clip: true
+
+            // the cover's colours, run together behind the panel
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                opacity: 0.55
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+
+                    GradientStop {
+                        position: 0
+                        color: Theme.accentContainer
+                    }
+
+                    GradientStop {
+                        position: 1
+                        color: Theme.alpha(Theme.cTertiary, 0.6)
+                    }
+
+                }
+
+            }
+
+            Row {
+                anchors.fill: parent
+                anchors.margins: Theme.dp(8)
+                spacing: Theme.dp(8)
+
+                Rectangle {
+                    width: Theme.dp(44)
+                    height: Theme.dp(44)
+                    radius: Theme.radiusSm
+                    color: Theme.accent
+                }
+
+                MiniLines {
+                    width: parent.width - Theme.dp(52)
+                }
+
+            }
+
+            MiniTrack {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.dp(8)
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelMini
+
+        MiniPanel {
+            width: Theme.dp(124)
+            height: Theme.dp(64)
+
+            MiniLines {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Theme.dp(8)
+            }
+
+            MiniTrack {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.dp(8)
             }
 
         }

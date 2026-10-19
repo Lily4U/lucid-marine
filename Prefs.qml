@@ -215,12 +215,17 @@ Singleton {
         "styles": [
             {"key": "disc", "name": "Disc", "blurb": "The cover turning in a ring that fills as it plays"},
             {"key": "cover", "name": "Cover", "blurb": "The album's cover standing still, then the track"},
-            {"key": "compact", "name": "Compact", "blurb": "Only the moving bars and the play button"}
+            {"key": "compact", "name": "Compact", "blurb": "Only the moving bars and the play button"},
+            {"key": "progress", "name": "Progress", "blurb": "The pill fills as the song goes"},
+            {"key": "controls", "name": "Controls", "blurb": "Previous, play and next, then the track"}
         ],
         "panelStyle": "mediaPanelStyle",
         "panelStyles": [
             {"key": "side", "name": "Side by side", "blurb": "The cover beside the track"},
-            {"key": "cover", "name": "Large cover", "blurb": "The cover across the panel, the track under it"}
+            {"key": "cover", "name": "Large cover", "blurb": "The cover across the panel, the track under it"},
+            {"key": "vinyl", "name": "Vinyl", "blurb": "The cover as a record that turns while it plays"},
+            {"key": "backdrop", "name": "Backdrop", "blurb": "Side by side, over the cover blurred across the panel"},
+            {"key": "mini", "name": "Mini", "blurb": "No cover: the track, its progress and the controls"}
         ]
     },
     {
