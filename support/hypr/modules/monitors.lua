@@ -89,10 +89,13 @@ function M.apply()
                     vrr       = tonumber(m.vrr) or 0,
                     disabled  = false,
                 }
-                -- a mirror takes its position from what it mirrors
+                -- a mirror takes its position from what it mirrors. hyprland keeps
+                -- an output's mirror when a rule leaves the field out, so stopping
+                -- one has to say mirror = "" outright
                 if type(m.mirror) == "string" and m.mirror ~= "" then
                     spec.mirror = m.mirror
                 else
+                    spec.mirror = ""
                     spec.position = tostring(m.position or M.defaults.position)
                 end
                 put(output, spec)
@@ -108,6 +111,7 @@ function M.apply()
                 scale     = M.defaults.scale,
                 transform = 0,
                 vrr       = 0,
+                mirror    = "",
                 disabled  = false,
             })
         end
