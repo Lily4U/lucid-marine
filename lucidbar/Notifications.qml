@@ -17,8 +17,9 @@ BarPill {
     readonly property color badgeColor: root.anyCritical ? Theme.error : Theme.accent
     readonly property color badgeTextColor: root.anyCritical ? Theme.fgError : Theme.fgAccent
     // the look picked on the module's card: a count, a dot, or bell and count on a chip
-    readonly property bool dotFace: Prefs.notificationsStyle === "dot"
-    readonly property bool chipLit: Prefs.notificationsStyle === "chip" && root.notifCount > 0
+    lookPref: Prefs.notificationsStyle
+    readonly property bool dotFace: root.look === "dot"
+    readonly property bool chipLit: root.look === "chip" && root.notifCount > 0
     readonly property int horizontalPadding: Theme.dp(10)
     readonly property real screenW: root.hostWindow ? root.hostWindow.screen.width : 1600
     readonly property real screenH: root.hostWindow ? root.hostWindow.screen.height : 900

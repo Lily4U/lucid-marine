@@ -13,7 +13,8 @@ BarPill {
 
     property var dockMod: null
     readonly property bool launcherOpen: !!root.dockMod && root.dockMod.menuOpen
-    readonly property bool gridFace: Prefs.startModuleStyle === "grid"
+    lookPref: Prefs.startModuleStyle
+    readonly property bool gridFace: root.look === "grid"
     // the distribution's logo, the account picture, or a word; the logo falls
     // back to Lucid's mark when the system names none or none is found
     property string osReleaseText: ""
@@ -28,9 +29,9 @@ BarPill {
         const themed = Quickshell.iconPath(root.osLogo, true);
         return themed !== "" ? themed : "file:///usr/share/pixmaps/" + root.osLogo + ".svg";
     }
-    readonly property bool distroFace: Prefs.startModuleStyle === "distro" && distroLogo.status !== Image.Error && root.osLogoSource !== ""
-    readonly property bool avatarFace: Prefs.startModuleStyle === "avatar"
-    readonly property bool labelFace: Prefs.startModuleStyle === "label"
+    readonly property bool distroFace: root.look === "distro" && distroLogo.status !== Image.Error && root.osLogoSource !== ""
+    readonly property bool avatarFace: root.look === "avatar"
+    readonly property bool labelFace: root.look === "label"
     readonly property bool markFace: !root.gridFace && !root.distroFace && !root.avatarFace && !root.labelFace
     readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), root.compactHeight - Theme.dp(14)))
     // the icon faces sit in a circle, as wide as the bar is tall; the word's

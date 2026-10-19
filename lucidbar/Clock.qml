@@ -35,8 +35,9 @@ BarPill {
     readonly property int pad: Theme.dp(16)
     // the look picked on the module's card: the time on an accent chip after
     // the date, the time then the date in one line, or the date under the time
-    readonly property bool inlineFace: Prefs.clockStyle === "inline"
-    readonly property bool stacked: Prefs.clockStyle === "stacked"
+    lookPref: Prefs.clockStyle
+    readonly property bool inlineFace: root.look === "inline"
+    readonly property bool stacked: root.look === "stacked"
     readonly property bool accentFace: !root.inlineFace && !root.stacked
     readonly property color timeInk: root.accentFace ? Theme.fgAccent : Theme.text
     readonly property string dateFormat: {

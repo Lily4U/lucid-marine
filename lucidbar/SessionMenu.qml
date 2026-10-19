@@ -83,7 +83,8 @@ BarPill {
     }
 
     // the looks, from its card on the Bar page
-    readonly property bool accentFace: Prefs.powerModuleStyle === "accent"
+    lookPref: Prefs.powerModuleStyle
+    readonly property bool accentFace: root.look === "accent"
     readonly property bool gridPanel: Prefs.powerModulePanelStyle === "grid"
 
     shown: Prefs.showPower

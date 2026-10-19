@@ -114,12 +114,13 @@ BarPill {
     }
     readonly property string displayTitle: (root.player && root.artist && Prefs.mediaArtist) ? root.artist + "  -  " + root.title : root.title
     // the looks picked on the module's card
-    readonly property bool coverFace: Prefs.mediaStyle === "cover"
-    readonly property bool compactFace: Prefs.mediaStyle === "compact"
+    lookPref: Prefs.mediaStyle
+    readonly property bool coverFace: root.look === "cover"
+    readonly property bool compactFace: root.look === "compact"
     // the pill fills as the song goes, behind the turning cover and the track
-    readonly property bool progressFace: Prefs.mediaStyle === "progress"
+    readonly property bool progressFace: root.look === "progress"
     // previous, play and next, then the track
-    readonly property bool controlsFace: Prefs.mediaStyle === "controls"
+    readonly property bool controlsFace: root.look === "controls"
     readonly property bool discFace: !root.coverFace && !root.compactFace && !root.controlsFace
     readonly property bool coverPanel: Prefs.mediaPanelStyle === "cover"
     // the cover as a record that turns while it plays, as the media widget's disc

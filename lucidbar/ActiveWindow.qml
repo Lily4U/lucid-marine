@@ -44,7 +44,8 @@ BarPill {
     }
     readonly property int horizontalPadding: Theme.dp(11)
     // the looks, from its card on the Bar page
-    readonly property bool chipFace: Prefs.windowModuleStyle === "chip"
+    lookPref: Prefs.windowModuleStyle
+    readonly property bool chipFace: root.look === "chip"
     readonly property bool iconOnly: Prefs.windowModuleText === "icon"
     // every window on the workspace in view, in Hyprland's order
     readonly property var here: root.active && root.active.workspace && root.active.workspace.toplevels ? root.active.workspace.toplevels.values.filter((t) => {

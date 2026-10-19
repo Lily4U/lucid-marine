@@ -35,6 +35,87 @@ Item {
     readonly property int morphDuration: Theme.barDurEnter
     readonly property var morphEasing: Theme.easeEmphasizedDecel
 
+    // the look picked on the module's card, and the one its face draws: a
+    // switch fades the old look out, flips, and brings the new one in as the
+    // pill takes its width. one set as the bar comes up just shows
+    property string lookPref: ""
+    property string look: ""
+    property bool lookSettled: false
+
+    function switchLook() {
+        if (pill.look === pill.lookPref)
+            return ;
+
+        if (!pill.lookSettled || !pill.shown || !pill.visible) {
+            lookSwitch.stop();
+            compactHolder.opacity = 1;
+            compactHolder.scale = 1;
+            pill.look = pill.lookPref;
+            return ;
+        }
+        lookSwitch.restart();
+    }
+
+    onLookPrefChanged: pill.switchLook()
+    Component.onCompleted: pill.look = pill.lookPref
+
+    Timer {
+        interval: 1500
+        running: Prefs.loaded && !pill.lookSettled
+        onTriggered: pill.lookSettled = true
+    }
+
+    SequentialAnimation {
+        id: lookSwitch
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: compactHolder
+                property: "opacity"
+                to: 0
+                duration: Theme.barMs(120)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.easeEmphasizedAccel
+            }
+
+            NumberAnimation {
+                target: compactHolder
+                property: "scale"
+                to: 0.86
+                duration: Theme.barMs(120)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.easeEmphasizedAccel
+            }
+
+        }
+
+        ScriptAction {
+            script: pill.look = pill.lookPref
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: compactHolder
+                property: "opacity"
+                to: 1
+                duration: Theme.barMs(240)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.easeEmphasizedDecel
+            }
+
+            NumberAnimation {
+                target: compactHolder
+                property: "scale"
+                to: 1
+                duration: Theme.barMs(320)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.curveDefaultSpatial
+            }
+
+        }
+
+    }
+
     // the id the bar knows this pill by
     function moduleId() {
         const map = pill.hostWindow && pill.hostWindow.moduleById ? pill.hostWindow.moduleById : {};
@@ -229,7 +310,7 @@ Item {
 
     readonly property real surfaceX: -pill.hoverGrow
     readonly property real surfaceY: 0
-    readonly property real surfaceWidth: (pill.popupMode ? pill.compactWidth : pill.width) + pill.hoverGrow * 2
+    readonly property real surfaceWidth: pill.width + pill.hoverGrow * 2
     readonly property real surfaceHeight: pill.popupMode ? pill.compactHeight : pill.height
     // the corners ModuleRegion's mask and blur follow
     readonly property real barTopLeftRadius: pill.popupMode ? pillRect.topLeftRadius : shell.topLeftRadius
@@ -326,7 +407,7 @@ Item {
         visible: pill.popupMode
         x: pill.surfaceX
         y: pill.surfaceY
-        width: pill.compactWidth + pill.hoverGrow * 2
+        width: pill.width + pill.hoverGrow * 2
         height: pill.compactHeight
         color: pill.restingColor
         clip: true
