@@ -401,7 +401,8 @@ Item {
 
     }
 
-    // a run of two in use, the second the one you are on, then four empty
+    // a run of two in use, the second the one you are on, then three empty;
+    // five, as six of the bar's cells do not fit a tile
     Component {
         id: workspacesDots
 
@@ -410,7 +411,7 @@ Item {
 
             readonly property int cell: Theme.dp(26)
 
-            implicitWidth: wsd.cell * 6
+            implicitWidth: wsd.cell * 5
             implicitHeight: wsd.cell
 
             Rectangle {
@@ -429,7 +430,7 @@ Item {
             }
 
             Repeater {
-                model: 6
+                model: 5
 
                 Item {
                     id: mark
@@ -479,7 +480,7 @@ Item {
 
             readonly property int cell: Theme.dp(26)
 
-            implicitWidth: wsn.cell * 6
+            implicitWidth: wsn.cell * 5
             implicitHeight: wsn.cell
 
             Rectangle {
@@ -498,7 +499,7 @@ Item {
             }
 
             Repeater {
-                model: 6
+                model: 5
 
                 BarText {
                     required property int index
