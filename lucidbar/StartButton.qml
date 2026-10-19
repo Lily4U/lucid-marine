@@ -33,12 +33,14 @@ BarPill {
     readonly property bool labelFace: Prefs.startModuleStyle === "label"
     readonly property bool markFace: !root.gridFace && !root.distroFace && !root.avatarFace && !root.labelFace
     readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), root.compactHeight - Theme.dp(14)))
+    // the logo faces sit in a circle, as wide as the bar is tall
+    readonly property bool roundFace: root.markFace || root.distroFace
 
     opensOnHover: false
     compactInteractive: false
     compactHovered: startArea.containsMouse
     shown: Prefs.showStart && root.dockMod !== null
-    compactWidth: root.labelFace ? startLabel.implicitWidth + Theme.dp(32) : root.glyph + Theme.dp(22)
+    compactWidth: root.labelFace ? startLabel.implicitWidth + Theme.dp(32) : (root.roundFace ? root.compactHeight : root.glyph + Theme.dp(22))
 
     FileView {
         id: osRelease
@@ -51,7 +53,7 @@ BarPill {
         // lit while the launcher is open; no hover or press tint of its own
         Rectangle {
             anchors.centerIn: parent
-            width: parent.width - Theme.dp(4)
+            width: root.roundFace ? height : parent.width - Theme.dp(4)
             height: Math.max(0, root.compactHeight - Theme.dp(8))
             radius: Theme.pill(height)
             color: root.launcherOpen ? Theme.alpha(Theme.accent, 0.2) : Theme.alpha(Theme.accent, 0)

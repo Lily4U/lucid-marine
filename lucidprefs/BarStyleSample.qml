@@ -1164,26 +1164,59 @@ Item {
     Component {
         id: startLogo
 
+        // Lucid's mark, as the bar draws it, in a circle as wide as the bar is tall
         Item {
-            implicitWidth: Theme.dp(26)
-            implicitHeight: Theme.dp(26)
+            id: logoSample
 
-            Rectangle {
-                anchors.centerIn: parent
-                width: Theme.dp(18)
-                height: Theme.dp(18)
-                radius: width / 2
-                color: "transparent"
-                border.width: Theme.dp(3)
-                border.color: Theme.accent
-            }
+            readonly property int pad: 0
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
 
-            Rectangle {
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
+
+            Shape {
                 anchors.centerIn: parent
-                width: Theme.dp(6)
-                height: Theme.dp(6)
-                radius: width / 2
-                color: Theme.text
+                width: logoSample.glyph
+                height: logoSample.glyph
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeColor: Theme.accent
+                    strokeWidth: 3
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+
+                    PathSvg {
+                        path: "M15.92,5.72 A7.4,7.4 0 1 0 18.95,14.53"
+                    }
+
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    fillColor: Theme.text
+
+                    PathSvg {
+                        path: "M12,7.4 C12.598,10.62 13.38,11.402 16.6,12 C13.38,12.598 12.598,13.38 12,16.6 C11.402,13.38 10.62,12.598 7.4,12 C10.62,11.402 11.402,10.62 12,7.4 Z"
+                    }
+
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    fillColor: Theme.accent
+
+                    PathSvg {
+                        path: "M20,9.4 A1,1 0 1 0 22,9.4 A1,1 0 1 0 20,9.4 Z"
+                    }
+
+                }
+
+                transform: Scale {
+                    xScale: logoSample.glyph / 24
+                    yScale: logoSample.glyph / 24
+                }
+
             }
 
         }
@@ -1216,18 +1249,25 @@ Item {
     Component {
         id: startDistro
 
-        // a generic peak, in the accent: the real logo is read on the bar
+        // a generic peak, in the accent: the real logo is read on the bar.
+        // in a circle as wide as the bar is tall, at the bar's glyph size
         Item {
-            implicitWidth: Theme.dp(20)
-            implicitHeight: Theme.dp(20)
+            id: distroSample
+
+            readonly property int pad: 0
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
+
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
 
             Shape {
-                width: 24
-                height: 24
+                anchors.centerIn: parent
+                width: distroSample.glyph
+                height: distroSample.glyph
                 preferredRendererType: Shape.CurveRenderer
                 transform: Scale {
-                    xScale: Theme.dp(20) / 24
-                    yScale: Theme.dp(20) / 24
+                    xScale: distroSample.glyph / 24
+                    yScale: distroSample.glyph / 24
                 }
 
                 ShapePath {
