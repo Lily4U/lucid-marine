@@ -33,14 +33,16 @@ BarPill {
     readonly property bool labelFace: Prefs.startModuleStyle === "label"
     readonly property bool markFace: !root.gridFace && !root.distroFace && !root.avatarFace && !root.labelFace
     readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), root.compactHeight - Theme.dp(14)))
-    // the logo faces sit in a circle, as wide as the bar is tall
-    readonly property bool roundFace: root.markFace || root.distroFace
+    // the icon faces sit in a circle, as wide as the bar is tall; the word's
+    // chip is hugged as closely at its ends as at its top and bottom
+    readonly property int chipWidth: Math.ceil(startLabel.implicitWidth) + Theme.dp(20)
+    readonly property int chipHeight: Math.min(Theme.dp(24), root.compactHeight - Theme.dp(8))
 
     opensOnHover: false
     compactInteractive: false
     compactHovered: startArea.containsMouse
     shown: Prefs.showStart && root.dockMod !== null
-    compactWidth: root.labelFace ? startLabel.implicitWidth + Theme.dp(32) : (root.roundFace ? root.compactHeight : root.glyph + Theme.dp(22))
+    compactWidth: root.labelFace ? root.chipWidth + root.compactHeight - root.chipHeight : root.compactHeight
 
     FileView {
         id: osRelease
@@ -53,7 +55,7 @@ BarPill {
         // lit while the launcher is open; no hover or press tint of its own
         Rectangle {
             anchors.centerIn: parent
-            width: root.roundFace ? height : parent.width - Theme.dp(4)
+            width: Math.max(0, parent.width - Theme.dp(8))
             height: Math.max(0, root.compactHeight - Theme.dp(8))
             radius: Theme.pill(height)
             color: root.launcherOpen ? Theme.alpha(Theme.accent, 0.2) : Theme.alpha(Theme.accent, 0)
@@ -166,8 +168,8 @@ BarPill {
         Rectangle {
             visible: root.labelFace
             anchors.centerIn: parent
-            width: startLabel.implicitWidth + Theme.dp(20)
-            height: Math.min(Theme.dp(24), root.compactHeight - Theme.dp(8))
+            width: root.chipWidth
+            height: root.chipHeight
             radius: Theme.pill(height)
             color: root.launcherOpen ? Theme.accentHover : Theme.accent
 

@@ -1226,18 +1226,33 @@ Item {
     Component {
         id: startGrid
 
-        Grid {
-            columns: 3
-            spacing: Theme.dp(3)
+        // the bar's grid of nine, in a circle as wide as the bar is tall
+        Item {
+            id: gridSample
 
-            Repeater {
-                model: 9
+            readonly property int pad: 0
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
 
-                Rectangle {
-                    width: Theme.dp(4)
-                    height: Theme.dp(4)
-                    radius: width / 2
-                    color: index === 4 ? Theme.accent : Theme.text
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
+
+            Grid {
+                anchors.centerIn: parent
+                columns: 3
+                spacing: Math.round(gridSample.glyph / 7)
+
+                Repeater {
+                    model: 9
+
+                    Rectangle {
+                        required property int index
+
+                        width: Math.round(gridSample.glyph / 5)
+                        height: width
+                        radius: Theme.pill(height)
+                        color: index === 4 ? Theme.accent : Theme.text
+                    }
+
                 }
 
             }
@@ -1290,17 +1305,20 @@ Item {
     Component {
         id: startAvatar
 
-        Rectangle {
-            implicitWidth: Theme.dp(22)
-            implicitHeight: Theme.dp(22)
-            radius: width / 2
-            color: Theme.secondaryContainer
+        // the account picture, as the bar shows it, in a circle as wide as the bar is tall
+        Item {
+            id: avatarSample
 
-            BarText {
+            readonly property int pad: 0
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
+
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
+
+            UserAvatar {
                 anchors.centerIn: parent
-                text: (Users.me && Users.me.name ? Users.me.name : "U").charAt(0).toUpperCase()
-                color: Theme.fgSecondaryContainer
-                font.pixelSize: Theme.fs(11)
+                user: Users.me
+                size: avatarSample.glyph + Theme.dp(2)
             }
 
         }
@@ -1310,19 +1328,32 @@ Item {
     Component {
         id: startLabel
 
-        Rectangle {
-            implicitWidth: startLabelText.implicitWidth + Theme.dp(20)
-            implicitHeight: Theme.dp(24)
-            radius: Theme.pill(height)
-            color: Theme.accent
+        // the word on its chip, hugged as closely at its ends as at its top
+        Item {
+            id: labelSample
 
-            BarText {
-                id: startLabelText
+            readonly property int pad: 0
+            readonly property int chipHeight: Math.min(Theme.dp(24), sample.stripHeight - Theme.dp(8))
 
+            implicitWidth: Math.ceil(startLabelText.implicitWidth) + Theme.dp(20) + sample.stripHeight - labelSample.chipHeight
+            implicitHeight: sample.stripHeight
+
+            Rectangle {
                 anchors.centerIn: parent
-                text: "Start"
-                color: Theme.fgAccent
-                font.pixelSize: Theme.fs(12)
+                width: Math.ceil(startLabelText.implicitWidth) + Theme.dp(20)
+                height: labelSample.chipHeight
+                radius: Theme.pill(height)
+                color: Theme.accent
+
+                BarText {
+                    id: startLabelText
+
+                    anchors.centerIn: parent
+                    text: "Start"
+                    color: Theme.fgAccent
+                    font.pixelSize: Theme.fs(12)
+                }
+
             }
 
         }
