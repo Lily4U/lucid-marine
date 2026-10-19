@@ -117,7 +117,9 @@ Item {
     // skips the focus grab - that pulls the keyboard off the focused window, and
     // merely passing over the bar must not do that - so a click anywhere on the
     // pill promotes it to an ordinary clicked-open panel, grab and all.
-    readonly property bool hoverOpens: Prefs.barHoverOpen && pill.shown
+    // off for a pill that is only a button, with nothing to unfold
+    property bool opensOnHover: true
+    readonly property bool hoverOpens: Prefs.barHoverOpen && pill.shown && pill.opensOnHover
     property bool hoverOpen: false
     readonly property bool surfaceHovered: pill.compactHovered || shellHover.hovered || pillHover.hovered
 

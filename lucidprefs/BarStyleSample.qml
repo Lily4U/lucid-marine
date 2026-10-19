@@ -43,7 +43,12 @@ Item {
         "power/panel/list": powerPanelList,
         "power/panel/grid": powerPanelGrid,
         "window/plain": windowPlain,
-        "window/chip": windowChip
+        "window/chip": windowChip,
+        "start/logo": startLogo,
+        "start/grid": startGrid,
+        "start/distro": startDistro,
+        "start/avatar": startAvatar,
+        "start/label": startLabel
     })
     // what the samples show: the time and date as the bar would
     readonly property string timeText: {
@@ -838,6 +843,134 @@ Item {
             implicitHeight: Theme.dp(10)
             radius: Theme.dp(5)
             color: Theme.error
+        }
+
+    }
+
+    Component {
+        id: startLogo
+
+        Item {
+            implicitWidth: Theme.dp(26)
+            implicitHeight: Theme.dp(26)
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Theme.dp(18)
+                height: Theme.dp(18)
+                radius: width / 2
+                color: "transparent"
+                border.width: Theme.dp(3)
+                border.color: Theme.accent
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Theme.dp(6)
+                height: Theme.dp(6)
+                radius: width / 2
+                color: Theme.text
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startGrid
+
+        Grid {
+            columns: 3
+            spacing: Theme.dp(3)
+
+            Repeater {
+                model: 9
+
+                Rectangle {
+                    width: Theme.dp(4)
+                    height: Theme.dp(4)
+                    radius: width / 2
+                    color: index === 4 ? Theme.accent : Theme.text
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startDistro
+
+        // a generic peak, in the accent: the real logo is read on the bar
+        Item {
+            implicitWidth: Theme.dp(20)
+            implicitHeight: Theme.dp(20)
+
+            Shape {
+                width: 24
+                height: 24
+                preferredRendererType: Shape.CurveRenderer
+                transform: Scale {
+                    xScale: Theme.dp(20) / 24
+                    yScale: Theme.dp(20) / 24
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    strokeColor: "transparent"
+                    fillColor: Theme.accent
+
+                    PathSvg {
+                        path: "M12 2 3 21h4.5L12 11l4.5 10H21Z"
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startAvatar
+
+        Rectangle {
+            implicitWidth: Theme.dp(22)
+            implicitHeight: Theme.dp(22)
+            radius: width / 2
+            color: Theme.secondaryContainer
+
+            BarText {
+                anchors.centerIn: parent
+                text: (Users.me && Users.me.name ? Users.me.name : "U").charAt(0).toUpperCase()
+                color: Theme.fgSecondaryContainer
+                font.pixelSize: Theme.fs(11)
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startLabel
+
+        Rectangle {
+            implicitWidth: startLabelText.implicitWidth + Theme.dp(20)
+            implicitHeight: Theme.dp(24)
+            radius: Theme.pill(height)
+            color: Theme.accent
+
+            BarText {
+                id: startLabelText
+
+                anchors.centerIn: parent
+                text: "Start"
+                color: Theme.fgAccent
+                font.pixelSize: Theme.fs(12)
+            }
+
         }
 
     }
