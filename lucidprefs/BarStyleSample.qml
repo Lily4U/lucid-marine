@@ -47,8 +47,6 @@ Item {
         "power/accent": powerAccent,
         "power/panel/list": powerPanelList,
         "power/panel/grid": powerPanelGrid,
-        "window/plain": windowPlain,
-        "window/chip": windowChip,
         "start/logo": startLogo,
         "start/grid": startGrid,
         "start/distro": startDistro,
@@ -1475,70 +1473,6 @@ Item {
 
                     }
 
-                }
-
-            }
-
-        }
-
-    }
-
-    Component {
-        id: windowPlain
-
-        Row {
-            spacing: Theme.dp(8)
-
-            Rectangle {
-                width: Theme.dp(17)
-                height: Theme.dp(17)
-                radius: Theme.dp(4)
-                color: Theme.accentContainer
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            BarText {
-                text: Prefs.windowModuleText === "icon" ? "" : "Window title"
-                visible: text !== ""
-                font.pixelSize: Theme.fontLabelLg
-                font.weight: Font.Medium
-                font.bold: false
-            }
-
-        }
-
-    }
-
-    Component {
-        id: windowChip
-
-        Rectangle {
-            implicitWidth: chipRow.implicitWidth + (Prefs.windowModuleText === "icon" ? Theme.dp(12) : Theme.dp(18))
-            implicitHeight: Theme.dp(26)
-            radius: height / 2
-            color: Theme.accentContainer
-
-            Row {
-                id: chipRow
-
-                anchors.centerIn: parent
-                spacing: Theme.dp(8)
-
-                Rectangle {
-                    width: Theme.dp(17)
-                    height: Theme.dp(17)
-                    radius: Theme.dp(4)
-                    color: Theme.accent
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                BarText {
-                    text: Prefs.windowModuleText === "icon" ? "" : "Window title"
-                    visible: text !== ""
-                    color: Theme.fgAccentContainer
-                    font.pixelSize: Theme.fontLabelLg
-                    font.weight: Font.Medium
-                    font.bold: false
                 }
 
             }

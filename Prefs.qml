@@ -322,12 +322,7 @@ Singleton {
         "name": "Active window",
         "desc": "The focused window's icon and title; open it to float, pin, fullscreen, move or close it, or switch to another window on the workspace",
         "when": "while a window on this workspace has the focus",
-        "options": ["windowModuleText", "windowModuleWidth", "windowModuleScroll", "windowModuleMiddleClose"],
-        "style": "windowModuleStyle",
-        "styles": [
-            {"key": "plain", "name": "Plain", "blurb": "The icon and the text on the bar"},
-            {"key": "chip", "name": "Chip", "blurb": "The same on a chip tinted with the accent"}
-        ]
+        "options": ["windowModuleText", "windowModuleWidth", "windowModuleScroll", "windowModuleMiddleClose"]
     },
     {
         "id": "start",
@@ -538,7 +533,6 @@ Singleton {
     property alias windowModuleWidth: s.windowModuleWidth
     property alias windowModuleScroll: s.windowModuleScroll
     property alias windowModuleMiddleClose: s.windowModuleMiddleClose
-    property alias windowModuleStyle: s.windowModuleStyle
     property alias showStart: s.showStart
     property alias startModuleStyle: s.startModuleStyle
     property alias workspacesByDisplay: s.workspacesByDisplay
@@ -1036,7 +1030,6 @@ Singleton {
         "windowModuleWidth": 260,
         "windowModuleScroll": true,
         "windowModuleMiddleClose": false,
-        "windowModuleStyle": "plain",
         "showStart": false,
         "startModuleStyle": "logo",
         "workspacesByDisplay": true,
@@ -1766,7 +1759,6 @@ Singleton {
             property int windowModuleWidth: 260
             property bool windowModuleScroll: true
             property bool windowModuleMiddleClose: false
-            property string windowModuleStyle: "plain"
             property bool showStart: false
             property string startModuleStyle: "logo"
             property bool workspacesByDisplay: true
