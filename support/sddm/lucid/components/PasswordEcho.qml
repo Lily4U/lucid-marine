@@ -19,8 +19,8 @@ Item {
     // the field's own fill, so an overflowing row fades out under its edge
     property color edge: "transparent"
     property font font
-    property real dot: 12
-    property real gap: 4
+    property real dot: Theme.dp(12)
+    property real gap: Theme.dp(4)
     readonly property var deck: ["slanted", "arch", "fan", "arrow", "semiCircle", "triangle", "diamond", "clamShell", "pentagon", "gem", "sunny", "verySunny", "cookie4", "ghostish", "softBurst"]
     property color tint: echo.color
     property real wave: 0
@@ -231,7 +231,7 @@ Item {
                     width: form.size
                     height: form.size
                     anchors.centerIn: parent
-                    anchors.verticalCenterOffset: -bead.bob * 3
+                    anchors.verticalCenterOffset: -bead.bob * Theme.dp(3)
                     layer.enabled: true
                     layer.samples: 8
                     layer.smooth: true
@@ -261,7 +261,7 @@ Item {
 
                 Text {
                     anchors.centerIn: parent
-                    anchors.verticalCenterOffset: -bead.bob * 3
+                    anchors.verticalCenterOffset: -bead.bob * Theme.dp(3)
                     text: bead.glyph
                     font: echo.font
                     color: bead.ink
@@ -428,9 +428,9 @@ Item {
     }
 
     Rectangle {
-        width: 18
+        width: Theme.dp(18)
         height: echo.height
-        opacity: Math.min(1, -row.x / 18)
+        opacity: Math.min(1, -row.x / Theme.dp(18))
         visible: row.x < 0
 
         gradient: Gradient {

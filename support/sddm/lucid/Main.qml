@@ -20,8 +20,8 @@ Item {
     // taking clicks and hover. a click out there only buys the focus back
     readonly property bool glanceLive: !Lock.focused
     readonly property real e: surface.ease(surface.t)
-    readonly property int pad: Math.round(Math.max(36, Math.min(76, surface.height * 0.062)))
-    readonly property int rightWidth: Math.round(Math.max(340, Math.min(440, surface.width * 0.25)))
+    readonly property int pad: Math.round(Math.max(Theme.dp(36), Math.min(Theme.dp(76), surface.height * 0.062)))
+    readonly property int rightWidth: Math.round(Math.max(Theme.dp(340), Math.min(Theme.dp(440), surface.width * 0.25)))
 
     width: 1920
     height: 1080
@@ -386,7 +386,7 @@ Item {
             enabled: surface.glanceLive
 
             transform: Translate {
-                y: (1 - surface.rv(0.06)) * -24
+                y: (1 - surface.rv(0.06)) * -Theme.dp(24)
             }
 
         }
@@ -394,14 +394,14 @@ Item {
         // ── the clock, left ────────────────────────────────────────────────
         Clock {
             anchors.left: parent.left
-            anchors.leftMargin: surface.pad + 14
+            anchors.leftMargin: surface.pad + Theme.dp(14)
             anchors.verticalCenter: parent.verticalCenter
-            unit: surface.primary ? Math.round(Math.min(178, surface.height * 0.155)) : Math.round(Math.min(220, surface.height * 0.19))
+            unit: surface.primary ? Math.round(Math.min(Theme.dp(178), surface.height * 0.155)) : Math.round(Math.min(Theme.dp(220), surface.height * 0.19))
             visible: surface.primary
             opacity: surface.rv(0.1)
 
             transform: Translate {
-                x: (1 - surface.rv(0.1)) * -30
+                x: (1 - surface.rv(0.1)) * -Theme.dp(30)
                 y: (1 - surface.rv(0.1)) * 22
             }
 
@@ -414,9 +414,9 @@ Item {
             anchors.right: parent.right
             anchors.rightMargin: surface.pad
             anchors.top: chips.bottom
-            anchors.topMargin: 26
+            anchors.topMargin: Theme.dp(26)
             anchors.bottom: parent.bottom
-            anchors.bottomMargin: surface.pad + 64
+            anchors.bottomMargin: surface.pad + Theme.dp(64)
             width: surface.rightWidth
             visible: surface.primary
 
@@ -440,7 +440,7 @@ Item {
         // ── the ways out, bottom left ──────────────────────────────────────
         PowerBar {
             anchors.left: parent.left
-            anchors.leftMargin: surface.pad + 14
+            anchors.leftMargin: surface.pad + Theme.dp(14)
             anchors.bottom: parent.bottom
             anchors.bottomMargin: surface.pad
             visible: surface.primary
@@ -456,7 +456,7 @@ Item {
         // ── every other screen: the time, and nothing to type into ─────────
         Column {
             anchors.centerIn: parent
-            spacing: 10
+            spacing: Theme.dp(10)
             visible: !surface.primary
             opacity: surface.rv(0.08)
 
@@ -466,18 +466,18 @@ Item {
 
             Clock {
                 anchors.horizontalCenter: parent.horizontalCenter
-                unit: Math.round(Math.min(200, surface.height * 0.17))
+                unit: Math.round(Math.min(Theme.dp(200), surface.height * 0.17))
             }
 
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 8
-                topPadding: 18
+                spacing: Theme.dp(8)
+                topPadding: Theme.dp(18)
 
                 Glyph {
                     anchors.verticalCenter: parent.verticalCenter
                     name: "lock"
-                    size: 17
+                    size: Theme.dp(17)
                     color: Theme.subtextDim
                 }
 

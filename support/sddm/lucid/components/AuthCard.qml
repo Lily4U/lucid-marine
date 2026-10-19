@@ -25,7 +25,7 @@ Rectangle {
     }
     readonly property bool hasStatus: Lock.statusText !== "" || card.layoutShort !== "" || keyboard.capsLock
     readonly property int rows: card.shown === "users" ? Lock.accounts.length + 1 : Lock.sessions.length
-    readonly property int rowH: 60
+    readonly property int rowH: Theme.dp(60)
 
     function focusInput() {
         if (Lock.sheet !== "")
@@ -64,7 +64,7 @@ Rectangle {
     clip: true
     // no Behavior: k is the one clock, and each face already eases its own
     // height, so easing the sum again would only put the card out of step
-    implicitHeight: 48 + (1 - card.k) * face.implicitHeight + card.k * sheet.implicitHeight
+    implicitHeight: Theme.dp(48) + (1 - card.k) * face.implicitHeight + card.k * sheet.implicitHeight
 
     Behavior on k {
         NumberAnimation {
@@ -119,10 +119,10 @@ Rectangle {
             // the scallops turn a little while the password is checked
             property real spin: Lock.phase === "checking" ? 30 : 0
 
-            x: 24 - card.k * card.width
-            y: 24
-            width: card.width - 48
-            spacing: 14
+            x: Theme.dp(24) - card.k * card.width
+            y: Theme.dp(24)
+            width: card.width - Theme.dp(48)
+            spacing: Theme.dp(14)
             visible: card.k < 0.999
 
             Behavior on spin {
@@ -137,15 +137,15 @@ Rectangle {
                 id: avatarBox
 
                 anchors.horizontalCenter: parent.horizontalCenter
-                width: 88
-                height: 88
+                width: Theme.dp(88)
+                height: Theme.dp(88)
 
                 // a ring in the avatar's own shape: accent while typing, red on
                 // refusal. it sits behind the face, so the face cuts it to a rim
                 Cookie {
                     anchors.centerIn: parent
-                    width: parent.width + 10
-                    height: parent.height + 10
+                    width: parent.width + Theme.dp(10)
+                    height: parent.height + Theme.dp(10)
                     spin: face.spin
                     color: Lock.granted ? Theme.success : (Lock.phase === "failed" ? Theme.error : Theme.alpha(Theme.accent, 0.7))
                     opacity: Lock.focused ? 1 : 0
@@ -184,7 +184,7 @@ Rectangle {
                     Glyph {
                         anchors.centerIn: parent
                         name: "person"
-                        size: 38
+                        size: Theme.dp(38)
                         color: Theme.subtext
                     }
 
@@ -208,12 +208,12 @@ Rectangle {
 
                 Item {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: nameRow.implicitWidth + (Lock.canSwitchUser ? 30 : 0)
-                    height: 40
+                    width: nameRow.implicitWidth + (Lock.canSwitchUser ? Theme.dp(30) : 0)
+                    height: Theme.dp(40)
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: height / 2
+                        radius: Theme.pill(height)
                         color: Theme.text
                         opacity: nameTap.pressed ? Theme.statePressed : (nameHover.hovered ? Theme.stateHover : 0)
 
@@ -230,8 +230,8 @@ Rectangle {
                         id: nameRow
 
                         anchors.centerIn: parent
-                        anchors.horizontalCenterOffset: Lock.canSwitchUser ? 3 : 0
-                        spacing: 4
+                        anchors.horizontalCenterOffset: Lock.canSwitchUser ? Theme.dp(3) : 0
+                        spacing: Theme.dp(4)
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
@@ -246,7 +246,7 @@ Rectangle {
                         Glyph {
                             anchors.verticalCenter: parent.verticalCenter
                             name: "expand"
-                            size: 22
+                            size: Theme.dp(22)
                             color: Theme.subtext
                             visible: Lock.canSwitchUser
                         }
@@ -283,14 +283,14 @@ Rectangle {
 
             Item {
                 width: parent.width
-                height: 6
+                height: Theme.dp(6)
             }
 
             // an account sddm does not list is named by hand, above the password
             Rectangle {
                 width: parent.width
-                height: 56
-                radius: height / 2
+                height: Theme.dp(56)
+                radius: Theme.pill(height)
                 color: Theme.cardHigh
                 border.width: nameInput.activeFocus ? 2 : 0
                 border.color: Theme.accent
@@ -300,16 +300,16 @@ Rectangle {
                     id: nameLead
 
                     anchors.left: parent.left
-                    anchors.leftMargin: 20
+                    anchors.leftMargin: Theme.dp(20)
                     anchors.verticalCenter: parent.verticalCenter
                     name: "person"
-                    size: 20
+                    size: Theme.dp(20)
                     color: nameInput.activeFocus ? Theme.accent : Theme.subtext
                 }
 
                 Text {
                     anchors.left: nameLead.right
-                    anchors.leftMargin: 14
+                    anchors.leftMargin: Theme.dp(14)
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Username"
                     color: Theme.subtextDim
@@ -323,9 +323,9 @@ Rectangle {
                     id: nameInput
 
                     anchors.left: nameLead.right
-                    anchors.leftMargin: 14
+                    anchors.leftMargin: Theme.dp(14)
                     anchors.right: parent.right
-                    anchors.rightMargin: 20
+                    anchors.rightMargin: Theme.dp(20)
                     anchors.verticalCenter: parent.verticalCenter
                     color: Theme.text
                     selectionColor: Theme.alpha(Theme.accent, 0.4)
@@ -357,7 +357,7 @@ Rectangle {
             // the status line: sddm's verdict, the keyboard's warnings, or nothing
             Item {
                 width: parent.width
-                height: card.hasStatus ? 22 : 0
+                height: card.hasStatus ? Theme.dp(22) : 0
                 clip: true
 
                 Behavior on height {
@@ -374,7 +374,7 @@ Rectangle {
 
                     anchors.left: parent.left
                     anchors.right: marks.left
-                    anchors.rightMargin: 8
+                    anchors.rightMargin: Theme.dp(8)
                     anchors.verticalCenter: parent.verticalCenter
                     text: Lock.statusText
                     elide: Text.ElideRight
@@ -437,13 +437,13 @@ Rectangle {
 
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
-                    spacing: 6
+                    spacing: Theme.dp(6)
 
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: capsRow.implicitWidth + 16
-                        height: 20
-                        radius: 999
+                        width: capsRow.implicitWidth + Theme.dp(16)
+                        height: Theme.dp(20)
+                        radius: Theme.dp(999)
                         color: Theme.alpha(Theme.warning, 0.18)
                         visible: keyboard.capsLock
 
@@ -451,12 +451,12 @@ Rectangle {
                             id: capsRow
 
                             anchors.centerIn: parent
-                            spacing: 4
+                            spacing: Theme.dp(4)
 
                             Glyph {
                                 anchors.verticalCenter: parent.verticalCenter
                                 name: "caps"
-                                size: 13
+                                size: Theme.dp(13)
                                 color: Theme.warning
                             }
 
@@ -476,9 +476,9 @@ Rectangle {
 
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: layoutText.implicitWidth + 18
-                        height: 20
-                        radius: 999
+                        width: layoutText.implicitWidth + Theme.dp(18)
+                        height: Theme.dp(20)
+                        radius: Theme.dp(999)
                         color: Theme.cardHigh
                         visible: card.layoutShort !== "" && Lock.focused
 
@@ -503,14 +503,14 @@ Rectangle {
             // what the password opens, and the way to open something else
             Item {
                 width: parent.width
-                height: 40
+                height: Theme.dp(40)
                 visible: Lock.sessions.length > 1
 
                 Rectangle {
                     anchors.horizontalCenter: parent.horizontalCenter
-                    width: sessionRow.implicitWidth + 32
+                    width: sessionRow.implicitWidth + Theme.dp(32)
                     height: parent.height
-                    radius: height / 2
+                    radius: Theme.pill(height)
                     color: Theme.alpha(Theme.text, sessionTap.pressed ? 0.14 : (sessionHover.hovered ? 0.1 : 0.05))
 
                     Behavior on color {
@@ -524,12 +524,12 @@ Rectangle {
                         id: sessionRow
 
                         anchors.centerIn: parent
-                        spacing: 8
+                        spacing: Theme.dp(8)
 
                         Glyph {
                             anchors.verticalCenter: parent.verticalCenter
                             name: "session"
-                            size: 17
+                            size: Theme.dp(17)
                             color: Theme.accent
                         }
 
@@ -548,7 +548,7 @@ Rectangle {
 
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
-                            width: Math.min(Math.ceil(sessionMeasure.implicitWidth), face.width - 110)
+                            width: Math.min(Math.ceil(sessionMeasure.implicitWidth), face.width - Theme.dp(110))
                             text: Lock.sessionName
                             elide: Text.ElideRight
                             color: Theme.text
@@ -561,7 +561,7 @@ Rectangle {
                         Glyph {
                             anchors.verticalCenter: parent.verticalCenter
                             name: "expand"
-                            size: 18
+                            size: Theme.dp(18)
                             color: Theme.subtext
                         }
 
@@ -589,34 +589,34 @@ Rectangle {
         Item {
             id: sheet
 
-            x: 24 + (1 - card.k) * card.width
-            y: 24
-            width: card.width - 48
-            implicitHeight: head.height + 10 + list.height
+            x: Theme.dp(24) + (1 - card.k) * card.width
+            y: Theme.dp(24)
+            width: card.width - Theme.dp(48)
+            implicitHeight: head.height + Theme.dp(10) + list.height
             visible: card.k > 0.001
 
             Item {
                 id: head
 
                 width: parent.width
-                height: 44
+                height: Theme.dp(44)
 
                 IconButton {
                     id: back
 
                     anchors.left: parent.left
-                    anchors.leftMargin: -6
+                    anchors.leftMargin: -Theme.dp(6)
                     anchors.verticalCenter: parent.verticalCenter
-                    diameter: 44
+                    diameter: Theme.dp(44)
                     glyph: "back"
-                    glyphSize: 22
+                    glyphSize: Theme.dp(22)
                     glyphColor: Theme.text
                     onClicked: Lock.closeSheet()
                 }
 
                 Text {
                     anchors.left: back.right
-                    anchors.leftMargin: 6
+                    anchors.leftMargin: Theme.dp(6)
                     anchors.verticalCenter: parent.verticalCenter
                     text: card.shown === "sessions" ? "Choose a session" : "Choose an account"
                     color: Theme.text
@@ -632,11 +632,11 @@ Rectangle {
                 id: list
 
                 anchors.top: head.bottom
-                anchors.topMargin: 10
+                anchors.topMargin: Theme.dp(10)
                 width: parent.width
                 // five and a half rows show there is more without a scrollbar
                 height: Math.min(card.rows, 5.5) * (card.rowH + list.spacing) - list.spacing
-                spacing: 4
+                spacing: Theme.dp(4)
                 clip: true
                 model: card.rows
                 boundsBehavior: Flickable.StopAtBounds
@@ -718,10 +718,10 @@ Rectangle {
                         id: lead
 
                         anchors.left: parent.left
-                        anchors.leftMargin: 10
+                        anchors.leftMargin: Theme.dp(10)
                         anchors.verticalCenter: parent.verticalCenter
-                        width: 40
-                        height: 40
+                        width: Theme.dp(40)
+                        height: Theme.dp(40)
 
                         Avatar {
                             anchors.fill: parent
@@ -739,7 +739,7 @@ Rectangle {
                             Glyph {
                                 anchors.centerIn: parent
                                 name: row.other ? "personAdd" : "session"
-                                size: 20
+                                size: Theme.dp(20)
                                 color: row.picked && !row.other ? Theme.fgAccentContainer : Theme.subtext
                             }
 
@@ -749,11 +749,11 @@ Rectangle {
 
                     Column {
                         anchors.left: lead.right
-                        anchors.leftMargin: 14
+                        anchors.leftMargin: Theme.dp(14)
                         anchors.right: tick.left
-                        anchors.rightMargin: 10
+                        anchors.rightMargin: Theme.dp(10)
                         anchors.verticalCenter: parent.verticalCenter
-                        spacing: 1
+                        spacing: Theme.dp(1)
 
                         Text {
                             width: parent.width
@@ -783,10 +783,10 @@ Rectangle {
                         id: tick
 
                         anchors.right: parent.right
-                        anchors.rightMargin: 16
+                        anchors.rightMargin: Theme.dp(16)
                         anchors.verticalCenter: parent.verticalCenter
                         name: "check"
-                        size: 20
+                        size: Theme.dp(20)
                         color: Theme.accent
                         opacity: row.picked ? 1 : 0
                     }

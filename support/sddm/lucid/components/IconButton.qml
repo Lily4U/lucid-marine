@@ -5,8 +5,8 @@ Item {
     id: btn
 
     property string glyph: "close"
-    property real diameter: 44
-    property real glyphSize: 20
+    property real diameter: Theme.dp(44)
+    property real glyphSize: Theme.dp(20)
     property color glyphColor: Theme.text
     property color baseColor: "transparent"
     property color hoverColor: Theme.text
@@ -56,6 +56,14 @@ Item {
         name: btn.glyph
         size: btn.glyphSize
         color: btn.glyphColor
+
+        Behavior on color {
+            ColorAnimation {
+                duration: Theme.ms(140)
+            }
+
+        }
+
     }
 
     HoverHandler {

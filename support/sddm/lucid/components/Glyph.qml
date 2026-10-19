@@ -27,11 +27,17 @@ Item {
         "personAdd": "person_add",
         "session": "desktop_windows",
         "host": "computer",
-        "keyboard": "keyboard"
+        "keyboard": "keyboard",
+        "wifi": "signal_wifi_4_bar",
+        "wifiOff": "signal_wifi_off",
+        "ethernet": "lan",
+        "bluetooth": "bluetooth",
+        "bluetoothOff": "bluetooth_disabled",
+        "batteryCharge": "battery_charging_full"
     })
     property string name: "lock"
     property color color: Theme.text
-    property real size: 20
+    property real size: Theme.dp(20)
     readonly property real drawn: Math.round(glyph.size * 1.1)
 
     implicitWidth: Math.round(glyph.size)
