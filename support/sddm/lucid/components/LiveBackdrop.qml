@@ -1,9 +1,9 @@
 import QtMultimedia
 import QtQuick
 
-// a live wallpaper behind the greeter. sync-sddm.sh hands over a small,
-// blurred, silent copy whose first frame is background.jpg, so the still under
-// this is already the picture the video starts on; it only has to fade over it
+// a live wallpaper behind the greeter. sync-sddm.sh hands over a silent copy
+// whose first frame is background.jpg, so the still under this is already the
+// picture the video starts on; it only has to fade over it
 Item {
     id: live
 

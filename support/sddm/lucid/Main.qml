@@ -310,18 +310,18 @@ Item {
 
     }
 
-    // the lock blurs the wallpaper live; a greeter should not be running a
-    // 64px blur over 1080p on a cold gpu at boot, so sync-sddm.sh bakes the
-    // resting blur into background.jpg and this only adds the focus deepening.
-    // blurs don't add up linearly: 0.7 over the bake is the lock's 0.82, measured
+    // the lock's own blur, live over sharp copies: a blur baked into a small
+    // copy showed the encoder's blocks once stretched. a copy from before that
+    // has it baked in, so only the focus deepening goes over it; blurs don't
+    // add up linearly, and 0.7 over that bake is the lock's 0.82, measured
     MultiEffect {
         anchors.fill: parent
         source: paperBox
         autoPaddingEnabled: false
         blurEnabled: true
         blurMax: 64
-        blur: surface.e * surface.out * surface.focusK * 0.7
-        visible: surface.focusK > 0.01
+        blur: surface.e * surface.out * (Theme.backgroundSharp ? 0.5 + surface.focusK * 0.32 : surface.focusK * 0.7)
+        visible: Theme.backgroundSharp || surface.focusK > 0.01
     }
 
     Rectangle {

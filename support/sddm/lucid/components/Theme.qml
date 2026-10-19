@@ -45,12 +45,17 @@ Item {
         const shared = config.background;
         return shared ? Qt.resolvedUrl("../" + shared) : "";
     }
-    // the account's live wallpaper, when it had one: a small blurred copy that
-    // plays over background.jpg, which is its first frame
+    // the account's live wallpaper, when it had one: a silent copy that plays
+    // over background.jpg, which is its first frame
     readonly property url backgroundVideo: {
         void lookConf.location;
         const v = root.lookOwn ? lookConf.value("backgroundVideo", "") : "";
         return v ? root.lookDir + v : "";
+    }
+    // sharp copies, blurred here as the lock does; older ones came blurred
+    readonly property bool backgroundSharp: {
+        void lookConf.location;
+        return root.lookOwn && lookConf.value("backgroundSharp", "") === "true";
     }
     readonly property int lookMs: 1000
     // awww's own fade curve, the one the desktop crossfades its palette on
