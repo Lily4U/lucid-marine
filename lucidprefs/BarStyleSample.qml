@@ -722,18 +722,23 @@ Item {
             width: Theme.dp(124)
             height: Theme.dp(64)
 
+            // clear of the panel's corners
             MiniLines {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.top: parent.top
-                anchors.margins: Theme.dp(8)
+                anchors.leftMargin: Theme.dp(14)
+                anchors.rightMargin: Theme.dp(14)
+                anchors.topMargin: Theme.dp(12)
             }
 
             MiniTrack {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                anchors.margins: Theme.dp(8)
+                anchors.leftMargin: Theme.dp(14)
+                anchors.rightMargin: Theme.dp(14)
+                anchors.bottomMargin: Theme.dp(12)
             }
 
         }
