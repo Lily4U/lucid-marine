@@ -62,6 +62,42 @@ BarPill {
     readonly property bool heroLayout: root.coverPanel && root.player !== null
     // concentric with the panel's own corner
     readonly property int innerRadius: Math.max(Theme.shapeMd, root.expandedRadius - root.pad)
+    // a remote cover is fetched into the cache and shown from there: an Image
+    // fed the url itself makes Qt run the network stack, and its http/2 client
+    // is what has been taking the shell down mid-session
+    readonly property bool remoteArt: /^https?:/.test(root.artUrl)
+    readonly property string artFile: {
+        if (!root.remoteArt)
+            return "";
+
+        var h = 5381;
+        for (var i = 0; i < root.artUrl.length; i++) h = ((h * 33) ^ root.artUrl.charCodeAt(i)) >>> 0
+        return Quickshell.env("HOME") + "/.cache/lucid/art/" + h.toString(16) + ".img";
+    }
+    property string localArt: ""
+    readonly property string artSource: root.remoteArt ? root.localArt : root.artUrl
+
+    // the last cover stays up until the next one is on disk, so RoundedArt can hold it
+    function fetchCover() {
+        if (root.artFile === "") {
+            root.localArt = "";
+            return ;
+        }
+        artFetch.running = false;
+        artFetch.running = true;
+    }
+
+    onArtFileChanged: root.fetchCover()
+    Component.onCompleted: root.fetchCover()
+
+    Process {
+        id: artFetch
+
+        command: ["sh", "-c", "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]", "sh", root.artFile, root.artUrl]
+        onExited: (code) => {
+            root.localArt = code === 0 ? "file://" + root.artFile : "";
+        }
+    }
     readonly property string displayTitle: (root.player && root.artist && Prefs.mediaArtist) ? root.artist + "  -  " + root.title : root.title
     // the looks picked on the module's card
     readonly property bool coverFace: Prefs.mediaStyle === "cover"
@@ -91,6 +127,66 @@ BarPill {
     readonly property int barCount: root.bars.length > 1 ? root.bars.length : 24
     property string shazamState: "idle"
     property var shazamResult: null
+    // shazam's cover is a remote url too, and goes through the same cache
+    readonly property bool shazamRemote: !!root.shazamResult && /^https?:/.test(root.shazamResult.art || "")
+    property string shazamLocalArt: ""
+    readonly property string shazamArtSource: root.shazamRemote ? root.shazamLocalArt : (root.shazamResult ? (root.shazamResult.art || "") : "")
+
+    onShazamResultChanged: {
+        root.shazamLocalArt = "";
+        if (root.shazamRemote) {
+            shazamFetch.running = false;
+            shazamFetch.running = true;
+        }
+    }
+
+    Process {
+        id: shazamFetch
+
+        command: ["sh", "-c", "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]", "sh", Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + ((root.shazamResult && root.shazamResult.key) || "0") + ".img", root.shazamResult ? root.shazamResult.art : ""]
+        onExited: (code) => {
+            if (code === 0)
+                root.shazamLocalArt = "file://" + Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + ((root.shazamResult && root.shazamResult.key) || "0") + ".img";
+
+        }
+    }
+    // the history's covers come out of the same cache; a row shows only what is on disk
+    property var historyArt: ({})
+
+    function shazamKey(entry) {
+        return String((entry && entry.key) || "").replace(/[^A-Za-z0-9_-]/g, "");
+    }
+
+    function fetchHistoryArt() {
+        if (root.page !== "shazam")
+            return ;
+
+        const args = [];
+        for (const e of (historyAdapter.items || []).slice(0, 3)) {
+            const key = root.shazamKey(e);
+            if (key !== "" && /^https?:/.test(e.art || "") && !root.historyArt[key])
+                args.push(key, e.art);
+        }
+        if (args.length === 0)
+            return ;
+
+        histArtFetch.running = false;
+        histArtFetch.command = ["sh", "-c", "d=\"$1\"; shift; mkdir -p \"$d\"; while [ $# -ge 2 ]; do f=\"$d/shazam-$1.img\"; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ] && echo \"$1\"; shift 2; done", "sh", Quickshell.env("HOME") + "/.cache/lucid/art"].concat(args);
+        histArtFetch.running = true;
+    }
+
+    Process {
+        id: histArtFetch
+
+        stdout: SplitParser {
+            onRead: (key) => {
+                const m = Object.assign({}, root.historyArt);
+                m[key] = "file://" + Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + key + ".img";
+                root.historyArt = m;
+            }
+        }
+
+    }
     property string shazamError: ""
     property int listenElapsed: 0
     readonly property int listenLimit: 30
@@ -446,6 +542,7 @@ BarPill {
 
         sinkProc.running = true;
         sourceProc.running = true;
+        root.fetchHistoryArt();
     }
     // gates the slide, so the first layout and the reset on close do not animate
     property bool pageSwitching: false
@@ -491,6 +588,8 @@ BarPill {
             id: historyAdapter
 
             property var items: []
+
+            onItemsChanged: root.fetchHistoryArt()
         }
 
     }
@@ -736,7 +835,7 @@ BarPill {
                         id: compactArtImg
 
                         anchors.fill: parent
-                        source: root.discFace ? root.artUrl : ""
+                        source: root.discFace ? root.artSource : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         sourceSize.width: Theme.dp(64)
@@ -766,7 +865,7 @@ BarPill {
                         id: coverArtImg
 
                         anchors.fill: parent
-                        source: root.coverFace ? root.artUrl : ""
+                        source: root.coverFace ? root.artSource : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         sourceSize.width: Theme.dp(64)
@@ -965,7 +1064,7 @@ BarPill {
 
                     RoundedArt {
                         anchors.fill: parent
-                        source: root.artUrl
+                        source: root.artSource
                         shapeRadius: root.innerRadius
                         decode: Theme.dp(512)
                         fallbackGlyph: Math.round(Math.min(parent.width, parent.height) * 0.32)
@@ -1241,7 +1340,7 @@ BarPill {
 
                     RoundedArt {
                         anchors.fill: parent
-                        source: root.artUrl
+                        source: root.artSource
                         shapeRadius: Theme.shapeLg
                         fallbackGlyph: Math.round(Math.min(parent.width, parent.height) * 0.32)
                     }
@@ -2160,7 +2259,7 @@ BarPill {
                     RoundedArt {
                         width: Theme.dp(88)
                         height: Theme.dp(88)
-                        source: root.shazamResult ? root.shazamResult.art : ""
+                        source: root.shazamArtSource
                         shapeRadius: Theme.shapeLg
                         fallbackGlyph: Theme.dp(30)
                     }
@@ -2340,7 +2439,7 @@ BarPill {
                             anchors.verticalCenter: parent.verticalCenter
                             width: Theme.dp(40)
                             height: Theme.dp(40)
-                            source: histRow.modelData.art
+                            source: root.historyArt[root.shazamKey(histRow.modelData)] || ""
                             shapeRadius: Theme.shapeSm
                             fallbackGlyph: Theme.dp(18)
                         }
