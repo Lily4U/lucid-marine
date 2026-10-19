@@ -47,6 +47,11 @@ end
 -- goes back to the defaults rather than staying at whatever it was given
 local touched = {}
 
+-- which outputs the last apply made a mirror. one that stops being a mirror is
+-- switched off and back on, or clients never hear of it as a display of its own
+-- and nothing (wallpaper, bar) is drawn on it
+local mirrored = {}
+
 local function put(output, spec)
     spec.output = output
     hl.monitor(spec)
@@ -55,6 +60,7 @@ end
 function M.apply()
     local cfg = config()
     local want = {}
+    local mirrors = {}
 
     -- switching off the only screen leaves nothing to switch it back on from,
     -- so the disables are counted first and dropped whole if that is what they
@@ -94,9 +100,11 @@ function M.apply()
                 -- one has to say mirror = "" outright
                 if type(m.mirror) == "string" and m.mirror ~= "" then
                     spec.mirror = m.mirror
+                    mirrors[output] = true
                 else
                     spec.mirror = ""
                     spec.position = tostring(m.position or M.defaults.position)
+                    if mirrored[output] then put(output, { disabled = true }) end
                 end
                 put(output, spec)
             end
@@ -105,6 +113,7 @@ function M.apply()
 
     for output in pairs(touched) do
         if not want[output] then
+            if mirrored[output] then put(output, { disabled = true }) end
             put(output, {
                 mode      = M.defaults.mode,
                 position  = M.defaults.position,
@@ -117,6 +126,7 @@ function M.apply()
         end
     end
     touched = want
+    mirrored = mirrors
 end
 
 -- workspaces tied to a display. hyprland keeps a workspace rule once it has
