@@ -170,12 +170,18 @@ WidgetBody {
     // every cover goes through the local copy: a remote one handed straight to
     // an Image makes Qt speak http/2 itself, which is where the shell has
     // crashed. the tint needs it, so it was fetched for the tint alone before
+    // the last cover stays up until the next one is on disk
     function fetchCover() {
-        w.localArt = "";
-        if (w.artFile !== "" && !w.preview) {
-            fetchArt.running = false;
-            fetchArt.running = true;
+        if (w.artFile === "" || w.preview) {
+            w.localArt = "";
+            return ;
         }
+        // handed over here: a command bound to artFile is still the old one in onArtFileChanged
+        fetchArt.superseded = fetchArt.running;
+        fetchArt.file = w.artFile;
+        fetchArt.running = false;
+        fetchArt.command = ["sh", "-c", fetchArt.script, "sh", w.artFile, w.artUrl];
+        fetchArt.running = true;
     }
 
     onArtFileChanged: w.fetchCover()
@@ -184,11 +190,17 @@ WidgetBody {
     Process {
         id: fetchArt
 
-        command: ["sh", "-c", "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]", "sh", w.artFile, w.artUrl]
-        onExited: (code) => {
-            if (code === 0)
-                w.localArt = "file://" + w.artFile;
+        property string file: ""
+        // a run cut short by the next fetch still reports, before that one starts
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
 
+        onExited: (code) => {
+            if (fetchArt.superseded) {
+                fetchArt.superseded = false;
+                return ;
+            }
+            w.localArt = code === 0 ? "file://" + fetchArt.file : "";
         }
     }
 

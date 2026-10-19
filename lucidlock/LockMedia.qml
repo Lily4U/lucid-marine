@@ -40,12 +40,18 @@ Rectangle {
     property string localArt: ""
     readonly property string artSource: media.remoteArt ? media.localArt : media.artUrl
 
+    // the last cover stays up until the next one is on disk
     function fetchCover() {
-        media.localArt = "";
-        if (media.artFile !== "") {
-            artFetch.running = false;
-            artFetch.running = true;
+        if (media.artFile === "") {
+            media.localArt = "";
+            return ;
         }
+        // handed over here: a command bound to artFile is still the old one in onArtFileChanged
+        artFetch.superseded = artFetch.running;
+        artFetch.file = media.artFile;
+        artFetch.running = false;
+        artFetch.command = ["sh", "-c", artFetch.script, "sh", media.artFile, media.artUrl];
+        artFetch.running = true;
     }
 
     onArtFileChanged: media.fetchCover()
@@ -54,11 +60,17 @@ Rectangle {
     Process {
         id: artFetch
 
-        command: ["sh", "-c", "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]", "sh", media.artFile, media.artUrl]
-        onExited: (code) => {
-            if (code === 0)
-                media.localArt = "file://" + media.artFile;
+        property string file: ""
+        // a run cut short by the next fetch still reports, before that one starts
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
 
+        onExited: (code) => {
+            if (artFetch.superseded) {
+                artFetch.superseded = false;
+                return ;
+            }
+            media.localArt = code === 0 ? "file://" + artFetch.file : "";
         }
     }
     property real livePos: 0

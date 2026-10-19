@@ -85,7 +85,11 @@ BarPill {
             root.localArt = "";
             return ;
         }
+        // handed over here: a command bound to artFile is still the old one in onArtFileChanged
+        artFetch.superseded = artFetch.running;
+        artFetch.file = root.artFile;
         artFetch.running = false;
+        artFetch.command = ["sh", "-c", artFetch.script, "sh", root.artFile, root.artUrl];
         artFetch.running = true;
     }
 
@@ -95,9 +99,17 @@ BarPill {
     Process {
         id: artFetch
 
-        command: ["sh", "-c", "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]", "sh", root.artFile, root.artUrl]
+        property string file: ""
+        // a run cut short by the next fetch still reports, before that one starts
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
+
         onExited: (code) => {
-            root.localArt = code === 0 ? "file://" + root.artFile : "";
+            if (artFetch.superseded) {
+                artFetch.superseded = false;
+                return ;
+            }
+            root.localArt = code === 0 ? "file://" + artFetch.file : "";
         }
     }
     readonly property string displayTitle: (root.player && root.artist && Prefs.mediaArtist) ? root.artist + "  -  " + root.title : root.title
@@ -144,21 +156,35 @@ BarPill {
     property string shazamLocalArt: ""
     readonly property string shazamArtSource: root.shazamRemote ? root.shazamLocalArt : (root.shazamResult ? (root.shazamResult.art || "") : "")
 
+    // read here, not through bindings on shazamResult, which can still be stale
     onShazamResultChanged: {
+        const r = root.shazamResult;
         root.shazamLocalArt = "";
-        if (root.shazamRemote) {
-            shazamFetch.running = false;
-            shazamFetch.running = true;
-        }
+        if (!r || !/^https?:/.test(r.art || ""))
+            return ;
+
+        const f = Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + (r.key || "0") + ".img";
+        shazamFetch.superseded = shazamFetch.running;
+        shazamFetch.file = f;
+        shazamFetch.running = false;
+        shazamFetch.command = ["sh", "-c", shazamFetch.script, "sh", f, r.art];
+        shazamFetch.running = true;
     }
 
     Process {
         id: shazamFetch
 
-        command: ["sh", "-c", "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]", "sh", Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + ((root.shazamResult && root.shazamResult.key) || "0") + ".img", root.shazamResult ? root.shazamResult.art : ""]
+        property string file: ""
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
+
         onExited: (code) => {
+            if (shazamFetch.superseded) {
+                shazamFetch.superseded = false;
+                return ;
+            }
             if (code === 0)
-                root.shazamLocalArt = "file://" + Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + ((root.shazamResult && root.shazamResult.key) || "0") + ".img";
+                root.shazamLocalArt = "file://" + shazamFetch.file;
 
         }
     }
