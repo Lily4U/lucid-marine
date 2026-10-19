@@ -1037,6 +1037,14 @@ Item {
     property bool showTransition: false
 
     onShownChanged: {
+        root.exiting = !root.shown;
+        if (root.exiting) {
+            contentEnter.stop();
+            contentExit.restart();
+        } else {
+            contentExit.stop();
+            contentEnter.restart();
+        }
         root.showTransition = true;
         showTimer.restart();
     }
@@ -1052,8 +1060,9 @@ Item {
         enabled: root.showTransition
 
         NumberAnimation {
-            duration: Theme.barMs(380)
-            easing.type: Easing.OutCubic
+            duration: root.exiting ? Theme.barMs(360) : Theme.barMs(380)
+            easing.type: root.exiting ? Easing.Bezier : Easing.OutCubic
+            easing.bezierCurve: Theme.curveStandard
         }
 
     }
@@ -1061,9 +1070,60 @@ Item {
     Behavior on implicitHeight {
         enabled: root.showTransition
 
+        SequentialAnimation {
+            PauseAnimation {
+                duration: root.exiting ? Theme.barMs(280) : 0
+            }
+
+            NumberAnimation {
+                duration: root.exiting ? 0 : Theme.barMs(380)
+                easing.type: Easing.OutCubic
+            }
+
+        }
+
+    }
+
+    ParallelAnimation {
+        id: contentExit
+
         NumberAnimation {
-            duration: Theme.barMs(380)
+            target: dotsRow
+            property: "opacity"
+            to: 0
+            duration: Theme.barMs(90)
             easing.type: Easing.OutCubic
+        }
+
+        NumberAnimation {
+            target: dotsRow
+            property: "scale"
+            to: 0.9
+            duration: Theme.barMs(90)
+            easing.type: Easing.OutCubic
+        }
+
+    }
+
+    ParallelAnimation {
+        id: contentEnter
+
+        NumberAnimation {
+            target: dotsRow
+            property: "opacity"
+            to: 1
+            duration: Theme.barMs(200)
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.easeEmphasizedDecel
+        }
+
+        NumberAnimation {
+            target: dotsRow
+            property: "scale"
+            to: 1
+            duration: Theme.barMs(240)
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.easeEmphasizedDecel
         }
 
     }
@@ -1094,25 +1154,36 @@ Item {
     readonly property real barBottomRightRadius: root.popupMode ? pillRect.bottomRightRadius : shell.bottomRightRadius
     readonly property Item popupItem: shell
 
+    // leaving, as BarPill does it: the dots fade first, then the pill fades and
+    // shrinks as the gap closes; set in onShownChanged, where it reads fresh
+    property bool exiting: false
+
     implicitWidth: root.shown ? root.compactWidth : 0
     implicitHeight: root.shown ? root.compactHeight : 0
     opacity: root.shown ? 1 : 0
-    scale: root.shown ? 1 : 0.82
+    scale: root.shown ? 1 : 0.86
     transformOrigin: Item.Center
     visible: root.opacity > 0.01
 
     Behavior on opacity {
-        NumberAnimation {
-            duration: Theme.barMs(180)
-            easing.type: Easing.OutCubic
+        SequentialAnimation {
+            PauseAnimation {
+                duration: root.exiting ? Theme.barMs(40) : 0
+            }
+
+            NumberAnimation {
+                duration: root.exiting ? Theme.barMs(180) : Theme.barMs(180)
+                easing.type: root.exiting ? Easing.InOutCubic : Easing.OutCubic
+            }
+
         }
 
     }
 
     Behavior on scale {
         NumberAnimation {
-            duration: Theme.barMs(260)
-            easing.type: root.shown ? Easing.OutBack : Easing.InCubic
+            duration: root.exiting ? Theme.barMs(300) : Theme.barMs(260)
+            easing.type: root.exiting ? Easing.InOutCubic : Easing.OutBack
         }
 
     }

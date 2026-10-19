@@ -48,8 +48,11 @@ Item {
 
         if (!pill.lookSettled || !pill.shown || !pill.visible) {
             lookSwitch.stop();
-            compactHolder.opacity = 1;
-            compactHolder.scale = 1;
+            // a pill on its way out keeps its contents faded
+            if (pill.shown) {
+                compactHolder.opacity = 1;
+                compactHolder.scale = 1;
+            }
             pill.look = pill.lookPref;
             return ;
         }
@@ -320,36 +323,49 @@ Item {
     readonly property real popupTopLeftRadius: shell.topLeftRadius
     readonly property real popupTopRightRadius: shell.topRightRadius
 
+    // leaving, the contents fade first, then the pill fades and shrinks as the
+    // gap closes on the standard curve; its height holds until it has gone, so
+    // it never squashes up into the bar's edge. set in onShownChanged, the one
+    // place the animations below read it fresh
+    property bool exiting: false
+
     implicitWidth: !pill.shown ? 0 : (pill.popupMode ? pill.compactWidth : pill.openWidth)
     implicitHeight: !pill.shown ? 0 : (pill.popupMode ? pill.compactHeight : pill.openHeight)
     opacity: pill.shown ? 1 : 0
-    scale: pill.shown ? 1 : 0.82
+    scale: pill.shown ? 1 : 0.86
     transformOrigin: Item.Center
     visible: pill.opacity > 0.01
     clip: !pill.popupMode && pill.anyOpen && !pill.overlayOpen
     z: (pill.popupOpen || pill.overlayOpen) ? 100 : 1
 
     Behavior on opacity {
-        NumberAnimation {
-            duration: Theme.barMs(180)
-            easing.type: Easing.OutCubic
+        SequentialAnimation {
+            PauseAnimation {
+                duration: pill.exiting ? Theme.barMs(40) : 0
+            }
+
+            NumberAnimation {
+                duration: pill.exiting ? Theme.barMs(180) : Theme.barMs(180)
+                easing.type: pill.exiting ? Easing.InOutCubic : Easing.OutCubic
+            }
+
         }
 
     }
 
     Behavior on scale {
         NumberAnimation {
-            duration: Theme.barMs(260)
-            easing.type: pill.shown ? Easing.OutBack : Easing.InCubic
+            duration: pill.exiting ? Theme.barMs(300) : Theme.barMs(260)
+            easing.type: pill.exiting ? Easing.InOutCubic : Easing.OutBack
         }
 
     }
 
     Behavior on implicitWidth {
         NumberAnimation {
-            duration: pill.morphDuration
+            duration: pill.exiting ? Theme.barMs(360) : pill.morphDuration
             easing.type: Easing.Bezier
-            easing.bezierCurve: pill.morphEasing
+            easing.bezierCurve: pill.exiting ? Theme.curveStandard : pill.morphEasing
         }
 
     }
@@ -357,17 +373,77 @@ Item {
     property bool shownTransition: false
 
     onShownChanged: {
+        pill.exiting = !pill.shown;
         pill.shownTransition = true;
         shownTransitionTimer.restart();
+        if (pill.exiting) {
+            lookSwitch.stop();
+            contentEnter.stop();
+            contentExit.restart();
+        } else {
+            contentExit.stop();
+            contentEnter.restart();
+        }
+    }
+
+    ParallelAnimation {
+        id: contentExit
+
+        NumberAnimation {
+            target: compactHolder
+            property: "opacity"
+            to: 0
+            duration: Theme.barMs(90)
+            easing.type: Easing.OutCubic
+        }
+
+        NumberAnimation {
+            target: compactHolder
+            property: "scale"
+            to: 0.9
+            duration: Theme.barMs(90)
+            easing.type: Easing.OutCubic
+        }
+
+    }
+
+    ParallelAnimation {
+        id: contentEnter
+
+        NumberAnimation {
+            target: compactHolder
+            property: "opacity"
+            to: 1
+            duration: Theme.barMs(200)
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.easeEmphasizedDecel
+        }
+
+        NumberAnimation {
+            target: compactHolder
+            property: "scale"
+            to: 1
+            duration: Theme.barMs(240)
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.easeEmphasizedDecel
+        }
+
     }
 
     Behavior on implicitHeight {
         enabled: !pill.anyOpen || pill.panelTransitioning || pill.shownTransition
 
-        NumberAnimation {
-            duration: pill.morphDuration
-            easing.type: Easing.Bezier
-            easing.bezierCurve: pill.morphEasing
+        SequentialAnimation {
+            PauseAnimation {
+                duration: pill.exiting ? Theme.barMs(280) : 0
+            }
+
+            NumberAnimation {
+                duration: pill.exiting ? 0 : pill.morphDuration
+                easing.type: Easing.Bezier
+                easing.bezierCurve: pill.morphEasing
+            }
+
         }
 
     }
