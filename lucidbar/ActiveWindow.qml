@@ -280,7 +280,9 @@ BarPill {
                 color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontLabelLg
-                font.weight: Font.Medium
+                // the media title's weight, the other title on the bar
+                font.bold: true
+                font.variableAxes: Theme.axes(Theme.fontLabelLg, 640, 0)
                 elide: Text.ElideRight
             }
 

@@ -317,7 +317,8 @@ Singleton {
     {
         "id": "window",
         "key": "showWindow",
-        "home": "left",
+        "home": "right",
+        "first": true,
         "name": "Active window",
         "desc": "The focused window's icon and title; open it to float, pin, fullscreen, move or close it, or switch to another window on the workspace",
         "when": "while a window on this workspace has the focus",
