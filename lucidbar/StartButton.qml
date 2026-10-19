@@ -48,12 +48,13 @@ BarPill {
     }
 
     compactContent: [
+        // lit while the launcher is open; no hover or press tint of its own
         Rectangle {
             anchors.centerIn: parent
             width: parent.width - Theme.dp(4)
             height: Math.max(0, root.compactHeight - Theme.dp(8))
             radius: Theme.pill(height)
-            color: root.launcherOpen ? Theme.alpha(Theme.accent, startArea.pressed ? 0.3 : 0.2) : Theme.alpha(Theme.text, startArea.pressed ? 0.14 : (startArea.containsMouse ? 0.08 : 0))
+            color: root.launcherOpen ? Theme.alpha(Theme.accent, 0.2) : Theme.alpha(Theme.accent, 0)
 
             Behavior on color {
                 ColorAnimation {
