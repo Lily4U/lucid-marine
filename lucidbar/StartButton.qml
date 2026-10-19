@@ -114,18 +114,18 @@ BarPill {
             }
 
         },
-        // or a grid of nine
+        // or a grid of nine, across as much of the glyph as the mark is
         Grid {
             visible: root.gridFace
             anchors.centerIn: parent
             columns: 3
-            spacing: Math.round(root.glyph / 7)
+            spacing: Math.round(root.glyph * 0.1)
 
             Repeater {
                 model: 9
 
                 Rectangle {
-                    width: Math.round(root.glyph / 5)
+                    width: Math.round(root.glyph * 0.16)
                     height: width
                     radius: Theme.pill(height)
                     color: index === 4 ? Theme.accent : Theme.text

@@ -1239,7 +1239,7 @@ Item {
             Grid {
                 anchors.centerIn: parent
                 columns: 3
-                spacing: Math.round(gridSample.glyph / 7)
+                spacing: Math.round(gridSample.glyph * 0.1)
 
                 Repeater {
                     model: 9
@@ -1247,7 +1247,7 @@ Item {
                     Rectangle {
                         required property int index
 
-                        width: Math.round(gridSample.glyph / 5)
+                        width: Math.round(gridSample.glyph * 0.16)
                         height: width
                         radius: Theme.pill(height)
                         color: index === 4 ? Theme.accent : Theme.text
