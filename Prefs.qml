@@ -328,6 +328,22 @@ Singleton {
             {"key": "plain", "name": "Plain", "blurb": "The icon and the text on the bar"},
             {"key": "chip", "name": "Chip", "blurb": "The same on a chip tinted with the accent"}
         ]
+    },
+    {
+        "id": "start",
+        "key": "showStart",
+        "home": "left",
+        "first": true,
+        "name": "Start",
+        "desc": "A button for the launcher, at the start of the bar: a click opens it or puts it away",
+        "style": "startModuleStyle",
+        "styles": [
+            {"key": "logo", "name": "Logo", "blurb": "Lucid's mark, as on the dock"},
+            {"key": "grid", "name": "Grid", "blurb": "Nine dots, the middle one in the accent"},
+            {"key": "distro", "name": "Distro", "blurb": "Your distribution's logo, in the accent"},
+            {"key": "avatar", "name": "Avatar", "blurb": "Your profile picture"},
+            {"key": "label", "name": "Label", "blurb": "The word Start on a chip in the accent"}
+        ]
     }
     ]
 
@@ -523,6 +539,8 @@ Singleton {
     property alias windowModuleScroll: s.windowModuleScroll
     property alias windowModuleMiddleClose: s.windowModuleMiddleClose
     property alias windowModuleStyle: s.windowModuleStyle
+    property alias showStart: s.showStart
+    property alias startModuleStyle: s.startModuleStyle
     property alias workspacesByDisplay: s.workspacesByDisplay
     property alias audioMeters: s.audioMeters
     property alias clockStyle: s.clockStyle
@@ -1019,6 +1037,8 @@ Singleton {
         "windowModuleScroll": true,
         "windowModuleMiddleClose": false,
         "windowModuleStyle": "plain",
+        "showStart": false,
+        "startModuleStyle": "logo",
         "workspacesByDisplay": true,
         "audioMeters": true,
         "clockStyle": "accent",
@@ -1352,10 +1372,16 @@ Singleton {
                 out[side].push(id);
             }
         }
-        for (const id in root.barModuleHome) {
-            if (!seen[id])
-                out[root.barModuleHome[id]].push(id);
+        // one new to the arrangement goes to its home group: at the end, or at
+        // the start for one that belongs there (the start button)
+        for (const m of root.barModules) {
+            if (seen[m.id])
+                continue;
 
+            if (m.first)
+                out[m.home].unshift(m.id);
+            else
+                out[m.home].push(m.id);
         }
         return out;
     }
@@ -1741,6 +1767,8 @@ Singleton {
             property bool windowModuleScroll: true
             property bool windowModuleMiddleClose: false
             property string windowModuleStyle: "plain"
+            property bool showStart: false
+            property string startModuleStyle: "logo"
             property bool workspacesByDisplay: true
             property bool audioMeters: true
             property string clockStyle: "accent"
