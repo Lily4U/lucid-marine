@@ -270,8 +270,7 @@ Singleton {
         "style": "notificationsStyle",
         "styles": [
             {"key": "badge", "name": "Count", "blurb": "The bell and how many are waiting"},
-            {"key": "dot", "name": "Dot", "blurb": "The bell with a dot while any are waiting"},
-            {"key": "chip", "name": "Accent", "blurb": "Bell and count on the accent while any wait"}
+            {"key": "dot", "name": "Dot", "blurb": "The bell with a dot while any are waiting"}
         ]
     },
     {

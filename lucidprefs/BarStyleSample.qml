@@ -36,7 +36,6 @@ Item {
         "workspaces/numbers": workspacesSample,
         "notifications/badge": notificationsBadge,
         "notifications/dot": notificationsDot,
-        "notifications/chip": notificationsChip,
         "system/values": systemValues,
         "system/icons": systemIcons,
         "tray/collapsed": trayCollapsed,
@@ -880,39 +879,6 @@ Item {
                 color: Theme.accent
                 border.width: 1.5
                 border.color: Theme.bg
-            }
-
-        }
-
-    }
-
-    Component {
-        id: notificationsChip
-
-        Rectangle {
-            implicitWidth: chipRow.implicitWidth + Theme.dp(14)
-            implicitHeight: Theme.dp(24)
-            radius: height / 2
-            color: Theme.accent
-
-            Row {
-                id: chipRow
-
-                anchors.centerIn: parent
-                spacing: Theme.dp(5)
-
-                MiniBell {
-                    ink: Theme.fgAccent
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                BarText {
-                    text: "3"
-                    color: Theme.fgAccent
-                    font.pixelSize: Theme.fs(12)
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
             }
 
         }
