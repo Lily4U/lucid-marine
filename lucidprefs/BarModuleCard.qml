@@ -97,6 +97,15 @@ SettingCard {
         showDivider: false
 
         Flow {
+            id: styleFlow
+
+            // the widest sample sets every tile's width, so the row stays even
+            readonly property int tileWidth: {
+                let w = 0;
+                for (let i = 0; i < styleFlow.children.length; i++) w = Math.max(w, styleFlow.children[i].needWidth || 0)
+                return w;
+            }
+
             width: parent.width
             spacing: Theme.dp(10)
 
@@ -109,6 +118,7 @@ SettingCard {
                     moduleId: card.moduleId
                     prefKey: card.mod ? card.mod.style : ""
                     style: modelData
+                    minWidth: styleFlow.tileWidth
                 }
 
             }

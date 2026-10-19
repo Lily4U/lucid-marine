@@ -81,6 +81,8 @@ Item {
     // the strip of bar behind it, and how far the module's own pill pads it
     readonly property int stripHeight: Math.min(Theme.dp(34), Theme.dp(Prefs.barHeight))
     readonly property int pad: loader.item && loader.item.pad !== undefined ? loader.item.pad : Theme.dp(12)
+    // the media samples' track, as the bar's title shows it
+    readonly property string mediaTitle: Prefs.mediaArtist ? "Artist  -  Song" : "Song"
 
     implicitWidth: loader.item ? loader.item.implicitWidth : 0
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -244,11 +246,13 @@ Item {
         id: mediaDisc
 
         Row {
+            readonly property int pad: Theme.dp(10)
+
             spacing: Theme.dp(8)
 
             Item {
-                width: Theme.dp(24)
-                height: Theme.dp(24)
+                width: Theme.dp(26)
+                height: Theme.dp(26)
                 anchors.verticalCenter: parent.verticalCenter
 
                 CircularProgress {
@@ -261,19 +265,36 @@ Item {
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: Theme.dp(16)
-                    height: Theme.dp(16)
-                    radius: height / 2
+                    width: Theme.dp(18)
+                    height: Theme.dp(18)
+                    radius: Theme.dp(9)
                     color: Theme.accentContainer
                 }
 
             }
 
-            BarText {
-                text: "Artist  -  Song"
+            Item {
+                width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(discTitle.implicitWidth)))
+                height: Theme.dp(18)
+                anchors.verticalCenter: parent.verticalCenter
+                clip: true
+
+                Text {
+                    id: discTitle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sample.mediaTitle
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                    font.pixelSize: Theme.fs(13)
+                    font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                }
+
             }
 
             MiniPlay {
+                visible: Prefs.mediaPlayButton
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -308,6 +329,8 @@ Item {
         id: mediaCover
 
         Row {
+            readonly property int pad: Theme.dp(10)
+
             spacing: Theme.dp(8)
 
             Rectangle {
@@ -318,12 +341,28 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            BarText {
-                text: "Artist  -  Song"
+            Item {
+                width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(coverTitle.implicitWidth)))
+                height: Theme.dp(18)
+                anchors.verticalCenter: parent.verticalCenter
+                clip: true
+
+                Text {
+                    id: coverTitle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sample.mediaTitle
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                    font.pixelSize: Theme.fs(13)
+                    font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                }
+
             }
 
             MiniPlay {
-                visible: true
+                visible: Prefs.mediaPlayButton
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -335,14 +374,23 @@ Item {
         id: mediaCompact
 
         Row {
+            readonly property int pad: Theme.dp(10)
+
             spacing: Theme.dp(8)
 
-            MiniBars {
+            Item {
+                width: Theme.dp(26)
+                height: Theme.dp(26)
                 anchors.verticalCenter: parent.verticalCenter
+
+                MiniBars {
+                    anchors.centerIn: parent
+                }
+
             }
 
             MiniPlay {
-                visible: true
+                visible: Prefs.mediaPlayButton
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -419,32 +467,68 @@ Item {
         id: mediaProgress
 
         Item {
-            implicitWidth: progressRow.implicitWidth + Theme.dp(16)
-            implicitHeight: Theme.dp(28)
+            id: prog
 
+            readonly property int pad: Theme.dp(10)
+
+            implicitWidth: progRow.implicitWidth
+            implicitHeight: progRow.implicitHeight
+
+            // the fill runs in the pill itself, inset 4 all round
             Rectangle {
-                width: parent.width * 0.45
-                height: parent.height
+                readonly property real track: prog.implicitWidth + prog.pad * 2 - Theme.dp(8)
+
+                x: Theme.dp(4) - prog.pad
+                anchors.verticalCenter: parent.verticalCenter
+                height: sample.stripHeight - Theme.dp(8)
+                width: Math.max(height, Math.round(track * 0.45))
                 radius: height / 2
                 color: Theme.alpha(Theme.accent, 0.28)
             }
 
             Row {
-                id: progressRow
+                id: progRow
 
-                anchors.centerIn: parent
                 spacing: Theme.dp(8)
 
-                Rectangle {
-                    width: Theme.dp(16)
-                    height: Theme.dp(16)
-                    radius: height / 2
-                    color: Theme.accentContainer
+                Item {
+                    width: Theme.dp(26)
+                    height: Theme.dp(26)
                     anchors.verticalCenter: parent.verticalCenter
+
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: Theme.dp(18)
+                        height: Theme.dp(18)
+                        radius: Theme.dp(9)
+                        color: Theme.accentContainer
+                    }
+
                 }
 
-                BarText {
-                    text: "Artist  -  Song"
+                Item {
+                    width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(progTitle.implicitWidth)))
+                    height: Theme.dp(18)
+                    anchors.verticalCenter: parent.verticalCenter
+                    clip: true
+
+                    Text {
+                        id: progTitle
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: sample.mediaTitle
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.bold: true
+                        font.pixelSize: Theme.fs(13)
+                        font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                    }
+
+                }
+
+                MiniPlay {
+                    visible: Prefs.mediaPlayButton
+                    anchors.verticalCenter: parent.verticalCenter
                 }
 
             }
@@ -457,24 +541,68 @@ Item {
         id: mediaControls
 
         Row {
-            spacing: Theme.dp(6)
+            readonly property int pad: Theme.dp(10)
 
-            MiniGlyph {
-                name: "skip_previous"
+            spacing: Theme.dp(8)
+
+            Row {
                 anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.dp(2)
+
+                Item {
+                    width: Theme.dp(24)
+                    height: Theme.dp(24)
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "skip_previous"
+                        size: Theme.dp(18)
+                        fill: 1
+                        color: Theme.text
+                    }
+
+                }
+
+                MiniPlay {
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Item {
+                    width: Theme.dp(24)
+                    height: Theme.dp(24)
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "skip_next"
+                        size: Theme.dp(18)
+                        fill: 1
+                        color: Theme.text
+                    }
+
+                }
+
             }
 
-            MiniPlay {
+            Item {
+                width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(controlsTitle.implicitWidth)))
+                height: Theme.dp(18)
                 anchors.verticalCenter: parent.verticalCenter
-            }
+                clip: true
 
-            MiniGlyph {
-                name: "skip_next"
-                anchors.verticalCenter: parent.verticalCenter
-            }
+                Text {
+                    id: controlsTitle
 
-            BarText {
-                text: "Artist  -  Song"
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sample.mediaTitle
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                    font.pixelSize: Theme.fs(13)
+                    font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                }
+
             }
 
         }
@@ -1341,10 +1469,10 @@ Item {
 
     // the media module's moving bars, standing still
     component MiniBars: Row {
-        spacing: 2.5
+        spacing: Theme.dp(2)
 
         Repeater {
-            model: [7, 14, 10]
+            model: [6, 11, 8]
 
             Rectangle {
                 required property int modelData
@@ -1360,17 +1488,17 @@ Item {
 
     }
 
-    // a play button on the accent
+    // the bar's play button: a pill on the accent, paused while it plays
     component MiniPlay: Rectangle {
-        width: Theme.dp(22)
-        height: Theme.dp(22)
-        radius: height / 2
+        width: Math.round(Theme.dp(24) * 1.3)
+        height: Theme.dp(24)
+        radius: Theme.dp(12)
         color: Theme.accent
 
         Icon {
             anchors.centerIn: parent
-            name: "play_arrow"
-            size: Theme.dp(18)
+            name: "pause"
+            size: Theme.dp(16)
             fill: 1
             color: Theme.fgAccent
         }
