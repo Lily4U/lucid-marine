@@ -562,10 +562,16 @@ Item {
                 }
             }
 
+            // centred in whole pixels of the pill's frame, not the surface's: hover
+            // grows the surface by fractions, and centring in it stepped half a
+            // pixel against that, so the content shook
             Item {
                 id: compactHolder
 
-                anchors.centerIn: parent
+                readonly property real frameX: compactFace.parent ? compactFace.parent.x : 0
+
+                x: Math.round(compactHolder.frameX + (compactFace.width - compactHolder.width) / 2) - compactHolder.frameX
+                y: Math.round((compactFace.height - compactHolder.height) / 2)
                 width: pill.compactWidth
                 height: pill.compactHeight
             }
