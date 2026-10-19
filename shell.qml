@@ -431,11 +431,12 @@ ShellRoot {
                 "system": systemMod,
                 "privacy": privacyMod,
                 "power": powerMod,
-                "window": windowMod
+                "window": windowMod,
+                "start": startMod
             })
             // what BarPill looks itself up in, for a right click to its card
             readonly property var moduleById: bar.pillFor
-            readonly property var modules: [workspacesMod, mprisMod, sysTrayMod, clockMod, notifMod, systemMod, privacyMod, powerMod, windowMod]
+            readonly property var modules: [workspacesMod, mprisMod, sysTrayMod, clockMod, notifMod, systemMod, privacyMod, powerMod, windowMod, startMod]
 
             // which modules switched on have left the bar for now, for the Bar
             // page's arrangement
@@ -865,6 +866,30 @@ ShellRoot {
 
             }
 
+            StartButton {
+                id: startMod
+
+                popupAlign: bar.alignOf("start")
+
+                hostWindow: bar
+                dockMod: dock
+                x: bar.placeFor("start")
+                anchors.top: parent.top
+                anchors.topMargin: bar.hiddenOffset
+
+                Behavior on x {
+                    enabled: bar.laidOut && bar.shuffling
+
+                    NumberAnimation {
+                        duration: Theme.barDurEnter
+                        easing.type: Easing.Bezier
+                        easing.bezierCurve: Theme.easeEmphasizedDecel
+                    }
+
+                }
+
+            }
+
             ActiveWindow {
                 id: windowMod
 
@@ -1046,6 +1071,10 @@ ShellRoot {
                     mod: windowMod
                 }
 
+                ModuleRegion {
+                    mod: startMod
+                }
+
                 Region {
                     item: Prefs.barAutoHide ? revealArea : null
                 }
@@ -1142,6 +1171,11 @@ ShellRoot {
                 ModuleRegion {
                     blur: true
                     mod: windowMod
+                }
+
+                ModuleRegion {
+                    blur: true
+                    mod: startMod
                 }
 
             }

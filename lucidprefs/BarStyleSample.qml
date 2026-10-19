@@ -27,6 +27,11 @@ Item {
         "media/compact": mediaCompact,
         "media/panel/side": mediaPanelSide,
         "media/panel/cover": mediaPanelCover,
+        "media/progress": mediaProgress,
+        "media/controls": mediaControls,
+        "media/panel/vinyl": mediaPanelVinyl,
+        "media/panel/backdrop": mediaPanelBackdrop,
+        "media/panel/mini": mediaPanelMini,
         "workspaces/dots": workspacesSample,
         "workspaces/numbers": workspacesSample,
         "notifications/badge": notificationsBadge,
@@ -43,7 +48,12 @@ Item {
         "power/panel/list": powerPanelList,
         "power/panel/grid": powerPanelGrid,
         "window/plain": windowPlain,
-        "window/chip": windowChip
+        "window/chip": windowChip,
+        "start/logo": startLogo,
+        "start/grid": startGrid,
+        "start/distro": startDistro,
+        "start/avatar": startAvatar,
+        "start/label": startLabel
     })
     // what the samples show: the time and date as the bar would
     readonly property string timeText: {
@@ -399,6 +409,203 @@ Item {
                     width: parent.width
                 }
 
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaProgress
+
+        Item {
+            implicitWidth: progressRow.implicitWidth + Theme.dp(16)
+            implicitHeight: Theme.dp(28)
+
+            Rectangle {
+                width: parent.width * 0.45
+                height: parent.height
+                radius: height / 2
+                color: Theme.alpha(Theme.accent, 0.28)
+            }
+
+            Row {
+                id: progressRow
+
+                anchors.centerIn: parent
+                spacing: Theme.dp(8)
+
+                Rectangle {
+                    width: Theme.dp(16)
+                    height: Theme.dp(16)
+                    radius: height / 2
+                    color: Theme.accentContainer
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                BarText {
+                    text: "Artist  -  Song"
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaControls
+
+        Row {
+            spacing: Theme.dp(6)
+
+            MiniGlyph {
+                name: "skip_previous"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            MiniPlay {
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            MiniGlyph {
+                name: "skip_next"
+                anchors.verticalCenter: parent.verticalCenter
+            }
+
+            BarText {
+                text: "Artist  -  Song"
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelVinyl
+
+        MiniPanel {
+            height: Theme.dp(104)
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: Theme.dp(8)
+                spacing: Theme.dp(6)
+
+                Item {
+                    width: parent.width
+                    height: Theme.dp(52)
+
+                    CircularProgress {
+                        anchors.centerIn: parent
+                        width: parent.height
+                        height: width
+                        thickness: Theme.dp(3)
+                        value: 0.4
+                        color: Theme.accent
+                        trackColor: Theme.alpha(Theme.text, 0.14)
+                    }
+
+                    ShapedImage {
+                        anchors.centerIn: parent
+                        width: parent.height - Theme.dp(12)
+                        height: width
+                        shape: "cookie12"
+                        fallbackColor: Theme.accentContainer
+                    }
+
+                }
+
+                MiniLines {
+                    width: parent.width
+                }
+
+                MiniTrack {
+                    width: parent.width
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelBackdrop
+
+        MiniPanel {
+            clip: true
+
+            // the cover's colours, run together behind the panel
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                opacity: 0.55
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+
+                    GradientStop {
+                        position: 0
+                        color: Theme.accentContainer
+                    }
+
+                    GradientStop {
+                        position: 1
+                        color: Theme.alpha(Theme.cTertiary, 0.6)
+                    }
+
+                }
+
+            }
+
+            Row {
+                anchors.fill: parent
+                anchors.margins: Theme.dp(8)
+                spacing: Theme.dp(8)
+
+                Rectangle {
+                    width: Theme.dp(44)
+                    height: Theme.dp(44)
+                    radius: Theme.radiusSm
+                    color: Theme.accent
+                }
+
+                MiniLines {
+                    width: parent.width - Theme.dp(52)
+                }
+
+            }
+
+            MiniTrack {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.dp(8)
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelMini
+
+        MiniPanel {
+            width: Theme.dp(124)
+            height: Theme.dp(64)
+
+            MiniLines {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.margins: Theme.dp(8)
+            }
+
+            MiniTrack {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.dp(8)
             }
 
         }
@@ -817,6 +1024,134 @@ Item {
             implicitHeight: Theme.dp(10)
             radius: Theme.dp(5)
             color: Theme.error
+        }
+
+    }
+
+    Component {
+        id: startLogo
+
+        Item {
+            implicitWidth: Theme.dp(26)
+            implicitHeight: Theme.dp(26)
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Theme.dp(18)
+                height: Theme.dp(18)
+                radius: width / 2
+                color: "transparent"
+                border.width: Theme.dp(3)
+                border.color: Theme.accent
+            }
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Theme.dp(6)
+                height: Theme.dp(6)
+                radius: width / 2
+                color: Theme.text
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startGrid
+
+        Grid {
+            columns: 3
+            spacing: Theme.dp(3)
+
+            Repeater {
+                model: 9
+
+                Rectangle {
+                    width: Theme.dp(4)
+                    height: Theme.dp(4)
+                    radius: width / 2
+                    color: index === 4 ? Theme.accent : Theme.text
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startDistro
+
+        // a generic peak, in the accent: the real logo is read on the bar
+        Item {
+            implicitWidth: Theme.dp(20)
+            implicitHeight: Theme.dp(20)
+
+            Shape {
+                width: 24
+                height: 24
+                preferredRendererType: Shape.CurveRenderer
+                transform: Scale {
+                    xScale: Theme.dp(20) / 24
+                    yScale: Theme.dp(20) / 24
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    strokeColor: "transparent"
+                    fillColor: Theme.accent
+
+                    PathSvg {
+                        path: "M12 2 3 21h4.5L12 11l4.5 10H21Z"
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startAvatar
+
+        Rectangle {
+            implicitWidth: Theme.dp(22)
+            implicitHeight: Theme.dp(22)
+            radius: width / 2
+            color: Theme.secondaryContainer
+
+            BarText {
+                anchors.centerIn: parent
+                text: (Users.me && Users.me.name ? Users.me.name : "U").charAt(0).toUpperCase()
+                color: Theme.fgSecondaryContainer
+                font.pixelSize: Theme.fs(11)
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startLabel
+
+        Rectangle {
+            implicitWidth: startLabelText.implicitWidth + Theme.dp(20)
+            implicitHeight: Theme.dp(24)
+            radius: Theme.pill(height)
+            color: Theme.accent
+
+            BarText {
+                id: startLabelText
+
+                anchors.centerIn: parent
+                text: "Start"
+                color: Theme.fgAccent
+                font.pixelSize: Theme.fs(12)
+            }
+
         }
 
     }
