@@ -27,8 +27,8 @@ Item {
         "media/compact": mediaCompact,
         "media/panel/side": mediaPanelSide,
         "media/panel/cover": mediaPanelCover,
-        "workspaces/dots": workspacesDots,
-        "workspaces/numbers": workspacesNumbers,
+        "workspaces/dots": workspacesSample,
+        "workspaces/numbers": workspacesSample,
         "notifications/badge": notificationsBadge,
         "notifications/dot": notificationsDot,
         "notifications/chip": notificationsChip,
@@ -67,6 +67,10 @@ Item {
             return Loc.now().toLocaleDateString(Qt.locale(), "ddd, dd/MM");
         }
     }
+
+    // the strip of bar behind it, and how far the module's own pill pads it
+    readonly property int stripHeight: Math.min(Theme.dp(34), Theme.dp(Prefs.barHeight))
+    readonly property int pad: loader.item && loader.item.pad !== undefined ? loader.item.pad : Theme.dp(12)
 
     implicitWidth: loader.item ? loader.item.implicitWidth : 0
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -401,117 +405,91 @@ Item {
 
     }
 
-    // a run of two in use, the second the one you are on, then three empty;
-    // five, as six of the bar's cells do not fit a tile
+    // the bar's own cells: square, inset as far as the pill pads them, those in
+    // use on one surface, the accent pill on the first, as many as the bar shows
     Component {
-        id: workspacesDots
+        id: workspacesSample
 
         Item {
-            id: wsd
+            id: ws
 
-            readonly property int cell: Theme.dp(26)
+            readonly property bool numbered: sample.styleKey === "numbers"
+            readonly property int pad: Theme.dp(4)
+            readonly property int cell: Math.max(Theme.dp(16), sample.stripHeight - ws.pad * 2)
+            readonly property int count: Math.max(3, Prefs.workspacesShown)
 
-            implicitWidth: wsd.cell * 5
-            implicitHeight: wsd.cell
+            implicitWidth: ws.cell * ws.count
+            implicitHeight: ws.cell
 
             Rectangle {
-                width: wsd.cell * 2
-                height: wsd.cell
+                width: ws.cell * 3
+                height: ws.cell
                 radius: Theme.pill(height)
                 color: Theme.withBlur(Theme.surfaceHighest)
             }
 
             Rectangle {
-                x: wsd.cell
-                width: wsd.cell
-                height: wsd.cell
+                width: ws.cell
+                height: ws.cell
                 radius: Theme.pill(height)
                 color: Theme.accent
             }
 
             Repeater {
-                model: 5
+                model: ws.count
 
                 Item {
                     id: mark
 
                     required property int index
-                    readonly property real size: wsd.cell * (mark.index === 1 ? 2 / 3 : (mark.index === 0 ? 1 / 3 : 1 / 4))
+                    readonly property bool focused: mark.index === 0
+                    readonly property bool occupied: mark.index < 3
+                    readonly property real size: ws.cell * (mark.focused ? 2 / 3 : (mark.occupied ? 1 / 3 : 1 / 4))
 
-                    x: mark.index * wsd.cell
-                    width: wsd.cell
-                    height: wsd.cell
-                    layer.enabled: true
-                    layer.samples: 8
+                    x: mark.index * ws.cell
+                    width: ws.cell
+                    height: ws.cell
 
-                    Shape {
-                        x: (wsd.cell - mark.size) / 2
-                        y: (wsd.cell - mark.size) / 2
-                        width: mark.size
-                        height: mark.size
-                        preferredRendererType: Shape.GeometryRenderer
+                    Item {
+                        anchors.fill: parent
+                        visible: !ws.numbered
+                        layer.enabled: true
+                        layer.samples: 8
+                        layer.smooth: true
 
-                        ShapePath {
-                            fillColor: mark.index === 1 ? Theme.fgPrimary : (mark.index === 0 ? Theme.text : Theme.alpha(Theme.subtext, 0.5))
-                            strokeColor: "transparent"
-                            strokeWidth: 0
+                        Shape {
+                            x: (ws.cell - mark.size) / 2
+                            y: (ws.cell - mark.size) / 2
+                            width: mark.size
+                            height: mark.size
+                            preferredRendererType: Shape.GeometryRenderer
 
-                            PathSvg {
-                                path: Shapes.path(mark.index === 1 ? "cookie9" : (mark.index === 0 ? "square" : "circle"), mark.size, 0)
+                            ShapePath {
+                                fillColor: mark.focused ? Theme.fgPrimary : (mark.occupied ? Theme.text : Theme.alpha(Theme.subtext, 0.5))
+                                strokeColor: "transparent"
+                                strokeWidth: 0
+
+                                PathSvg {
+                                    path: Shapes.path(mark.focused ? "cookie9" : (mark.occupied ? "square" : "circle"), mark.size, 0)
+                                }
+
                             }
 
                         }
 
                     }
 
-                }
+                    Text {
+                        anchors.centerIn: parent
+                        visible: ws.numbered
+                        text: mark.index + 1
+                        color: mark.focused ? Theme.fgPrimary : (mark.occupied ? Theme.text : Theme.alpha(Theme.subtext, 0.55))
+                        font.family: Theme.fontFamily
+                        font.bold: true
+                        font.pixelSize: Theme.fs(12)
+                        font.variableAxes: Theme.axes(Theme.fs(12), 680, 100)
+                    }
 
-            }
-
-        }
-
-    }
-
-    Component {
-        id: workspacesNumbers
-
-        Item {
-            id: wsn
-
-            readonly property int cell: Theme.dp(26)
-
-            implicitWidth: wsn.cell * 5
-            implicitHeight: wsn.cell
-
-            Rectangle {
-                width: wsn.cell * 2
-                height: wsn.cell
-                radius: Theme.pill(height)
-                color: Theme.withBlur(Theme.surfaceHighest)
-            }
-
-            Rectangle {
-                x: wsn.cell
-                width: wsn.cell
-                height: wsn.cell
-                radius: Theme.pill(height)
-                color: Theme.accent
-            }
-
-            Repeater {
-                model: 5
-
-                BarText {
-                    required property int index
-
-                    x: index * wsn.cell
-                    width: wsn.cell
-                    height: wsn.cell
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: index + 1
-                    font.pixelSize: Theme.fs(12)
-                    color: index === 1 ? Theme.fgPrimary : (index === 0 ? Theme.text : Theme.alpha(Theme.subtext, 0.55))
                 }
 
             }

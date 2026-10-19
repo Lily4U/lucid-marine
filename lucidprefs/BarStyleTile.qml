@@ -17,7 +17,8 @@ Item {
     readonly property string key: tile.style ? tile.style.key : ""
     readonly property bool picked: tile.prefKey !== "" && Prefs[tile.prefKey] === tile.key
 
-    implicitWidth: Theme.dp(172)
+    // wider for a sample that needs it, so nothing of it is cut off
+    implicitWidth: Math.max(Theme.dp(172), (tile.panel ? 0 : sample.implicitWidth + sample.pad * 2) + Theme.dp(20))
     implicitHeight: tile.panel ? Theme.dp(196) : Theme.dp(144)
 
     Rectangle {
@@ -61,8 +62,8 @@ Item {
             Rectangle {
                 visible: !tile.panel
                 anchors.centerIn: parent
-                width: Math.min(parent.width, sample.implicitWidth + Theme.dp(24))
-                height: Math.min(Theme.dp(34), Theme.dp(Prefs.barHeight))
+                width: sample.implicitWidth + sample.pad * 2
+                height: sample.stripHeight
                 radius: height / 2
                 color: Theme.bg
             }
