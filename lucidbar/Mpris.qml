@@ -1350,7 +1350,7 @@ BarPill {
                     shape: "cookie12"
                     source: root.vinylPanel ? root.artSource : ""
                     decode: Theme.dp(384)
-                    fallbackColor: Theme.alpha(Theme.text, 0.1)
+                    fallbackColor: Theme.secondaryContainer
 
                     // only while it can be seen
                     RotationAnimation on rotation {
@@ -1361,14 +1361,17 @@ BarPill {
                         running: root.isPlaying && root.expanded && vinyl.visible
                     }
 
-                    Icon {
-                        anchors.centerIn: parent
-                        visible: !record.ready
-                        name: "album"
-                        size: record.width * 0.4
-                        color: Theme.subtextDim
-                    }
+                }
 
+                // no cover: a note on the record, beside it so it does not turn
+                // with it; a turned icon layer goes jagged
+                Icon {
+                    anchors.centerIn: record
+                    visible: !record.ready
+                    name: "music_note"
+                    size: Math.round(record.width * 0.34)
+                    fill: 1
+                    color: Theme.fgSecondaryContainer
                 }
 
                 Rectangle {

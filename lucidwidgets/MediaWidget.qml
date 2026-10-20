@@ -778,13 +778,17 @@ WidgetBody {
                 running: w.playing && w.visible && !w.preview
             }
 
-            Icon {
-                anchors.centerIn: parent
-                name: "album"
-                size: record.width * 0.4
-                color: w.inkFaint
-            }
+        }
 
+        // no cover: a note on the record, beside it so it does not turn with
+        // it; a turned icon layer goes jagged
+        Icon {
+            anchors.centerIn: record
+            visible: !record.ready
+            name: "music_note"
+            size: Math.round(record.width * 0.34)
+            fill: 1
+            color: w.inkFaint
         }
 
         Rectangle {
