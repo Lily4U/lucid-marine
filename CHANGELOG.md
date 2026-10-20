@@ -2,6 +2,24 @@
 
 All notable changes to Lucid are recorded here, newest first.
 
+## Unreleased
+
+### New
+
+- **Update from inside Lucid.** When a new release is out, *Settings → About*
+  (and the notification that announces it) has an **Update** button. It warns
+  you what is about to happen, asks for your password once, and then installs
+  the release's own source with its own installer, in a pop-up with a progress
+  bar. Anything the installer would ask in a terminal, a yes or no or sudo
+  wanting the password again, is asked in the pop-up. When it is done,
+  **Restart now**, **Remind me later** (an hour) or **Cancel**. The updater
+  runs outside the shell, so it survives a reload, and the pop-up picks up
+  where it was. Only a published release counts as an update, not a push to
+  `main`. The password goes to `sudo` once and is never stored.
+- **Beta updates.** A switch under *Settings → About*, with a warning that
+  things may break, offers the newest commit on `main` before it becomes a
+  release. It installs the same way and needs the password too.
+
 ## v1.20.1 — 2026-10-15
 
 A point release on top of Lucid 2: icons on the desktop, bar modules that join

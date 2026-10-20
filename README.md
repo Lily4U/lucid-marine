@@ -115,9 +115,19 @@ one. The request is a plain `curl` for
 `api.github.com/repos/Sn3akyy1/lucid/releases/latest` and carries nothing about
 you or your machine; **Settings → About** shows what it found and turns it off.
 
+**Update** (on the About page, or on the notification) installs the release
+for you: a warning, your password, then a pop-up with a progress bar that also
+asks anything the installer would ask in a terminal. It downloads the release's
+source from GitHub and runs that release's own `install.sh`, the same as doing
+it by hand below, and offers to restart Lucid at the end. The password goes to
+`sudo` once and is not kept. Only a published release counts, never a push to
+`main`, unless you turn on **Beta updates**, which offers the newest commit on
+`main` instead and comes with a warning: beta builds are untested.
+
 ```sh
 qs ipc call updates status   # what it knows
 qs ipc call updates check    # ask now
+qs ipc call updates update   # install the new release (warning first)
 ```
 
 ### Older versions
@@ -1288,7 +1298,7 @@ Every surface is scriptable. `qs ipc call -- <target> <function> [arg]`:
 | `screenshot` | `full` `text` |
 | `media` | `toggle` `open` `close` `identify` `playPause` `next` `previous` |
 | `workspaces` | `toggle` `open` `close` |
-| `updates` | `status` `check` `whatsnew` (the What's new sheet for this version) |
+| `updates` | `status` `check` `whatsnew` (the What's new sheet for this version) `update` (install the newest release) `beta` (install the newest commit on `main`) `show` (bring back a hidden update pop-up) |
 | `displays` | `list` `settings` `shell <where>` `bar <where>` `dock <where>` — *where* is an output name, `left`/`middle`/`right`, `here`, `next`, `prev` or `auto` |
 | `polkit` | `status` `demo <action-id>` `fail` `grant` `close` — `demo` raises the dialog with no PAM session behind it, for previewing a theme |
 | `debug` | `toggle` `on` `off` — draws input and blur region outlines |

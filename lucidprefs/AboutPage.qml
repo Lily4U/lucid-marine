@@ -77,13 +77,23 @@ Column {
         title: "UPDATES"
 
         SettingRow {
-            title: Updates.available ? "Lucid v" + Updates.latest + " is out" : "Version " + Updates.currentLabel
+            title: {
+                if (Updates.installing)
+                    return "Updating to " + Updates.flowLabel;
+
+                if (Updates.restartPending)
+                    return "Restart to finish";
+
+                return Updates.available ? "Lucid v" + Updates.latest + " is out" : "Version " + Updates.currentLabel;
+            }
             description: Updates.status
+            stacked: true
 
             Row {
                 spacing: Theme.dp(8)
 
                 M3Button {
+                    visible: !Updates.installing
                     text: Updates.busy ? "Checking…" : "Check now"
                     variant: "tonal"
                     enabled: !Updates.busy && Updates.current !== ""
@@ -99,10 +109,34 @@ Column {
 
                 // a newer one's notes live on GitHub until it is installed
                 M3Button {
-                    visible: Updates.available
+                    visible: Updates.available && !Updates.restartPending
                     text: "Release notes"
-                    variant: "filled"
+                    variant: "outlined"
                     onClicked: Updates.openLatest()
+                }
+
+                // installs it from the release, warning and password first
+                M3Button {
+                    visible: Updates.available && !Updates.installing && !Updates.restartPending
+                    text: "Update"
+                    variant: "filled"
+                    iconPath: "download"
+                    onClicked: Updates.startUpdate("release")
+                }
+
+                M3Button {
+                    visible: Updates.installing
+                    text: "Show progress"
+                    variant: "filled"
+                    onClicked: Updates.show()
+                }
+
+                M3Button {
+                    visible: Updates.restartPending
+                    text: "Restart now"
+                    variant: "filled"
+                    iconPath: "restart_alt"
+                    onClicked: Updates.restartNow()
                 }
 
             }
@@ -113,13 +147,56 @@ Column {
             title: "Check for updates"
             resetKey: "updateCheck"
             description: "Once a day Lucid asks GitHub for the newest release, and tells you once when there is one. The request carries nothing about you or this machine."
-            showDivider: false
 
             M3Switch {
                 checked: Prefs.updateCheck
                 onToggled: (v) => {
                     return Prefs.updateCheck = v;
                 }
+            }
+
+        }
+
+        SettingRow {
+            title: "Beta updates"
+            resetKey: "updateBeta"
+            description: "Offers the newest commit on main, before it becomes a release. Installing one needs your password, like an update. Turning this off does not roll anything back; the next release replaces the beta."
+            warning: "Critical: beta builds are untested and things may break. The bar, the lock screen or the whole shell can fail to start, and getting back may take a terminal."
+            showDivider: Prefs.updateBeta
+
+            M3Switch {
+                checked: Prefs.updateBeta
+                onToggled: (v) => {
+                    return Prefs.updateBeta = v;
+                }
+            }
+
+        }
+
+        SettingRow {
+            visible: Prefs.updateBeta
+            title: Updates.betaAvailable ? "Beta " + Updates.betaShort + " is available" : "Beta build"
+            description: Updates.betaStatus
+            showDivider: false
+
+            Row {
+                spacing: Theme.dp(8)
+
+                M3Button {
+                    text: Updates.betaBusy ? "Checking…" : "Check"
+                    variant: "tonal"
+                    enabled: !Updates.betaBusy
+                    onClicked: Updates.checkBeta()
+                }
+
+                M3Button {
+                    text: "Install beta"
+                    variant: "filled"
+                    destructive: true
+                    enabled: Updates.betaSha !== "" && !Updates.installing
+                    onClicked: Updates.startUpdate("beta")
+                }
+
             }
 
         }

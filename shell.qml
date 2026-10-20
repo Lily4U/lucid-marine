@@ -14,6 +14,7 @@ import "./lucidprefs"
 import "./lucidsession"
 import "./lucidshot"
 import "./lucidswitch"
+import "./lucidupdate"
 import "./lucidwidgets"
 import QtQuick
 import Quickshell
@@ -1309,6 +1310,11 @@ ShellRoot {
 
     WhatsNew {
         id: whatsNewMod
+    }
+
+    // the update pop-up: warning, password, progress, restart
+    UpdateSheet {
+        id: updateSheetMod
     }
 
     SettingsHost {

@@ -659,6 +659,8 @@ Singleton {
     property alias audioCombine: s.audioCombine
     property alias kdeConnectEnabled: s.kdeConnectEnabled
     property alias updateCheck: s.updateCheck
+    // the newest commit on main, offered for install before it is a release
+    property alias updateBeta: s.updateBeta
     property alias storageLowWarn: s.storageLowWarn
     property alias storageLowPercent: s.storageLowPercent
     // 0 means never
@@ -863,7 +865,7 @@ Singleton {
         { "key": "idle", "icon": "bedtime", "keys": "sleep suspend lock dim screen off hypridle caffeine", "group": "System", "label": "Idle", "title": "Idle and Sleep", "blurb": "What happens when you walk away: dimming, locking, screen off and suspend", "toggle": "idleEnabled" },
         { "key": "datetime", "icon": "schedule", "keys": "clock time zone location 24 hour seconds week monday sunday units metric imperial celsius fahrenheit temperature wind mph timer pomodoro focus break alarm world", "group": "System", "label": "Date & Time", "title": "Date and Time", "blurb": "Where you are, the clock, and its timers" },
         { "key": "storage", "icon": "hard_drive", "keys": "disk space storage usage free full clean cleanup cache trash duplicates large files drives ssd health smart trim mount", "group": "System", "label": "Storage", "title": "Storage", "blurb": "What fills your drives, what could go, and the drives themselves" },
-        { "key": "about", "icon": "info", "keys": "version update lucid", "group": "System", "label": "About", "title": "About", "blurb": "Lucid" }
+        { "key": "about", "icon": "info", "keys": "version update upgrade install release beta restart lucid", "group": "System", "label": "About", "title": "About", "blurb": "Lucid" }
     ]
 
     function settingsPage(key) {
@@ -1149,6 +1151,7 @@ Singleton {
         "audioCombine": "",
         "kdeConnectEnabled": true,
         "updateCheck": true,
+        "updateBeta": false,
         "storageLowWarn": true,
         "storageLowPercent": 10,
         "storageTrashDays": 0,
@@ -1878,6 +1881,7 @@ Singleton {
             property string audioCombine: ""
             property bool kdeConnectEnabled: true
             property bool updateCheck: true
+            property bool updateBeta: false
             property bool storageLowWarn: true
             property int storageLowPercent: 10
             property int storageTrashDays: 0
