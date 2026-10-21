@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Hyprland._FocusGrab
 import Quickshell.Io
@@ -59,15 +60,75 @@ BarPill {
     readonly property string artist: root.player ? root.player.trackArtist : ""
     readonly property string artUrl: root.player ? root.player.trackArtUrl : ""
     readonly property string sourceName: root.player ? (root.player.identity || "Media player") : ""
-    readonly property bool heroLayout: root.coverPanel && root.player !== null
+    // the cover across the top, or the record: either way the track goes under it
+    readonly property bool heroLayout: (root.coverPanel || root.vinylPanel) && root.player !== null
     // concentric with the panel's own corner
     readonly property int innerRadius: Math.max(Theme.shapeMd, root.expandedRadius - root.pad)
+    // a remote cover is fetched into the cache and shown from there: an Image
+    // fed the url itself makes Qt run the network stack, and its http/2 client
+    // is what has been taking the shell down mid-session
+    readonly property bool remoteArt: /^https?:/.test(root.artUrl)
+    readonly property string artFile: {
+        if (!root.remoteArt)
+            return "";
+
+        var h = 5381;
+        for (var i = 0; i < root.artUrl.length; i++) h = ((h * 33) ^ root.artUrl.charCodeAt(i)) >>> 0
+        return Quickshell.env("HOME") + "/.cache/lucid/art/" + h.toString(16) + ".img";
+    }
+    property string localArt: ""
+    readonly property string artSource: root.remoteArt ? root.localArt : root.artUrl
+
+    // the last cover stays up until the next one is on disk, so RoundedArt can hold it
+    function fetchCover() {
+        if (root.artFile === "") {
+            root.localArt = "";
+            return ;
+        }
+        // handed over here: a command bound to artFile is still the old one in onArtFileChanged
+        artFetch.superseded = artFetch.running;
+        artFetch.file = root.artFile;
+        artFetch.running = false;
+        artFetch.command = ["sh", "-c", artFetch.script, "sh", root.artFile, root.artUrl];
+        artFetch.running = true;
+    }
+
+    onArtFileChanged: root.fetchCover()
+    Component.onCompleted: root.fetchCover()
+
+    Process {
+        id: artFetch
+
+        property string file: ""
+        // a run cut short by the next fetch still reports, before that one starts
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
+
+        onExited: (code) => {
+            if (artFetch.superseded) {
+                artFetch.superseded = false;
+                return ;
+            }
+            root.localArt = code === 0 ? "file://" + artFetch.file : "";
+        }
+    }
     readonly property string displayTitle: (root.player && root.artist && Prefs.mediaArtist) ? root.artist + "  -  " + root.title : root.title
     // the looks picked on the module's card
-    readonly property bool coverFace: Prefs.mediaStyle === "cover"
-    readonly property bool compactFace: Prefs.mediaStyle === "compact"
-    readonly property bool discFace: !root.coverFace && !root.compactFace
+    lookPref: Prefs.mediaStyle
+    readonly property bool coverFace: root.look === "cover"
+    readonly property bool compactFace: root.look === "compact"
+    // the pill fills as the song goes, behind the turning cover and the track
+    readonly property bool progressFace: root.look === "progress"
+    // previous, play and next, then the track
+    readonly property bool controlsFace: root.look === "controls"
+    readonly property bool discFace: !root.coverFace && !root.compactFace && !root.controlsFace
     readonly property bool coverPanel: Prefs.mediaPanelStyle === "cover"
+    // the cover as a record that turns while it plays, as the media widget's disc
+    readonly property bool vinylPanel: Prefs.mediaPanelStyle === "vinyl"
+    // side by side, over the cover blurred across the whole panel
+    readonly property bool backdropPanel: Prefs.mediaPanelStyle === "backdrop"
+    // side by side without the cover, narrower
+    readonly property bool miniPanel: Prefs.mediaPanelStyle === "mini"
     readonly property real posSec: root.player ? root.player.position : 0
     readonly property real lenSec: root.player ? root.player.length : 0
     readonly property bool hasDuration: root.lenSec > 0
@@ -91,6 +152,80 @@ BarPill {
     readonly property int barCount: root.bars.length > 1 ? root.bars.length : 24
     property string shazamState: "idle"
     property var shazamResult: null
+    // shazam's cover is a remote url too, and goes through the same cache
+    readonly property bool shazamRemote: !!root.shazamResult && /^https?:/.test(root.shazamResult.art || "")
+    property string shazamLocalArt: ""
+    readonly property string shazamArtSource: root.shazamRemote ? root.shazamLocalArt : (root.shazamResult ? (root.shazamResult.art || "") : "")
+
+    // read here, not through bindings on shazamResult, which can still be stale
+    onShazamResultChanged: {
+        const r = root.shazamResult;
+        root.shazamLocalArt = "";
+        if (!r || !/^https?:/.test(r.art || ""))
+            return ;
+
+        const f = Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + (r.key || "0") + ".img";
+        shazamFetch.superseded = shazamFetch.running;
+        shazamFetch.file = f;
+        shazamFetch.running = false;
+        shazamFetch.command = ["sh", "-c", shazamFetch.script, "sh", f, r.art];
+        shazamFetch.running = true;
+    }
+
+    Process {
+        id: shazamFetch
+
+        property string file: ""
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
+
+        onExited: (code) => {
+            if (shazamFetch.superseded) {
+                shazamFetch.superseded = false;
+                return ;
+            }
+            if (code === 0)
+                root.shazamLocalArt = "file://" + shazamFetch.file;
+
+        }
+    }
+    // the history's covers come out of the same cache; a row shows only what is on disk
+    property var historyArt: ({})
+
+    function shazamKey(entry) {
+        return String((entry && entry.key) || "").replace(/[^A-Za-z0-9_-]/g, "");
+    }
+
+    function fetchHistoryArt() {
+        if (root.page !== "shazam")
+            return ;
+
+        const args = [];
+        for (const e of (historyAdapter.items || []).slice(0, 3)) {
+            const key = root.shazamKey(e);
+            if (key !== "" && /^https?:/.test(e.art || "") && !root.historyArt[key])
+                args.push(key, e.art);
+        }
+        if (args.length === 0)
+            return ;
+
+        histArtFetch.running = false;
+        histArtFetch.command = ["sh", "-c", "d=\"$1\"; shift; mkdir -p \"$d\"; while [ $# -ge 2 ]; do f=\"$d/shazam-$1.img\"; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ] && echo \"$1\"; shift 2; done", "sh", Quickshell.env("HOME") + "/.cache/lucid/art"].concat(args);
+        histArtFetch.running = true;
+    }
+
+    Process {
+        id: histArtFetch
+
+        stdout: SplitParser {
+            onRead: (key) => {
+                const m = Object.assign({}, root.historyArt);
+                m[key] = "file://" + Quickshell.env("HOME") + "/.cache/lucid/art/shazam-" + key + ".img";
+                root.historyArt = m;
+            }
+        }
+
+    }
     property string shazamError: ""
     property int listenElapsed: 0
     readonly property int listenLimit: 30
@@ -446,6 +581,7 @@ BarPill {
 
         sinkProc.running = true;
         sourceProc.running = true;
+        root.fetchHistoryArt();
     }
     // gates the slide, so the first layout and the reset on close do not animate
     property bool pageSwitching: false
@@ -468,7 +604,7 @@ BarPill {
     shown: Prefs.barHas("media") && !(Prefs.mediaHideIdle && root.player === null)
 
     compactWidth: compactRow.implicitWidth + Theme.dp(20)
-    panelWidth: Math.min(Theme.dp(400), root.screenW - Theme.dp(34))
+    panelWidth: Math.min(root.miniPanel ? Theme.dp(320) : Theme.dp(400), root.screenW - Theme.dp(34))
     panelHeight: root.pad * 2 + (root.page === "player" ? playerColumn.implicitHeight : shazamColumn.implicitHeight)
     expandedRadius: Theme.radiusXl
     compactCollapseScale: 0.94
@@ -491,6 +627,8 @@ BarPill {
             id: historyAdapter
 
             property var items: []
+
+            onItemsChanged: root.fetchHistoryArt()
         }
 
     }
@@ -676,6 +814,19 @@ BarPill {
     }
 
     compactContent: [
+        // Progress: the pill fills, as a capsule, as the song goes
+        Rectangle {
+            readonly property real track: parent.width - Theme.dp(8)
+
+            visible: root.progressFace && root.player !== null && width > 0
+            x: Theme.dp(4)
+            anchors.verticalCenter: parent.verticalCenter
+            height: parent.height - Theme.dp(8)
+            // nothing before the song starts, then never thinner than it is tall
+            width: root.hasDuration && root.posSec > 0 ? Math.max(height, track * Math.min(1, root.posSec / root.lenSec)) : 0
+            radius: height / 2
+            color: Theme.alpha(Theme.accent, 0.28)
+        },
         MouseArea {
             anchors.fill: parent
             hoverEnabled: true
@@ -708,14 +859,63 @@ BarPill {
             anchors.centerIn: parent
             spacing: Theme.dp(8)
 
+            // Controls: previous, play and next before the track
+            Row {
+                visible: root.controlsFace && root.player !== null
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.dp(2)
+
+                BarSkip {
+                    glyph: root.prevGlyph
+                    enabled: root.player !== null && root.player.canGoPrevious
+                    onActivated: root.skip(-1)
+                }
+
+                Rectangle {
+                    width: Math.round(Theme.dp(24) * 1.3)
+                    height: Theme.dp(24)
+                    radius: controlsPlay.pressed ? Theme.dp(8) : Theme.dp(12)
+                    anchors.verticalCenter: parent.verticalCenter
+                    color: Theme.accent
+                    opacity: root.player !== null && root.player.canTogglePlaying ? 1 : 0.4
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: root.isPlaying ? root.pauseGlyph : root.playGlyph
+                        size: Theme.dp(16)
+                        fill: 1
+                        color: Theme.fgAccent
+                    }
+
+                    StateLayer {
+                        id: controlsPlay
+
+                        radius: parent.radius
+                        tint: Theme.fgAccent
+                        disabled: !(root.player !== null && root.player.canTogglePlaying)
+                        onClicked: root.togglePlay()
+                    }
+
+                }
+
+                BarSkip {
+                    glyph: root.nextGlyph
+                    enabled: root.player !== null && root.player.canGoNext
+                    onActivated: root.skip(1)
+                }
+
+            }
+
             Item {
+                visible: !(root.controlsFace && root.player !== null)
                 width: root.coverFace ? Theme.dp(22) : Theme.dp(26)
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
 
                 CircularProgress {
                     anchors.fill: parent
-                    visible: root.player !== null && !root.coverFace
+                    // the Progress look shows it in the pill's fill instead
+                    visible: root.player !== null && !root.coverFace && !root.progressFace
                     value: root.lenSec > 0 ? root.posSec / root.lenSec : 0
                     thickness: 2.5
                     color: Theme.accent
@@ -736,7 +936,7 @@ BarPill {
                         id: compactArtImg
 
                         anchors.fill: parent
-                        source: root.discFace ? root.artUrl : ""
+                        source: root.discFace ? root.artSource : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         sourceSize.width: Theme.dp(64)
@@ -766,7 +966,7 @@ BarPill {
                         id: coverArtImg
 
                         anchors.fill: parent
-                        source: root.coverFace ? root.artUrl : ""
+                        source: root.coverFace ? root.artSource : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
                         sourceSize.width: Theme.dp(64)
@@ -882,7 +1082,7 @@ BarPill {
             }
 
             Rectangle {
-                visible: Prefs.mediaPlayButton
+                visible: Prefs.mediaPlayButton && !(root.controlsFace && root.player !== null)
                 width: Math.round(Theme.dp(24) * 1.3)
                 height: Theme.dp(24)
                 radius: playArea.pressed ? Theme.dp(8) : Theme.dp(12)
@@ -922,6 +1122,44 @@ BarPill {
     ]
 
     panelContent: [
+    // backdrop: the cover blurred across the whole panel, under a scrim the
+    // text reads on. clipped to the panel's own corners
+    ClippingRectangle {
+        anchors.fill: parent
+        topLeftRadius: root.popupItem.topLeftRadius
+        topRightRadius: root.popupItem.topRightRadius
+        bottomLeftRadius: root.popupItem.bottomLeftRadius
+        bottomRightRadius: root.popupItem.bottomRightRadius
+        color: "transparent"
+        visible: root.backdropPanel && root.player !== null && backdropArt.status === Image.Ready
+
+        Image {
+            id: backdropArt
+
+            anchors.fill: parent
+            source: root.backdropPanel ? root.artSource : ""
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            sourceSize.width: 256
+            sourceSize.height: 256
+            visible: false
+        }
+
+        MultiEffect {
+            anchors.fill: parent
+            source: backdropArt
+            blurEnabled: true
+            blur: 1
+            blurMax: 64
+            saturation: 0.2
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            color: Theme.alpha(Theme.bgOpaque, 0.6)
+        }
+
+    },
     Item {
         id: playerPage
 
@@ -957,7 +1195,7 @@ BarPill {
 
                 width: root.contentWidth
                 height: Math.round(root.contentWidth * 0.56)
-                visible: root.heroLayout
+                visible: root.heroLayout && root.coverPanel
 
                 // the cover with its hover hint; a click raises the player, or plays and pauses
                 Item {
@@ -965,7 +1203,7 @@ BarPill {
 
                     RoundedArt {
                         anchors.fill: parent
-                        source: root.artUrl
+                        source: root.artSource
                         shapeRadius: root.innerRadius
                         decode: Theme.dp(512)
                         fallbackGlyph: Math.round(Math.min(parent.width, parent.height) * 0.32)
@@ -1067,6 +1305,162 @@ BarPill {
                         radius: parent.radius
                         tint: Theme.text
                         disabled: !sourceChip.many
+                        onClicked: root.cyclePlayer()
+                    }
+
+                }
+
+            }
+
+            // vinyl: the cover as a record that turns while it plays, ringed by the
+            // track's progress, as the media widget's disc. a click plays and pauses
+            Item {
+                id: vinyl
+
+                width: root.contentWidth
+                height: Math.round(root.contentWidth * 0.62)
+                visible: root.heroLayout && root.vinylPanel
+
+                // the wheel over it sets the player's volume
+                MouseArea {
+                    anchors.fill: parent
+                    acceptedButtons: Qt.NoButton
+                    onWheel: (wheel) => {
+                        return root.nudgeVolume(wheel.angleDelta.y > 0 ? 0.05 : -0.05);
+                    }
+                }
+
+                CircularProgress {
+                    anchors.centerIn: parent
+                    width: vinyl.height
+                    height: width
+                    thickness: Theme.dp(6)
+                    value: root.progress
+                    animated: false
+                    color: Theme.accent
+                    trackColor: Theme.alpha(Theme.text, 0.14)
+                }
+
+                ShapedImage {
+                    id: record
+
+                    anchors.centerIn: parent
+                    width: vinyl.height - Theme.dp(24)
+                    height: width
+                    shape: "cookie12"
+                    source: root.vinylPanel ? root.artSource : ""
+                    decode: Theme.dp(384)
+                    fallbackColor: Theme.secondaryContainer
+
+                    // only while it can be seen
+                    RotationAnimation on rotation {
+                        from: 0
+                        to: 360
+                        duration: 24000
+                        loops: Animation.Infinite
+                        running: root.isPlaying && root.expanded && vinyl.visible
+                    }
+
+                }
+
+                // no cover: a note on the record, beside it so it does not turn
+                // with it; a turned icon layer goes jagged
+                Icon {
+                    anchors.centerIn: record
+                    visible: !record.ready
+                    name: "music_note"
+                    size: Math.round(record.width * 0.34)
+                    fill: 1
+                    color: Theme.fgSecondaryContainer
+                }
+
+                Rectangle {
+                    anchors.centerIn: parent
+                    width: Theme.dp(56)
+                    height: Theme.dp(56)
+                    radius: vinylTap.pressed ? Theme.dp(16) : Theme.dp(28)
+                    color: Theme.accent
+                    opacity: vinylHover.hovered || !root.isPlaying ? 1 : 0
+                    scale: vinylHover.hovered || !root.isPlaying ? 1 : 0.7
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Theme.durDefaultEffects
+                        }
+
+                    }
+
+                    Behavior on scale {
+                        NumberAnimation {
+                            duration: Theme.durFastSpatial
+                            easing.type: Easing.Bezier
+                            easing.bezierCurve: Theme.curveFastSpatial
+                        }
+
+                    }
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: root.isPlaying ? root.pauseGlyph : root.playGlyph
+                        size: Theme.dp(30)
+                        fill: 1
+                        color: Theme.fgAccent
+                    }
+
+                    StateLayer {
+                        id: vinylTap
+
+                        radius: parent.radius
+                        tint: Theme.fgAccent
+                        disabled: !(root.player !== null && root.player.canTogglePlaying)
+                        onClicked: root.togglePlay()
+                    }
+
+                }
+
+                HoverHandler {
+                    id: vinylHover
+                }
+
+                // where it plays from; with several players a click moves to the next
+                Rectangle {
+                    id: vinylSource
+
+                    readonly property bool many: root.mprisPlayers.length > 1
+
+                    width: vinylSourceRow.implicitWidth + Theme.dp(20)
+                    height: Theme.dp(26)
+                    radius: height / 2
+                    color: Theme.alpha(Theme.bg, 0.88)
+                    visible: root.sourceName !== ""
+
+                    Row {
+                        id: vinylSourceRow
+
+                        anchors.centerIn: parent
+                        spacing: Theme.dp(4)
+
+                        LText {
+                            anchors.verticalCenter: parent.verticalCenter
+                            role: "labelMedium"
+                            color: Theme.text
+                            text: root.sourceName
+                        }
+
+                        Icon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: vinylSource.many
+                            name: root.swapGlyph
+                            size: Theme.dp(14)
+                            color: Theme.text
+                        }
+
+                    }
+
+                    StateLayer {
+                        radius: parent.radius
+                        tint: Theme.text
+                        disabled: !vinylSource.many
                         onClicked: root.cyclePlayer()
                     }
 
@@ -1219,7 +1613,8 @@ BarPill {
             Item {
                 id: trackHeader
 
-                readonly property int infoX: root.artSize + Theme.dp(14)
+                // mini leaves the cover out and the track takes its place
+                readonly property int infoX: root.miniPanel ? 0 : root.artSize + Theme.dp(14)
 
                 width: root.contentWidth
                 height: root.artSize
@@ -1236,12 +1631,13 @@ BarPill {
 
                 // the cover with its hover hint; a click raises the player, or plays and pauses
                 Item {
+                    visible: !root.miniPanel
                     width: root.artSize
                     height: root.artSize
 
                     RoundedArt {
                         anchors.fill: parent
-                        source: root.artUrl
+                        source: root.artSource
                         shapeRadius: Theme.shapeLg
                         fallbackGlyph: Math.round(Math.min(parent.width, parent.height) * 0.32)
                     }
@@ -2160,7 +2556,7 @@ BarPill {
                     RoundedArt {
                         width: Theme.dp(88)
                         height: Theme.dp(88)
-                        source: root.shazamResult ? root.shazamResult.art : ""
+                        source: root.shazamArtSource
                         shapeRadius: Theme.shapeLg
                         fallbackGlyph: Theme.dp(30)
                     }
@@ -2340,7 +2736,7 @@ BarPill {
                             anchors.verticalCenter: parent.verticalCenter
                             width: Theme.dp(40)
                             height: Theme.dp(40)
-                            source: histRow.modelData.art
+                            source: root.historyArt[root.shazamKey(histRow.modelData)] || ""
                             shapeRadius: Theme.shapeSm
                             fallbackGlyph: Theme.dp(18)
                         }
@@ -2402,6 +2798,36 @@ BarPill {
 
     }
     ]
+
+    // previous or next on the bar, for the Controls look
+    component BarSkip: Item {
+        id: skipBtn
+
+        property string glyph: ""
+
+        signal activated()
+
+        width: Theme.dp(24)
+        height: Theme.dp(24)
+        anchors.verticalCenter: parent.verticalCenter
+        opacity: skipBtn.enabled ? 1 : 0.4
+
+        Icon {
+            anchors.centerIn: parent
+            name: skipBtn.glyph
+            size: Theme.dp(18)
+            fill: 1
+            color: Theme.text
+        }
+
+        StateLayer {
+            radius: height / 2
+            tint: Theme.text
+            disabled: !skipBtn.enabled
+            onClicked: skipBtn.activated()
+        }
+
+    }
 
     // clipped, not shader-masked: a mask renders blank or as one huge blob
     // on machines without a real gpu

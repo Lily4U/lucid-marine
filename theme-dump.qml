@@ -52,6 +52,8 @@ ShellRoot {
                 "fontFamily": Theme.fontFamily,
                 "fontScale": Theme.fontScale,
                 "motionScale": Theme.motionScale,
+                "uiScale": Theme.uiScale,
+                "cornerScale": Theme.cornerScale,
                 "clock24h": Prefs.clock24h
             }));
             Qt.exit(0);

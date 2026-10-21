@@ -17,7 +17,13 @@ Item {
     readonly property string key: tile.style ? tile.style.key : ""
     readonly property bool picked: tile.prefKey !== "" && Prefs[tile.prefKey] === tile.key
 
-    implicitWidth: Theme.dp(172)
+    // the strip as the module's pill pads the sample, and the room it takes
+    readonly property int stripWidth: Math.ceil(sample.implicitWidth) + sample.pad * 2
+    readonly property int needWidth: tile.panel ? 0 : tile.stripWidth + Theme.dp(10) * 2
+    // the card sets it, so every look of a module is as wide as the widest needs
+    property int minWidth: 0
+
+    implicitWidth: Math.max(Theme.dp(172), tile.minWidth, tile.needWidth)
     implicitHeight: tile.panel ? Theme.dp(196) : Theme.dp(144)
 
     Rectangle {
@@ -61,8 +67,8 @@ Item {
             Rectangle {
                 visible: !tile.panel
                 anchors.centerIn: parent
-                width: Math.min(parent.width, sample.implicitWidth + Theme.dp(24))
-                height: Math.min(Theme.dp(34), Theme.dp(Prefs.barHeight))
+                width: tile.stripWidth
+                height: sample.stripHeight
                 radius: height / 2
                 color: Theme.bg
             }

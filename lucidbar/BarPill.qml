@@ -35,6 +35,90 @@ Item {
     readonly property int morphDuration: Theme.barDurEnter
     readonly property var morphEasing: Theme.easeEmphasizedDecel
 
+    // the look picked on the module's card, and the one its face draws: a
+    // switch fades the old look out, flips, and brings the new one in as the
+    // pill takes its width. one set as the bar comes up just shows
+    property string lookPref: ""
+    property string look: ""
+    property bool lookSettled: false
+
+    function switchLook() {
+        if (pill.look === pill.lookPref)
+            return ;
+
+        if (!pill.lookSettled || !pill.shown || !pill.visible) {
+            lookSwitch.stop();
+            // a pill on its way out keeps its contents faded
+            if (pill.shown) {
+                compactHolder.opacity = 1;
+                compactHolder.scale = 1;
+            }
+            pill.look = pill.lookPref;
+            return ;
+        }
+        lookSwitch.restart();
+    }
+
+    onLookPrefChanged: pill.switchLook()
+    Component.onCompleted: pill.look = pill.lookPref
+
+    Timer {
+        interval: 1500
+        running: Prefs.loaded && !pill.lookSettled
+        onTriggered: pill.lookSettled = true
+    }
+
+    SequentialAnimation {
+        id: lookSwitch
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: compactHolder
+                property: "opacity"
+                to: 0
+                duration: Theme.barMs(120)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.easeEmphasizedAccel
+            }
+
+            NumberAnimation {
+                target: compactHolder
+                property: "scale"
+                to: 0.86
+                duration: Theme.barMs(120)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.easeEmphasizedAccel
+            }
+
+        }
+
+        ScriptAction {
+            script: pill.look = pill.lookPref
+        }
+
+        ParallelAnimation {
+            NumberAnimation {
+                target: compactHolder
+                property: "opacity"
+                to: 1
+                duration: Theme.barMs(240)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.easeEmphasizedDecel
+            }
+
+            NumberAnimation {
+                target: compactHolder
+                property: "scale"
+                to: 1
+                duration: Theme.barMs(320)
+                easing.type: Easing.Bezier
+                easing.bezierCurve: Theme.curveDefaultSpatial
+            }
+
+        }
+
+    }
+
     // the id the bar knows this pill by
     function moduleId() {
         const map = pill.hostWindow && pill.hostWindow.moduleById ? pill.hostWindow.moduleById : {};
@@ -117,7 +201,9 @@ Item {
     // skips the focus grab - that pulls the keyboard off the focused window, and
     // merely passing over the bar must not do that - so a click anywhere on the
     // pill promotes it to an ordinary clicked-open panel, grab and all.
-    readonly property bool hoverOpens: Prefs.barHoverOpen && pill.shown
+    // off for a pill that is only a button, with nothing to unfold
+    property bool opensOnHover: true
+    readonly property bool hoverOpens: Prefs.barHoverOpen && pill.shown && pill.opensOnHover
     property bool hoverOpen: false
     readonly property bool surfaceHovered: pill.compactHovered || shellHover.hovered || pillHover.hovered
 
@@ -227,7 +313,7 @@ Item {
 
     readonly property real surfaceX: -pill.hoverGrow
     readonly property real surfaceY: 0
-    readonly property real surfaceWidth: (pill.popupMode ? pill.compactWidth : pill.width) + pill.hoverGrow * 2
+    readonly property real surfaceWidth: pill.width + pill.hoverGrow * 2
     readonly property real surfaceHeight: pill.popupMode ? pill.compactHeight : pill.height
     // the corners ModuleRegion's mask and blur follow
     readonly property real barTopLeftRadius: pill.popupMode ? pillRect.topLeftRadius : shell.topLeftRadius
@@ -237,36 +323,49 @@ Item {
     readonly property real popupTopLeftRadius: shell.topLeftRadius
     readonly property real popupTopRightRadius: shell.topRightRadius
 
+    // leaving, the contents fade first, then the pill fades and shrinks as the
+    // gap closes on the standard curve; its height holds until it has gone, so
+    // it never squashes up into the bar's edge. set in onShownChanged, the one
+    // place the animations below read it fresh
+    property bool exiting: false
+
     implicitWidth: !pill.shown ? 0 : (pill.popupMode ? pill.compactWidth : pill.openWidth)
     implicitHeight: !pill.shown ? 0 : (pill.popupMode ? pill.compactHeight : pill.openHeight)
     opacity: pill.shown ? 1 : 0
-    scale: pill.shown ? 1 : 0.82
+    scale: pill.shown ? 1 : 0.86
     transformOrigin: Item.Center
     visible: pill.opacity > 0.01
     clip: !pill.popupMode && pill.anyOpen && !pill.overlayOpen
     z: (pill.popupOpen || pill.overlayOpen) ? 100 : 1
 
     Behavior on opacity {
-        NumberAnimation {
-            duration: Theme.barMs(180)
-            easing.type: Easing.OutCubic
+        SequentialAnimation {
+            PauseAnimation {
+                duration: pill.exiting ? Theme.barMs(40) : 0
+            }
+
+            NumberAnimation {
+                duration: pill.exiting ? Theme.barMs(180) : Theme.barMs(180)
+                easing.type: pill.exiting ? Easing.InOutCubic : Easing.OutCubic
+            }
+
         }
 
     }
 
     Behavior on scale {
         NumberAnimation {
-            duration: Theme.barMs(260)
-            easing.type: pill.shown ? Easing.OutBack : Easing.InCubic
+            duration: pill.exiting ? Theme.barMs(300) : Theme.barMs(260)
+            easing.type: pill.exiting ? Easing.InOutCubic : Easing.OutBack
         }
 
     }
 
     Behavior on implicitWidth {
         NumberAnimation {
-            duration: pill.morphDuration
+            duration: pill.exiting ? Theme.barMs(360) : pill.morphDuration
             easing.type: Easing.Bezier
-            easing.bezierCurve: pill.morphEasing
+            easing.bezierCurve: pill.exiting ? Theme.curveStandard : pill.morphEasing
         }
 
     }
@@ -274,17 +373,77 @@ Item {
     property bool shownTransition: false
 
     onShownChanged: {
+        pill.exiting = !pill.shown;
         pill.shownTransition = true;
         shownTransitionTimer.restart();
+        if (pill.exiting) {
+            lookSwitch.stop();
+            contentEnter.stop();
+            contentExit.restart();
+        } else {
+            contentExit.stop();
+            contentEnter.restart();
+        }
+    }
+
+    ParallelAnimation {
+        id: contentExit
+
+        NumberAnimation {
+            target: compactHolder
+            property: "opacity"
+            to: 0
+            duration: Theme.barMs(90)
+            easing.type: Easing.OutCubic
+        }
+
+        NumberAnimation {
+            target: compactHolder
+            property: "scale"
+            to: 0.9
+            duration: Theme.barMs(90)
+            easing.type: Easing.OutCubic
+        }
+
+    }
+
+    ParallelAnimation {
+        id: contentEnter
+
+        NumberAnimation {
+            target: compactHolder
+            property: "opacity"
+            to: 1
+            duration: Theme.barMs(200)
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.easeEmphasizedDecel
+        }
+
+        NumberAnimation {
+            target: compactHolder
+            property: "scale"
+            to: 1
+            duration: Theme.barMs(240)
+            easing.type: Easing.Bezier
+            easing.bezierCurve: Theme.easeEmphasizedDecel
+        }
+
     }
 
     Behavior on implicitHeight {
         enabled: !pill.anyOpen || pill.panelTransitioning || pill.shownTransition
 
-        NumberAnimation {
-            duration: pill.morphDuration
-            easing.type: Easing.Bezier
-            easing.bezierCurve: pill.morphEasing
+        SequentialAnimation {
+            PauseAnimation {
+                duration: pill.exiting ? Theme.barMs(280) : 0
+            }
+
+            NumberAnimation {
+                duration: pill.exiting ? 0 : pill.morphDuration
+                easing.type: Easing.Bezier
+                easing.bezierCurve: pill.morphEasing
+            }
+
         }
 
     }
@@ -324,7 +483,7 @@ Item {
         visible: pill.popupMode
         x: pill.surfaceX
         y: pill.surfaceY
-        width: pill.compactWidth + pill.hoverGrow * 2
+        width: pill.width + pill.hoverGrow * 2
         height: pill.compactHeight
         color: pill.restingColor
         clip: true
@@ -560,10 +719,16 @@ Item {
                 }
             }
 
+            // centred in whole pixels of the pill's frame, not the surface's: hover
+            // grows the surface by fractions, and centring in it stepped half a
+            // pixel against that, so the content shook
             Item {
                 id: compactHolder
 
-                anchors.centerIn: parent
+                readonly property real frameX: compactFace.parent ? compactFace.parent.x : 0
+
+                x: Math.round(compactHolder.frameX + (compactFace.width - compactHolder.width) / 2) - compactHolder.frameX
+                y: Math.round((compactFace.height - compactHolder.height) / 2)
                 width: pill.compactWidth
                 height: pill.compactHeight
             }

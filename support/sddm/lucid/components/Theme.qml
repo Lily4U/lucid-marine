@@ -45,12 +45,17 @@ Item {
         const shared = config.background;
         return shared ? Qt.resolvedUrl("../" + shared) : "";
     }
-    // the account's live wallpaper, when it had one: a small blurred copy that
-    // plays over background.jpg, which is its first frame
+    // the account's live wallpaper, when it had one: a silent copy that plays
+    // over background.jpg, which is its first frame
     readonly property url backgroundVideo: {
         void lookConf.location;
         const v = root.lookOwn ? lookConf.value("backgroundVideo", "") : "";
         return v ? root.lookDir + v : "";
+    }
+    // sharp copies, blurred here as the lock does; older ones came blurred
+    readonly property bool backgroundSharp: {
+        void lookConf.location;
+        return root.lookOwn && lookConf.value("backgroundSharp", "") === "true";
     }
     readonly property int lookMs: 1000
     // awww's own fade curve, the one the desktop crossfades its palette on
@@ -189,16 +194,35 @@ Item {
     }
     readonly property real fontScale: root.num("fontScale", 0.9)
     readonly property real motionScale: root.num("motionScale", 1.125)
+    // the shell's interface size and corner rounding, so the greeter is drawn
+    // at the lock's own size; fontScale above already carries uiScale
+    readonly property real uiScale: Math.max(0.7, Math.min(1.3, root.num("uiScale", 1)))
+    readonly property real cornerScale: Math.max(0, Math.min(1.5, root.num("cornerScale", 1)))
 
-    readonly property int shapeSm: 8
-    readonly property int shapeMd: 12
-    readonly property int shapeLg: 16
-    readonly property int shapeXl: 28
+    readonly property int shapeSm: root.rad(8)
+    readonly property int shapeMd: root.rad(12)
+    readonly property int shapeLg: root.rad(16)
+    readonly property int shapeLgInc: root.rad(20)
+    readonly property int shapeXl: root.rad(28)
+    readonly property int shapeXlInc: root.rad(32)
     readonly property real stateHover: 0.08
     readonly property real statePressed: 0.1
 
     function fs(px) {
         return Math.round(px * root.fontScale);
+    }
+
+    // Theme.dp/rad/pill from the shell, the same arithmetic
+    function dp(px) {
+        return Math.round(px * root.uiScale);
+    }
+
+    function rad(px) {
+        return px < 8 ? root.dp(px) : Math.round(px * root.uiScale * root.cornerScale);
+    }
+
+    function pill(size) {
+        return size / 2 * Math.min(1, root.cornerScale);
     }
 
     function ms(d) {

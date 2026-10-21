@@ -78,6 +78,9 @@ WidgetBody {
         return Quickshell.env("HOME") + "/.cache/lucid/art/" + h.toString(16) + ".img";
     }
     property string localArt: ""
+    // what every image on the card shows: the cached copy for a remote cover,
+    // the url as it is for a local one
+    readonly property string artSource: w.remoteArt ? w.localArt : w.artUrl
 
     function toggle() {
         if (w.has && w.player.canTogglePlaying)
@@ -164,12 +167,21 @@ WidgetBody {
         w.posStamp = Date.now();
     }
 
+    // every cover goes through the local copy: a remote one handed straight to
+    // an Image makes Qt speak http/2 itself, which is where the shell has
+    // crashed. the tint needs it, so it was fetched for the tint alone before
+    // the last cover stays up until the next one is on disk
     function fetchCover() {
-        w.localArt = "";
-        if (w.artFile !== "" && w.opt("artTint") !== false && !w.preview) {
-            fetchArt.running = false;
-            fetchArt.running = true;
+        if (w.artFile === "" || w.preview) {
+            w.localArt = "";
+            return ;
         }
+        // handed over here: a command bound to artFile is still the old one in onArtFileChanged
+        fetchArt.superseded = fetchArt.running;
+        fetchArt.file = w.artFile;
+        fetchArt.running = false;
+        fetchArt.command = ["sh", "-c", fetchArt.script, "sh", w.artFile, w.artUrl];
+        fetchArt.running = true;
     }
 
     onArtFileChanged: w.fetchCover()
@@ -178,18 +190,24 @@ WidgetBody {
     Process {
         id: fetchArt
 
-        command: ["sh", "-c", "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]", "sh", w.artFile, w.artUrl]
-        onExited: (code) => {
-            if (code === 0)
-                w.localArt = "file://" + w.artFile;
+        property string file: ""
+        // a run cut short by the next fetch still reports, before that one starts
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
 
+        onExited: (code) => {
+            if (fetchArt.superseded) {
+                fetchArt.superseded = false;
+                return ;
+            }
+            w.localArt = code === 0 ? "file://" + fetchArt.file : "";
         }
     }
 
     ColorQuantizer {
         id: quant
 
-        source: w.remoteArt ? w.localArt : w.artUrl
+        source: w.artSource
         depth: 3
         rescaleSize: 48
     }
@@ -226,7 +244,7 @@ WidgetBody {
             id: covImg
 
             anchors.fill: parent
-            source: w.artUrl
+            source: w.artSource
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             sourceSize.width: Theme.dp(512)
@@ -749,7 +767,7 @@ WidgetBody {
             width: Math.min(parent.width, parent.height) - Theme.dp(40)
             height: width
             shape: "cookie12"
-            source: w.artUrl
+            source: w.artSource
             fallbackColor: Theme.alpha(w.ink, 0.1)
 
             RotationAnimation on rotation {
@@ -760,13 +778,17 @@ WidgetBody {
                 running: w.playing && w.visible && !w.preview
             }
 
-            Icon {
-                anchors.centerIn: parent
-                name: "album"
-                size: record.width * 0.4
-                color: w.inkFaint
-            }
+        }
 
+        // no cover: a note on the record, beside it so it does not turn with
+        // it; a turned icon layer goes jagged
+        Icon {
+            anchors.centerIn: record
+            visible: !record.ready
+            name: "music_note"
+            size: Math.round(record.width * 0.34)
+            fill: 1
+            color: w.inkFaint
         }
 
         Rectangle {
@@ -842,7 +864,7 @@ WidgetBody {
             width: pillRing.width - Theme.dp(12)
             height: width
             shape: "circle"
-            source: w.artUrl
+            source: w.artSource
             fallbackColor: Theme.alpha(w.ink, 0.1)
 
             Icon {
@@ -978,7 +1000,7 @@ WidgetBody {
             width: Math.round(orbit.d * 0.5)
             height: width
             shape: "circle"
-            source: w.artUrl
+            source: w.artSource
             decode: Theme.dp(256)
             fallbackColor: Theme.alpha(w.ink, 0.1)
 
@@ -1039,7 +1061,7 @@ WidgetBody {
             height: width
             shape: blob.shown
             to: w.trackShape
-            source: w.artUrl
+            source: w.artSource
             decode: Theme.dp(384)
             fallbackColor: Theme.alpha(w.fill, 1)
             Component.onCompleted: blob.shown = w.trackShape
@@ -1181,7 +1203,7 @@ WidgetBody {
             width: capsule.width - Theme.dp(24)
             height: width
             shape: "circle"
-            source: w.artUrl
+            source: w.artSource
             fallbackColor: Theme.alpha(w.ink, 0.1)
 
             Icon {

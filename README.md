@@ -116,10 +116,23 @@ one. The request is a plain `curl` for
 `api.github.com/repos/Lily4U/lucid-marine/releases/latest` and carries nothing about
 you or your machine; **Settings → About** shows what it found and turns it off.
 
+**Update** (on the About page, or on the notification) installs the release
+for you: a warning, your password, then a pop-up with a progress bar that also
+asks anything the installer would ask in a terminal. It downloads the release's
+source from GitHub and runs that release's own `install.sh`, the same as doing
+it by hand below, and offers to restart Lucid at the end. The password goes to
+`sudo` once and is not kept. Only a published release counts, never a push to
+`main`, unless you turn on **Beta updates**, which offers the newest commit on
+`main` instead and comes with a warning: beta builds are untested.
+
 ```sh
 qs ipc call updates status   # what it knows
 qs ipc call updates check    # ask now
+<<<<<<< HEAD
 
+=======
+qs ipc call updates update   # install the new release (warning first)
+>>>>>>> upstream/main
 ```
 
 ### Older versions
@@ -262,11 +275,107 @@ you know what's being pulled in.
 | `polkit` | Administrator prompts |
 | `accountsservice` | Users and Accounts page |
 | `libnotify` | Notification actions |
+<<<<<<< HEAD
 | `swappy` | Screenshot markup |
 | **`colorpicker`** (custom C binary) | Fast native screen color picking (replaces hyprpicker dependency) |
 | `xdg-utils` | Opening links and files |
 | `librsvg`, `gtk-update-icon-cache` | Pointer shadow and icon cache |
 | `google-noto-color-emoji-fonts` | Emoji rendering |
+=======
+| `swappy` | Marking up a screenshot, from its preview card or notification |
+| `hyprpicker` | The Colour mode. Without it the mode says so and picks nothing |
+| `xdg-utils` | Opening links and files from the shell |
+| `librsvg` | Turning the pointer's shadow off — the cursor theme is rendered again from its vector sources |
+| `noto-fonts-emoji` | Emoji rendering |
+
+**The Hyprland config and the look** — installed unless you pass `--no-hypr`
+or `--no-look`. The binds shell out to these, so a missing one is a dead key:
+
+| Package | Backs |
+| --- | --- |
+| `kitty` | Terminal (`F9`), and the themed terminal colours |
+| `fish` | The shell kitty opens |
+| `nautilus` | Files (`SUPER`+`E`) |
+| `playerctl` | The media keys |
+| `gnome-calculator` | Calculator (`F12`) |
+| `starship` | The prompt |
+| `ttf-jetbrains-mono-nerd` | The glyphs the prompt and kitty are drawn with |
+| `adw-gtk-theme` | Provides `adw-gtk3-dark`, the GTK theme Lucid selects |
+| `papirus-icon-theme` | Fallback icons — FairyWren declares `Inherits=Papirus` |
+
+**The dock's default pins** — installed unless you pass `--no-apps`. Several
+GB, mostly from the AUR:
+
+`zen-browser-bin` · `vscodium-bin` · `spotify` · `vesktop` · `nautilus` ·
+`steam` · `proton-vpn-gtk-app`
+
+Anything you already have an equivalent of is left alone — `vscodium` counts
+for `vscodium-bin`, `discord` for `vesktop`, and so on. `steam` is skipped
+unless the `multilib` repo is enabled; with it come the Vulkan drivers for the
+graphics cards the machine has (`vulkan-radeon`, `vulkan-intel`, NVIDIA's own or
+nouveau, and their 32-bit halves), so pacman never has to guess one.
+
+Lucid uses Hyprland-specific APIs for workspaces and window management. It
+will not work on other compositors.
+
+### Fonts
+
+The default UI font is **Google Sans**, which is not in the Arch repos. If you
+don't have it, Qt falls back to your default sans and everything still works —
+or pick any installed font in Settings → General.
+
+## Optional setup
+
+**GIF search** needs a free Giphy key (email only, no card) from
+[developers.giphy.com](https://developers.giphy.com/dashboard/). Put it in
+`~/.config/quickshell/lucidmoji/config.json`:
+
+```json
+{ "giphyKey": "your-key-here", "tenorKey": "", "gifDir": "" }
+```
+
+Tenor works too if you'd rather use that. Emoji and kaomoji need no key.
+
+**Wallpapers** default to `~/Pictures/wallpapers`, one folder per theme —
+`~/Pictures/wallpapers/gruvbox` is what the strip shows while you are on
+Gruvbox. The installer puts a set in each of them, skipping any file you already
+have, and `--no-wallpapers` leaves the folder alone entirely. Change the folder
+in Settings → General, which then applies to every theme.
+
+## IPC reference
+
+Every surface is scriptable. `qs ipc call -- <target> <function> [arg]`:
+
+| Target | Functions |
+| --- | --- |
+| `launcher` | `toggle` `open` `close` `wallpaper` `theme` `power` `blur` `command` `shuffle` `clipboard` `emoji` `search <query>` `hide <id>` `unhide <id>` `hidden` |
+| `settings` | `toggle` `open` `close` `show <page>` `general` `users` `glass` `bar` `dock` `colours` `palettes` `environment` `keybinds` `input` `displays` `widgets` `windows` `workspaces` `notifications` `sound` `network` `bluetooth` `kdeconnect` `idle` `datetime` `font` `search <words>` `reset` |
+| `idle` | `status` `keepawake` `awake` `normal` `on` `off` `restart` |
+| `network` | `status` `list` `rescan` |
+| `nightlight` | `toggle` `on` `off` `status` |
+| `kdeconnect` | `status` `list` `rescan` `ring <id>` `ping <id>` `clipboard <id>` `files <id>` `send <id> <path>` |
+| `desktop` | `icons` (hide or show the desktop icons) `arrange` `selectAll` `undo` `refresh` |
+| `bluetooth` | `send <address> <path>` (an empty path opens the file chooser) |
+| `widgets` | `panel` `openPanel <screen>` `closePanel` `add <type> <variant>` `remove <uid>` `clear` `toggle` `lock` `unlock` `list` `catalogue` `settings` `resize <uid> <w> <h>` |
+| `moji` | `toggle` `open` `close` `emoji` `kaomoji` `gif` `center` |
+| `keyboard` | `toggle` `open` `close` `letters` `fnkeys` `center` `bigger` `smaller` |
+| `notifs` | `toggle` `open` `close` `clear` `toggleDnd` `expandAll` `settings` `count` |
+| `lock` | `lock` `unlock` `isLocked` `status` — nothing here bypasses the password; PAM is the only way in |
+| `snap` | `toggle` `open` `close` `text` `color` `video` |
+| `session` | `toggle` `open` `close` |
+| `switcher` | `next` `prev` `toggle` `open` `close` `status` — `next`/`prev` open it when it is closed |
+| `timer` | `start <seconds>` `stopwatch` `pomodoro` `pomodoroSkip` `pomodoroStop` `pomodoroAdd <minutes>` `status` |
+| `clock` | `open <tab>` `toggle` `close` — *tab* is `today`, `calendar`, `timer`, `stopwatch` or `world` |
+| `toast` | `show <icon> <label>` `warn <icon> <label>` |
+| `sounds` | `play <name>` `list` — at the system-sound volume |
+| `screenshot` | `full` `text` |
+| `media` | `toggle` `open` `close` `identify` `playPause` `next` `previous` |
+| `workspaces` | `toggle` `open` `close` |
+| `updates` | `status` `check` `whatsnew` (the What's new sheet for this version) `update` (install the newest release) `beta` (install the newest commit on `main`) `show` (bring back a hidden update pop-up) |
+| `displays` | `list` `settings` `shell <where>` `bar <where>` `dock <where>` — *where* is an output name, `left`/`middle`/`right`, `here`, `next`, `prev` or `auto` |
+| `polkit` | `status` `demo <action-id>` `fail` `grant` `close` — `demo` raises the dialog with no PAM session behind it, for previewing a theme |
+| `debug` | `toggle` `on` `off` — draws input and blur region outlines |
+>>>>>>> upstream/main
 
 ## Uninstall
 

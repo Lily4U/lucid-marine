@@ -1521,8 +1521,9 @@ step "Done"
 # "No running instances for <path>", which the path matches. the field only
 # a real instance has is what to look for.
 # no grep -q here: it would close the pipe, and pipefail would then read the
-# producer's SIGPIPE as "not running"
-if qs list 2>/dev/null | grep -F "Config path: $SHELL_DIR/shell.qml" >/dev/null; then
+# producer's SIGPIPE as "not running". the in-shell updater (LUCID_UPDATER)
+# asks about the restart itself, once the install has finished
+if [[ -z "${LUCID_UPDATER:-}" ]] && qs list 2>/dev/null | grep -F "Config path: $SHELL_DIR/shell.qml" >/dev/null; then
     if ask "  Lucid is running on the old files. Restart it now?"; then
         qs kill -p "$SHELL_DIR" 2>/dev/null || true
         sleep 1

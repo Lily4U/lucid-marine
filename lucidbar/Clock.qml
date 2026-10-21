@@ -35,23 +35,26 @@ BarPill {
     readonly property int pad: Theme.dp(16)
     // the look picked on the module's card: the time on an accent chip after
     // the date, the time then the date in one line, or the date under the time
-    readonly property bool inlineFace: Prefs.clockStyle === "inline"
-    readonly property bool stacked: Prefs.clockStyle === "stacked"
+    lookPref: Prefs.clockStyle
+    readonly property bool inlineFace: root.look === "inline"
+    readonly property bool stacked: root.look === "stacked"
     readonly property bool accentFace: !root.inlineFace && !root.stacked
     readonly property color timeInk: root.accentFace ? Theme.fgAccent : Theme.text
-    readonly property string dateFormat: {
+    // the day's name and the date, apart: both bold, the date in the accent
+    readonly property var dateParts: {
         switch (Prefs.clockDateFormat) {
         case "short":
-            return "ddd d";
+            return ["ddd", "d"];
         case "long":
-            return "ddd d MMM";
+            return ["ddd", "d MMM"];
         case "numeric":
-            return Qt.locale().dateFormat(Locale.ShortFormat);
+            return ["", Qt.locale().dateFormat(Locale.ShortFormat)];
         default:
-            return "ddd, dd/MM";
+            return ["ddd,", "dd/MM"];
         }
     }
-    readonly property string dateText: root.now.toLocaleDateString(Qt.locale(), root.dateFormat)
+    readonly property string dayText: root.dateParts[0] === "" ? "" : root.now.toLocaleDateString(Qt.locale(), root.dateParts[0])
+    readonly property string dayDateText: root.now.toLocaleDateString(Qt.locale(), root.dateParts[1])
 
     function showTab(t) {
         if (t === root.tab)
@@ -258,14 +261,30 @@ BarPill {
 
             // the date reads as context, the time as the thing itself: an accent
             // chip is the one fill the bar carries on live data
-            LText {
+            Row {
                 visible: Prefs.clockShowDate && root.accentFace
                 anchors.verticalCenter: parent.verticalCenter
-                role: "labelLarge"
-                size: Theme.fs(12.5)
-                weight: 560
-                color: Theme.subtext
-                text: root.dateText
+                spacing: Theme.dp(4)
+
+                LText {
+                    visible: root.dayText !== ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    role: "labelLarge"
+                    size: Theme.fs(12.5)
+                    weight: 700
+                    color: Theme.subtext
+                    text: root.dayText
+                }
+
+                LText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    role: "labelLarge"
+                    size: Theme.fs(12.5)
+                    weight: 700
+                    color: Theme.accent
+                    text: root.dayDateText
+                }
+
             }
 
             Rectangle {
@@ -356,14 +375,30 @@ BarPill {
                     }
 
                     // two lines: the date small under the time
-                    LText {
+                    Row {
                         visible: Prefs.clockShowDate && root.stacked
                         anchors.horizontalCenter: parent.horizontalCenter
-                        role: "labelMedium"
-                        size: Theme.fs(10)
-                        weight: 600
-                        color: Theme.subtext
-                        text: root.dateText
+                        spacing: Theme.dp(3)
+
+                        LText {
+                            visible: root.dayText !== ""
+                            anchors.verticalCenter: parent.verticalCenter
+                            role: "labelMedium"
+                            size: Theme.fs(10)
+                            weight: 700
+                            color: Theme.subtext
+                            text: root.dayText
+                        }
+
+                        LText {
+                            anchors.verticalCenter: parent.verticalCenter
+                            role: "labelMedium"
+                            size: Theme.fs(10)
+                            weight: 700
+                            color: Theme.accent
+                            text: root.dayDateText
+                        }
+
                     }
 
                 }
@@ -380,14 +415,30 @@ BarPill {
                 color: Theme.subtextDim
             }
 
-            LText {
+            Row {
                 visible: Prefs.clockShowDate && root.inlineFace
                 anchors.verticalCenter: parent.verticalCenter
-                role: "labelLarge"
-                size: Theme.fs(12.5)
-                weight: 560
-                color: Theme.subtext
-                text: root.dateText
+                spacing: Theme.dp(4)
+
+                LText {
+                    visible: root.dayText !== ""
+                    anchors.verticalCenter: parent.verticalCenter
+                    role: "labelLarge"
+                    size: Theme.fs(12.5)
+                    weight: 700
+                    color: Theme.subtext
+                    text: root.dayText
+                }
+
+                LText {
+                    anchors.verticalCenter: parent.verticalCenter
+                    role: "labelLarge"
+                    size: Theme.fs(12.5)
+                    weight: 700
+                    color: Theme.accent
+                    text: root.dayDateText
+                }
+
             }
 
             Row {

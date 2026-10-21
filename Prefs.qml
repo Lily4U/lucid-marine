@@ -215,12 +215,17 @@ Singleton {
         "styles": [
             {"key": "disc", "name": "Disc", "blurb": "The cover turning in a ring that fills as it plays"},
             {"key": "cover", "name": "Cover", "blurb": "The album's cover standing still, then the track"},
-            {"key": "compact", "name": "Compact", "blurb": "Only the moving bars and the play button"}
+            {"key": "compact", "name": "Compact", "blurb": "Only the moving bars and the play button"},
+            {"key": "progress", "name": "Progress", "blurb": "The pill fills as the song goes"},
+            {"key": "controls", "name": "Controls", "blurb": "Previous, play and next, then the track"}
         ],
         "panelStyle": "mediaPanelStyle",
         "panelStyles": [
             {"key": "side", "name": "Side by side", "blurb": "The cover beside the track"},
-            {"key": "cover", "name": "Large cover", "blurb": "The cover across the panel, the track under it"}
+            {"key": "cover", "name": "Large cover", "blurb": "The cover across the panel, the track under it"},
+            {"key": "vinyl", "name": "Vinyl", "blurb": "The cover as a record that turns while it plays"},
+            {"key": "backdrop", "name": "Backdrop", "blurb": "Side by side, over the cover blurred across the panel"},
+            {"key": "mini", "name": "Mini", "blurb": "No cover: the track, its progress and the controls"}
         ]
     },
     {
@@ -265,8 +270,7 @@ Singleton {
         "style": "notificationsStyle",
         "styles": [
             {"key": "badge", "name": "Count", "blurb": "The bell and how many are waiting"},
-            {"key": "dot", "name": "Dot", "blurb": "The bell with a dot while any are waiting"},
-            {"key": "chip", "name": "Accent", "blurb": "Bell and count on the accent while any wait"}
+            {"key": "dot", "name": "Dot", "blurb": "The bell with a dot while any are waiting"}
         ]
     },
     {
@@ -313,15 +317,27 @@ Singleton {
     {
         "id": "window",
         "key": "showWindow",
-        "home": "left",
+        "home": "right",
+        "first": true,
         "name": "Active window",
         "desc": "The focused window's icon and title; open it to float, pin, fullscreen, move or close it, or switch to another window on the workspace",
         "when": "while a window on this workspace has the focus",
-        "options": ["windowModuleText", "windowModuleWidth", "windowModuleScroll", "windowModuleMiddleClose"],
-        "style": "windowModuleStyle",
+        "options": ["windowModuleText", "windowModuleWidth", "windowModuleScroll", "windowModuleMiddleClose"]
+    },
+    {
+        "id": "start",
+        "key": "showStart",
+        "home": "left",
+        "first": true,
+        "name": "Start",
+        "desc": "A button for the launcher, at the start of the bar: a click opens it or puts it away",
+        "style": "startModuleStyle",
         "styles": [
-            {"key": "plain", "name": "Plain", "blurb": "The icon and the text on the bar"},
-            {"key": "chip", "name": "Chip", "blurb": "The same on a chip tinted with the accent"}
+            {"key": "logo", "name": "Logo", "blurb": "Lucid's mark, as on the dock"},
+            {"key": "grid", "name": "Grid", "blurb": "Nine dots, the middle one in the accent"},
+            {"key": "distro", "name": "Distro", "blurb": "Your distribution's logo, in the accent"},
+            {"key": "avatar", "name": "Avatar", "blurb": "Your profile picture"},
+            {"key": "label", "name": "Label", "blurb": "The word Start on a chip in the accent"}
         ]
     }
     ]
@@ -517,7 +533,8 @@ Singleton {
     property alias windowModuleWidth: s.windowModuleWidth
     property alias windowModuleScroll: s.windowModuleScroll
     property alias windowModuleMiddleClose: s.windowModuleMiddleClose
-    property alias windowModuleStyle: s.windowModuleStyle
+    property alias showStart: s.showStart
+    property alias startModuleStyle: s.startModuleStyle
     property alias workspacesByDisplay: s.workspacesByDisplay
     property alias audioMeters: s.audioMeters
     property alias clockStyle: s.clockStyle
@@ -642,6 +659,8 @@ Singleton {
     property alias audioCombine: s.audioCombine
     property alias kdeConnectEnabled: s.kdeConnectEnabled
     property alias updateCheck: s.updateCheck
+    // the newest commit on main, offered for install before it is a release
+    property alias updateBeta: s.updateBeta
     property alias storageLowWarn: s.storageLowWarn
     property alias storageLowPercent: s.storageLowPercent
     // 0 means never
@@ -846,7 +865,7 @@ Singleton {
         { "key": "idle", "icon": "bedtime", "keys": "sleep suspend lock dim screen off hypridle caffeine", "group": "System", "label": "Idle", "title": "Idle and Sleep", "blurb": "What happens when you walk away: dimming, locking, screen off and suspend", "toggle": "idleEnabled" },
         { "key": "datetime", "icon": "schedule", "keys": "clock time zone location 24 hour seconds week monday sunday units metric imperial celsius fahrenheit temperature wind mph timer pomodoro focus break alarm world", "group": "System", "label": "Date & Time", "title": "Date and Time", "blurb": "Where you are, the clock, and its timers" },
         { "key": "storage", "icon": "hard_drive", "keys": "disk space storage usage free full clean cleanup cache trash duplicates large files drives ssd health smart trim mount", "group": "System", "label": "Storage", "title": "Storage", "blurb": "What fills your drives, what could go, and the drives themselves" },
-        { "key": "about", "icon": "info", "keys": "version update lucid", "group": "System", "label": "About", "title": "About", "blurb": "Lucid" }
+        { "key": "about", "icon": "info", "keys": "version update upgrade install release beta restart lucid", "group": "System", "label": "About", "title": "About", "blurb": "Lucid" }
     ]
 
     function settingsPage(key) {
@@ -1013,7 +1032,8 @@ Singleton {
         "windowModuleWidth": 260,
         "windowModuleScroll": true,
         "windowModuleMiddleClose": false,
-        "windowModuleStyle": "plain",
+        "showStart": false,
+        "startModuleStyle": "logo",
         "workspacesByDisplay": true,
         "audioMeters": true,
         "clockStyle": "accent",
@@ -1131,6 +1151,7 @@ Singleton {
         "audioCombine": "",
         "kdeConnectEnabled": true,
         "updateCheck": true,
+        "updateBeta": false,
         "storageLowWarn": true,
         "storageLowPercent": 10,
         "storageTrashDays": 0,
@@ -1347,10 +1368,16 @@ Singleton {
                 out[side].push(id);
             }
         }
-        for (const id in root.barModuleHome) {
-            if (!seen[id])
-                out[root.barModuleHome[id]].push(id);
+        // one new to the arrangement goes to its home group: at the end, or at
+        // the start for one that belongs there (the start button)
+        for (const m of root.barModules) {
+            if (seen[m.id])
+                continue;
 
+            if (m.first)
+                out[m.home].unshift(m.id);
+            else
+                out[m.home].push(m.id);
         }
         return out;
     }
@@ -1735,7 +1762,8 @@ Singleton {
             property int windowModuleWidth: 260
             property bool windowModuleScroll: true
             property bool windowModuleMiddleClose: false
-            property string windowModuleStyle: "plain"
+            property bool showStart: false
+            property string startModuleStyle: "logo"
             property bool workspacesByDisplay: true
             property bool audioMeters: true
             property string clockStyle: "accent"
@@ -1853,6 +1881,7 @@ Singleton {
             property string audioCombine: ""
             property bool kdeConnectEnabled: true
             property bool updateCheck: true
+            property bool updateBeta: false
             property bool storageLowWarn: true
             property int storageLowPercent: 10
             property int storageTrashDays: 0

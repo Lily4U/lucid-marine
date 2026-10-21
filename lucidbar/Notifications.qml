@@ -16,9 +16,9 @@ BarPill {
     readonly property bool anyCritical: Notifs.criticalCount > 0
     readonly property color badgeColor: root.anyCritical ? Theme.error : Theme.accent
     readonly property color badgeTextColor: root.anyCritical ? Theme.fgError : Theme.fgAccent
-    // the look picked on the module's card: a count, a dot, or bell and count on a chip
-    readonly property bool dotFace: Prefs.notificationsStyle === "dot"
-    readonly property bool chipLit: Prefs.notificationsStyle === "chip" && root.notifCount > 0
+    // the look picked on the module's card: a count, or a dot
+    lookPref: Prefs.notificationsStyle
+    readonly property bool dotFace: root.look === "dot"
     readonly property int horizontalPadding: Theme.dp(10)
     readonly property real screenW: root.hostWindow ? root.hostWindow.screen.width : 1600
     readonly property real screenH: root.hostWindow ? root.hostWindow.screen.height : 900
@@ -184,24 +184,6 @@ BarPill {
     }
 
     compactContent: [
-        Rectangle {
-            anchors.centerIn: compactRow
-            width: compactRow.implicitWidth + Theme.dp(14)
-            height: Theme.dp(24)
-            radius: height / 2
-            color: root.badgeColor
-            opacity: root.chipLit ? 1 : 0
-            visible: opacity > 0.01
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: Theme.barMs(180)
-                    easing.type: Easing.OutCubic
-                }
-
-            }
-
-        },
 
         Row {
             id: compactRow
@@ -218,7 +200,7 @@ BarPill {
                     anchors.centerIn: parent
                     size: Theme.dp(17)
                     path: Notifs.icons.notifications
-                    color: root.chipLit ? root.badgeTextColor : Theme.text
+                    color: Theme.text
                     fill: root.notifCount > 0 ? 1 : 0
                     opacity: root.silenced ? 0 : 1
                     scale: root.silenced ? 0.55 : 1
@@ -255,7 +237,7 @@ BarPill {
                     anchors.centerIn: parent
                     size: Theme.dp(17)
                     path: Notifs.icons.bedtime
-                    color: root.chipLit ? root.badgeTextColor : Theme.accent
+                    color: Theme.accent
                     opacity: root.silenced ? 1 : 0
                     scale: root.silenced ? 1 : 0.55
                     rotation: root.silenced ? 0 : 30
@@ -329,8 +311,7 @@ BarPill {
                 height: Theme.dp(16)
                 width: badge.on ? Math.max(Theme.dp(16), badgeText.implicitWidth + Theme.dp(8)) : 0
                 radius: Theme.dp(999)
-                // on the chip the count is ink on the chip's own fill
-                color: root.chipLit ? "transparent" : root.badgeColor
+                color: root.badgeColor
                 opacity: badge.on ? 1 : 0
                 scale: badge.on ? 1 : 0.4
                 clip: true

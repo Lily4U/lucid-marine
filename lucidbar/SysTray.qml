@@ -17,7 +17,8 @@ BarPill {
         return id !== "";
     })
     // the look picked on the module's card: collapsed, or every app's icon
-    readonly property bool iconFace: Prefs.trayStyle === "icons"
+    lookPref: Prefs.trayStyle
+    readonly property bool iconFace: root.look === "icons"
     readonly property var trayItems: {
         const raw = SystemTray.items ? SystemTray.items.values : [];
         const visible = raw.filter((i) => {

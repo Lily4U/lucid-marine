@@ -1,4 +1,6 @@
 import QtQuick
+import Quickshell
+import Quickshell.Io
 import Quickshell.Services.Mpris
 import Quickshell.Widgets
 import qs
@@ -23,6 +25,54 @@ Rectangle {
     readonly property string title: media.player ? (media.player.trackTitle || "Unknown track") : ""
     readonly property string artist: media.player ? (media.player.trackArtist || media.player.identity || "") : ""
     readonly property real length: media.player ? media.player.length : 0
+    // a remote cover through the cache, never straight into the Image: Qt's
+    // own http/2 client is what has been crashing the shell
+    readonly property string artUrl: media.player ? (media.player.trackArtUrl || "") : ""
+    readonly property bool remoteArt: /^https?:/.test(media.artUrl)
+    readonly property string artFile: {
+        if (!media.remoteArt)
+            return "";
+
+        var h = 5381;
+        for (var i = 0; i < media.artUrl.length; i++) h = ((h * 33) ^ media.artUrl.charCodeAt(i)) >>> 0
+        return Quickshell.env("HOME") + "/.cache/lucid/art/" + h.toString(16) + ".img";
+    }
+    property string localArt: ""
+    readonly property string artSource: media.remoteArt ? media.localArt : media.artUrl
+
+    // the last cover stays up until the next one is on disk
+    function fetchCover() {
+        if (media.artFile === "") {
+            media.localArt = "";
+            return ;
+        }
+        // handed over here: a command bound to artFile is still the old one in onArtFileChanged
+        artFetch.superseded = artFetch.running;
+        artFetch.file = media.artFile;
+        artFetch.running = false;
+        artFetch.command = ["sh", "-c", artFetch.script, "sh", media.artFile, media.artUrl];
+        artFetch.running = true;
+    }
+
+    onArtFileChanged: media.fetchCover()
+    Component.onCompleted: media.fetchCover()
+
+    Process {
+        id: artFetch
+
+        property string file: ""
+        // a run cut short by the next fetch still reports, before that one starts
+        property bool superseded: false
+        readonly property string script: "f=\"$1\"; d=\"$(dirname \"$f\")\"; mkdir -p \"$d\"; find \"$d\" -name '*.img' -mtime +14 -delete 2>/dev/null; [ -s \"$f\" ] || { t=\"$f.$$\"; curl -sfL --max-time 10 -o \"$t\" \"$2\" && mv \"$t\" \"$f\" || rm -f \"$t\"; }; [ -s \"$f\" ]"
+
+        onExited: (code) => {
+            if (artFetch.superseded) {
+                artFetch.superseded = false;
+                return ;
+            }
+            media.localArt = code === 0 ? "file://" + artFetch.file : "";
+        }
+    }
     property real livePos: 0
     property double posStamp: 0
     readonly property real progress: media.length > 0 ? Math.min(1, media.livePos / media.length) : 0
@@ -91,7 +141,7 @@ Rectangle {
             id: cover
 
             anchors.fill: parent
-            source: media.player && media.player.trackArtUrl ? media.player.trackArtUrl : ""
+            source: media.artSource
             fillMode: Image.PreserveAspectCrop
             sourceSize.width: Theme.dp(160)
             sourceSize.height: Theme.dp(160)

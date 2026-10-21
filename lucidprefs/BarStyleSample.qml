@@ -27,11 +27,15 @@ Item {
         "media/compact": mediaCompact,
         "media/panel/side": mediaPanelSide,
         "media/panel/cover": mediaPanelCover,
-        "workspaces/dots": workspacesDots,
-        "workspaces/numbers": workspacesNumbers,
+        "media/progress": mediaProgress,
+        "media/controls": mediaControls,
+        "media/panel/vinyl": mediaPanelVinyl,
+        "media/panel/backdrop": mediaPanelBackdrop,
+        "media/panel/mini": mediaPanelMini,
+        "workspaces/dots": workspacesSample,
+        "workspaces/numbers": workspacesSample,
         "notifications/badge": notificationsBadge,
         "notifications/dot": notificationsDot,
-        "notifications/chip": notificationsChip,
         "system/values": systemValues,
         "system/icons": systemIcons,
         "tray/collapsed": trayCollapsed,
@@ -42,8 +46,11 @@ Item {
         "power/accent": powerAccent,
         "power/panel/list": powerPanelList,
         "power/panel/grid": powerPanelGrid,
-        "window/plain": windowPlain,
-        "window/chip": windowChip
+        "start/logo": startLogo,
+        "start/grid": startGrid,
+        "start/distro": startDistro,
+        "start/avatar": startAvatar,
+        "start/label": startLabel
     })
     // what the samples show: the time and date as the bar would
     readonly property string timeText: {
@@ -55,18 +62,27 @@ Item {
         const t = now.toLocaleTimeString(Qt.locale(), "h:mm AP");
         return t.replace(now.toLocaleTimeString(Qt.locale(), "AP"), "").trim();
     }
-    readonly property string dateText: {
+    // the day's name and the date, apart, as the clock shows them
+    readonly property var dateParts: {
         switch (Prefs.clockDateFormat) {
         case "short":
-            return Loc.now().toLocaleDateString(Qt.locale(), "ddd d");
+            return ["ddd", "d"];
         case "long":
-            return Loc.now().toLocaleDateString(Qt.locale(), "ddd d MMM");
+            return ["ddd", "d MMM"];
         case "numeric":
-            return Loc.now().toLocaleDateString(Qt.locale(), Qt.locale().dateFormat(Locale.ShortFormat));
+            return ["", Qt.locale().dateFormat(Locale.ShortFormat)];
         default:
-            return Loc.now().toLocaleDateString(Qt.locale(), "ddd, dd/MM");
+            return ["ddd,", "dd/MM"];
         }
     }
+    readonly property string dayText: sample.dateParts[0] === "" ? "" : Loc.now().toLocaleDateString(Qt.locale(), sample.dateParts[0])
+    readonly property string dayDateText: Loc.now().toLocaleDateString(Qt.locale(), sample.dateParts[1])
+
+    // the strip of bar behind it, and how far the module's own pill pads it
+    readonly property int stripHeight: Math.min(Theme.dp(34), Theme.dp(Prefs.barHeight))
+    readonly property int pad: loader.item && loader.item.pad !== undefined ? loader.item.pad : Theme.dp(12)
+    // the media samples' track, as the bar's title shows it
+    readonly property string mediaTitle: Prefs.mediaArtist ? "Artist  -  Song" : "Song"
 
     implicitWidth: loader.item ? loader.item.implicitWidth : 0
     implicitHeight: loader.item ? loader.item.implicitHeight : 0
@@ -97,10 +113,21 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            BarText {
+            Row {
                 visible: Prefs.clockShowDate
-                text: sample.dateText
-                color: Theme.subtextDim
+                spacing: Theme.dp(4)
+
+                BarText {
+                    visible: sample.dayText !== ""
+                    text: sample.dayText
+                    color: Theme.subtextDim
+                }
+
+                BarText {
+                    text: sample.dayDateText
+                    color: Theme.accent
+                }
+
             }
 
         }
@@ -119,12 +146,24 @@ Item {
                 font.pixelSize: Theme.fs(12)
             }
 
-            BarText {
+            Row {
                 visible: Prefs.clockShowDate
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: sample.dateText
-                color: Theme.subtextDim
-                font.pixelSize: Theme.fs(10)
+                spacing: Theme.dp(3)
+
+                BarText {
+                    visible: sample.dayText !== ""
+                    text: sample.dayText
+                    color: Theme.subtextDim
+                    font.pixelSize: Theme.fs(10)
+                }
+
+                BarText {
+                    text: sample.dayDateText
+                    color: Theme.accent
+                    font.pixelSize: Theme.fs(10)
+                }
+
             }
 
         }
@@ -137,11 +176,22 @@ Item {
         Row {
             spacing: Theme.dp(8)
 
-            BarText {
+            Row {
                 visible: Prefs.clockShowDate
                 anchors.verticalCenter: parent.verticalCenter
-                text: sample.dateText
-                color: Theme.subtext
+                spacing: Theme.dp(4)
+
+                BarText {
+                    visible: sample.dayText !== ""
+                    text: sample.dayText
+                    color: Theme.subtext
+                }
+
+                BarText {
+                    text: sample.dayDateText
+                    color: Theme.accent
+                }
+
             }
 
             Rectangle {
@@ -230,11 +280,13 @@ Item {
         id: mediaDisc
 
         Row {
+            readonly property int pad: Theme.dp(10)
+
             spacing: Theme.dp(8)
 
             Item {
-                width: Theme.dp(24)
-                height: Theme.dp(24)
+                width: Theme.dp(26)
+                height: Theme.dp(26)
                 anchors.verticalCenter: parent.verticalCenter
 
                 CircularProgress {
@@ -247,19 +299,36 @@ Item {
 
                 Rectangle {
                     anchors.centerIn: parent
-                    width: Theme.dp(16)
-                    height: Theme.dp(16)
-                    radius: height / 2
+                    width: Theme.dp(18)
+                    height: Theme.dp(18)
+                    radius: Theme.dp(9)
                     color: Theme.accentContainer
                 }
 
             }
 
-            BarText {
-                text: "Artist  -  Song"
+            Item {
+                width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(discTitle.implicitWidth)))
+                height: Theme.dp(18)
+                anchors.verticalCenter: parent.verticalCenter
+                clip: true
+
+                Text {
+                    id: discTitle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sample.mediaTitle
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                    font.pixelSize: Theme.fs(13)
+                    font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                }
+
             }
 
             MiniPlay {
+                visible: Prefs.mediaPlayButton
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -294,6 +363,8 @@ Item {
         id: mediaCover
 
         Row {
+            readonly property int pad: Theme.dp(10)
+
             spacing: Theme.dp(8)
 
             Rectangle {
@@ -304,12 +375,28 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
 
-            BarText {
-                text: "Artist  -  Song"
+            Item {
+                width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(coverTitle.implicitWidth)))
+                height: Theme.dp(18)
+                anchors.verticalCenter: parent.verticalCenter
+                clip: true
+
+                Text {
+                    id: coverTitle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sample.mediaTitle
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                    font.pixelSize: Theme.fs(13)
+                    font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                }
+
             }
 
             MiniPlay {
-                visible: true
+                visible: Prefs.mediaPlayButton
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -321,14 +408,23 @@ Item {
         id: mediaCompact
 
         Row {
+            readonly property int pad: Theme.dp(10)
+
             spacing: Theme.dp(8)
 
-            MiniBars {
+            Item {
+                width: Theme.dp(26)
+                height: Theme.dp(26)
                 anchors.verticalCenter: parent.verticalCenter
+
+                MiniBars {
+                    anchors.centerIn: parent
+                }
+
             }
 
             MiniPlay {
-                visible: true
+                visible: Prefs.mediaPlayButton
                 anchors.verticalCenter: parent.verticalCenter
             }
 
@@ -401,68 +497,72 @@ Item {
 
     }
 
-    // a run of two in use, the second the one you are on, then four empty
     Component {
-        id: workspacesDots
+        id: mediaProgress
 
         Item {
-            id: wsd
+            id: prog
 
-            readonly property int cell: Theme.dp(26)
+            readonly property int pad: Theme.dp(10)
 
-            implicitWidth: wsd.cell * 6
-            implicitHeight: wsd.cell
+            implicitWidth: progRow.implicitWidth
+            implicitHeight: progRow.implicitHeight
 
+            // the fill runs in the pill itself, inset 4 all round
             Rectangle {
-                width: wsd.cell * 2
-                height: wsd.cell
-                radius: Theme.pill(height)
-                color: Theme.withBlur(Theme.surfaceHighest)
+                readonly property real track: prog.implicitWidth + prog.pad * 2 - Theme.dp(8)
+
+                x: Theme.dp(4) - prog.pad
+                anchors.verticalCenter: parent.verticalCenter
+                height: sample.stripHeight - Theme.dp(8)
+                width: Math.max(height, Math.round(track * 0.45))
+                radius: height / 2
+                color: Theme.alpha(Theme.accent, 0.28)
             }
 
-            Rectangle {
-                x: wsd.cell
-                width: wsd.cell
-                height: wsd.cell
-                radius: Theme.pill(height)
-                color: Theme.accent
-            }
+            Row {
+                id: progRow
 
-            Repeater {
-                model: 6
+                spacing: Theme.dp(8)
 
                 Item {
-                    id: mark
+                    width: Theme.dp(26)
+                    height: Theme.dp(26)
+                    anchors.verticalCenter: parent.verticalCenter
 
-                    required property int index
-                    readonly property real size: wsd.cell * (mark.index === 1 ? 2 / 3 : (mark.index === 0 ? 1 / 3 : 1 / 4))
-
-                    x: mark.index * wsd.cell
-                    width: wsd.cell
-                    height: wsd.cell
-                    layer.enabled: true
-                    layer.samples: 8
-
-                    Shape {
-                        x: (wsd.cell - mark.size) / 2
-                        y: (wsd.cell - mark.size) / 2
-                        width: mark.size
-                        height: mark.size
-                        preferredRendererType: Shape.GeometryRenderer
-
-                        ShapePath {
-                            fillColor: mark.index === 1 ? Theme.fgPrimary : (mark.index === 0 ? Theme.text : Theme.alpha(Theme.subtext, 0.5))
-                            strokeColor: "transparent"
-                            strokeWidth: 0
-
-                            PathSvg {
-                                path: Shapes.path(mark.index === 1 ? "cookie9" : (mark.index === 0 ? "square" : "circle"), mark.size, 0)
-                            }
-
-                        }
-
+                    Rectangle {
+                        anchors.centerIn: parent
+                        width: Theme.dp(18)
+                        height: Theme.dp(18)
+                        radius: Theme.dp(9)
+                        color: Theme.accentContainer
                     }
 
+                }
+
+                Item {
+                    width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(progTitle.implicitWidth)))
+                    height: Theme.dp(18)
+                    anchors.verticalCenter: parent.verticalCenter
+                    clip: true
+
+                    Text {
+                        id: progTitle
+
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: sample.mediaTitle
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.bold: true
+                        font.pixelSize: Theme.fs(13)
+                        font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                    }
+
+                }
+
+                MiniPlay {
+                    visible: Prefs.mediaPlayButton
+                    anchors.verticalCenter: parent.verticalCenter
                 }
 
             }
@@ -472,45 +572,298 @@ Item {
     }
 
     Component {
-        id: workspacesNumbers
+        id: mediaControls
+
+        Row {
+            readonly property int pad: Theme.dp(10)
+
+            spacing: Theme.dp(8)
+
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: Theme.dp(2)
+
+                Item {
+                    width: Theme.dp(24)
+                    height: Theme.dp(24)
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "skip_previous"
+                        size: Theme.dp(18)
+                        fill: 1
+                        color: Theme.text
+                    }
+
+                }
+
+                MiniPlay {
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Item {
+                    width: Theme.dp(24)
+                    height: Theme.dp(24)
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Icon {
+                        anchors.centerIn: parent
+                        name: "skip_next"
+                        size: Theme.dp(18)
+                        fill: 1
+                        color: Theme.text
+                    }
+
+                }
+
+            }
+
+            Item {
+                width: Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), Math.ceil(controlsTitle.implicitWidth)))
+                height: Theme.dp(18)
+                anchors.verticalCenter: parent.verticalCenter
+                clip: true
+
+                Text {
+                    id: controlsTitle
+
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: sample.mediaTitle
+                    color: Theme.text
+                    font.family: Theme.fontFamily
+                    font.bold: true
+                    font.pixelSize: Theme.fs(13)
+                    font.variableAxes: Theme.axes(Theme.fs(13), 640, 0)
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelVinyl
+
+        MiniPanel {
+            height: Theme.dp(104)
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: Theme.dp(8)
+                spacing: Theme.dp(6)
+
+                Item {
+                    width: parent.width
+                    height: Theme.dp(52)
+
+                    CircularProgress {
+                        anchors.centerIn: parent
+                        width: parent.height
+                        height: width
+                        thickness: Theme.dp(3)
+                        value: 0.4
+                        color: Theme.accent
+                        trackColor: Theme.alpha(Theme.text, 0.14)
+                    }
+
+                    ShapedImage {
+                        anchors.centerIn: parent
+                        width: parent.height - Theme.dp(12)
+                        height: width
+                        shape: "cookie12"
+                        fallbackColor: Theme.accentContainer
+                    }
+
+                }
+
+                MiniLines {
+                    width: parent.width
+                }
+
+                MiniTrack {
+                    width: parent.width
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelBackdrop
+
+        MiniPanel {
+            clip: true
+
+            // the cover's colours, run together behind the panel
+            Rectangle {
+                anchors.fill: parent
+                radius: parent.radius
+                opacity: 0.55
+                gradient: Gradient {
+                    orientation: Gradient.Horizontal
+
+                    GradientStop {
+                        position: 0
+                        color: Theme.accentContainer
+                    }
+
+                    GradientStop {
+                        position: 1
+                        color: Theme.alpha(Theme.cTertiary, 0.6)
+                    }
+
+                }
+
+            }
+
+            Row {
+                anchors.fill: parent
+                anchors.margins: Theme.dp(8)
+                spacing: Theme.dp(8)
+
+                Rectangle {
+                    width: Theme.dp(44)
+                    height: Theme.dp(44)
+                    radius: Theme.radiusSm
+                    color: Theme.accent
+                }
+
+                MiniLines {
+                    width: parent.width - Theme.dp(52)
+                }
+
+            }
+
+            MiniTrack {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.margins: Theme.dp(8)
+            }
+
+        }
+
+    }
+
+    Component {
+        id: mediaPanelMini
+
+        MiniPanel {
+            width: Theme.dp(124)
+            height: Theme.dp(64)
+
+            // clear of the panel's corners
+            MiniLines {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.top: parent.top
+                anchors.leftMargin: Theme.dp(14)
+                anchors.rightMargin: Theme.dp(14)
+                anchors.topMargin: Theme.dp(12)
+            }
+
+            MiniTrack {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.bottom: parent.bottom
+                anchors.leftMargin: Theme.dp(14)
+                anchors.rightMargin: Theme.dp(14)
+                anchors.bottomMargin: Theme.dp(12)
+            }
+
+        }
+
+    }
+
+    // the bar's own cells: square, inset as far as the pill pads them, those in
+    // use on one surface, the accent pill on the first, as many as the bar shows
+    Component {
+        id: workspacesSample
 
         Item {
-            id: wsn
+            id: ws
 
-            readonly property int cell: Theme.dp(26)
+            readonly property bool numbered: sample.styleKey === "numbers"
+            readonly property int pad: Theme.dp(4)
+            readonly property int cell: Math.max(Theme.dp(16), sample.stripHeight - ws.pad * 2)
+            readonly property int count: Math.max(3, Prefs.workspacesShown)
 
-            implicitWidth: wsn.cell * 6
-            implicitHeight: wsn.cell
+            implicitWidth: ws.cell * ws.count
+            implicitHeight: ws.cell
 
             Rectangle {
-                width: wsn.cell * 2
-                height: wsn.cell
+                width: ws.cell * 3
+                height: ws.cell
                 radius: Theme.pill(height)
                 color: Theme.withBlur(Theme.surfaceHighest)
             }
 
             Rectangle {
-                x: wsn.cell
-                width: wsn.cell
-                height: wsn.cell
+                width: ws.cell
+                height: ws.cell
                 radius: Theme.pill(height)
                 color: Theme.accent
             }
 
             Repeater {
-                model: 6
+                model: ws.count
 
-                BarText {
+                Item {
+                    id: mark
+
                     required property int index
+                    readonly property bool focused: mark.index === 0
+                    readonly property bool occupied: mark.index < 3
+                    readonly property real size: ws.cell * (mark.focused ? 2 / 3 : (mark.occupied ? 1 / 3 : 1 / 4))
 
-                    x: index * wsn.cell
-                    width: wsn.cell
-                    height: wsn.cell
-                    horizontalAlignment: Text.AlignHCenter
-                    verticalAlignment: Text.AlignVCenter
-                    text: index + 1
-                    font.pixelSize: Theme.fs(12)
-                    color: index === 1 ? Theme.fgPrimary : (index === 0 ? Theme.text : Theme.alpha(Theme.subtext, 0.55))
+                    x: mark.index * ws.cell
+                    width: ws.cell
+                    height: ws.cell
+
+                    Item {
+                        anchors.fill: parent
+                        visible: !ws.numbered
+                        layer.enabled: true
+                        layer.samples: 8
+                        layer.smooth: true
+
+                        Shape {
+                            x: (ws.cell - mark.size) / 2
+                            y: (ws.cell - mark.size) / 2
+                            width: mark.size
+                            height: mark.size
+                            preferredRendererType: Shape.GeometryRenderer
+
+                            ShapePath {
+                                fillColor: mark.focused ? Theme.fgPrimary : (mark.occupied ? Theme.text : Theme.alpha(Theme.subtext, 0.5))
+                                strokeColor: "transparent"
+                                strokeWidth: 0
+
+                                PathSvg {
+                                    path: Shapes.path(mark.focused ? "cookie9" : (mark.occupied ? "square" : "circle"), mark.size, 0)
+                                }
+
+                            }
+
+                        }
+
+                    }
+
+                    Text {
+                        anchors.centerIn: parent
+                        visible: ws.numbered
+                        text: mark.index + 1
+                        color: mark.focused ? Theme.fgPrimary : (mark.occupied ? Theme.text : Theme.alpha(Theme.subtext, 0.55))
+                        font.family: Theme.fontFamily
+                        font.bold: true
+                        font.pixelSize: Theme.fs(12)
+                        font.variableAxes: Theme.axes(Theme.fs(12), 680, 100)
+                    }
+
                 }
 
             }
@@ -563,39 +916,6 @@ Item {
                 color: Theme.accent
                 border.width: 1.5
                 border.color: Theme.bg
-            }
-
-        }
-
-    }
-
-    Component {
-        id: notificationsChip
-
-        Rectangle {
-            implicitWidth: chipRow.implicitWidth + Theme.dp(14)
-            implicitHeight: Theme.dp(24)
-            radius: height / 2
-            color: Theme.accent
-
-            Row {
-                id: chipRow
-
-                anchors.centerIn: parent
-                spacing: Theme.dp(5)
-
-                MiniBell {
-                    ink: Theme.fgAccent
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                BarText {
-                    text: "3"
-                    color: Theme.fgAccent
-                    font.pixelSize: Theme.fs(12)
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
             }
 
         }
@@ -843,6 +1163,209 @@ Item {
     }
 
     Component {
+        id: startLogo
+
+        // Lucid's mark, as the bar draws it, in a circle as wide as the bar is tall
+        Item {
+            id: logoSample
+
+            readonly property int pad: 0
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
+
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
+
+            Shape {
+                anchors.centerIn: parent
+                width: logoSample.glyph
+                height: logoSample.glyph
+                preferredRendererType: Shape.CurveRenderer
+
+                ShapePath {
+                    strokeColor: Theme.accent
+                    strokeWidth: 3
+                    fillColor: "transparent"
+                    capStyle: ShapePath.RoundCap
+
+                    PathSvg {
+                        path: "M15.92,5.72 A7.4,7.4 0 1 0 18.95,14.53"
+                    }
+
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    fillColor: Theme.text
+
+                    PathSvg {
+                        path: "M12,7.4 C12.598,10.62 13.38,11.402 16.6,12 C13.38,12.598 12.598,13.38 12,16.6 C11.402,13.38 10.62,12.598 7.4,12 C10.62,11.402 11.402,10.62 12,7.4 Z"
+                    }
+
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    fillColor: Theme.accent
+
+                    PathSvg {
+                        path: "M20,9.4 A1,1 0 1 0 22,9.4 A1,1 0 1 0 20,9.4 Z"
+                    }
+
+                }
+
+                transform: Scale {
+                    xScale: logoSample.glyph / 24
+                    yScale: logoSample.glyph / 24
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startGrid
+
+        // the bar's grid of nine, in a circle as wide as the bar is tall
+        Item {
+            id: gridSample
+
+            readonly property int pad: 0
+            readonly property int size: {
+                const s = Math.round(gridSample.glyph * 0.78);
+                return (sample.stripHeight - s) % 2 === 0 ? s : s - 1;
+            }
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
+
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
+
+            Grid {
+                anchors.centerIn: parent
+                columns: 3
+                spacing: gridSample.size / 8
+
+                Repeater {
+                    model: 9
+
+                    Rectangle {
+                        required property int index
+
+                        width: gridSample.size / 4
+                        height: width
+                        radius: Theme.pill(height)
+                        color: index === 4 ? Theme.accent : Theme.text
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startDistro
+
+        // a generic peak, in the accent: the real logo is read on the bar.
+        // in a circle as wide as the bar is tall, at the bar's glyph size
+        Item {
+            id: distroSample
+
+            readonly property int pad: 0
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
+
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
+
+            Shape {
+                anchors.centerIn: parent
+                width: distroSample.glyph
+                height: distroSample.glyph
+                preferredRendererType: Shape.CurveRenderer
+                transform: Scale {
+                    xScale: distroSample.glyph / 24
+                    yScale: distroSample.glyph / 24
+                }
+
+                ShapePath {
+                    strokeWidth: 0
+                    strokeColor: "transparent"
+                    fillColor: Theme.accent
+
+                    PathSvg {
+                        path: "M12 2 3 21h4.5L12 11l4.5 10H21Z"
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startAvatar
+
+        // the account picture, as the bar shows it, in a circle as wide as the bar is tall
+        Item {
+            id: avatarSample
+
+            readonly property int pad: 0
+            readonly property int glyph: Math.max(Theme.dp(16), Math.min(Theme.dp(22), sample.stripHeight - Theme.dp(14)))
+
+            implicitWidth: sample.stripHeight
+            implicitHeight: sample.stripHeight
+
+            UserAvatar {
+                anchors.centerIn: parent
+                user: Users.me
+                size: avatarSample.glyph + Theme.dp(2)
+            }
+
+        }
+
+    }
+
+    Component {
+        id: startLabel
+
+        // the word on its chip, hugged as closely at its ends as at its top
+        Item {
+            id: labelSample
+
+            readonly property int pad: 0
+            readonly property int chipHeight: Math.min(Theme.dp(24), sample.stripHeight - Theme.dp(8))
+
+            implicitWidth: Math.ceil(startLabelText.implicitWidth) + Theme.dp(20) + sample.stripHeight - labelSample.chipHeight
+            implicitHeight: sample.stripHeight
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: Math.ceil(startLabelText.implicitWidth) + Theme.dp(20)
+                height: labelSample.chipHeight
+                radius: Theme.pill(height)
+                color: Theme.accent
+
+                BarText {
+                    id: startLabelText
+
+                    anchors.centerIn: parent
+                    text: "Start"
+                    color: Theme.fgAccent
+                    font.pixelSize: Theme.fs(12)
+                }
+
+            }
+
+        }
+
+    }
+
+    Component {
         id: powerIcon
 
         MiniGlyph {
@@ -961,76 +1484,12 @@ Item {
 
     }
 
-    Component {
-        id: windowPlain
-
-        Row {
-            spacing: Theme.dp(8)
-
-            Rectangle {
-                width: Theme.dp(17)
-                height: Theme.dp(17)
-                radius: Theme.dp(4)
-                color: Theme.accentContainer
-                anchors.verticalCenter: parent.verticalCenter
-            }
-
-            BarText {
-                text: Prefs.windowModuleText === "icon" ? "" : "Window title"
-                visible: text !== ""
-                font.pixelSize: Theme.fontLabelLg
-                font.weight: Font.Medium
-                font.bold: false
-            }
-
-        }
-
-    }
-
-    Component {
-        id: windowChip
-
-        Rectangle {
-            implicitWidth: chipRow.implicitWidth + (Prefs.windowModuleText === "icon" ? Theme.dp(12) : Theme.dp(18))
-            implicitHeight: Theme.dp(26)
-            radius: height / 2
-            color: Theme.accentContainer
-
-            Row {
-                id: chipRow
-
-                anchors.centerIn: parent
-                spacing: Theme.dp(8)
-
-                Rectangle {
-                    width: Theme.dp(17)
-                    height: Theme.dp(17)
-                    radius: Theme.dp(4)
-                    color: Theme.accent
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-
-                BarText {
-                    text: Prefs.windowModuleText === "icon" ? "" : "Window title"
-                    visible: text !== ""
-                    color: Theme.fgAccentContainer
-                    font.pixelSize: Theme.fontLabelLg
-                    font.weight: Font.Medium
-                    font.bold: false
-                }
-
-            }
-
-        }
-
-    }
-
     // the media module's moving bars, standing still
     component MiniBars: Row {
-        spacing: 2.5
+        spacing: Theme.dp(2)
 
         Repeater {
-            model: [7, 14, 10]
+            model: [6, 11, 8]
 
             Rectangle {
                 required property int modelData
@@ -1046,17 +1505,17 @@ Item {
 
     }
 
-    // a play button on the accent
+    // the bar's play button: a pill on the accent, paused while it plays
     component MiniPlay: Rectangle {
-        width: Theme.dp(22)
-        height: Theme.dp(22)
-        radius: height / 2
+        width: Math.round(Theme.dp(24) * 1.3)
+        height: Theme.dp(24)
+        radius: Theme.dp(12)
         color: Theme.accent
 
         Icon {
             anchors.centerIn: parent
-            name: "play_arrow"
-            size: Theme.dp(18)
+            name: "pause"
+            size: Theme.dp(16)
             fill: 1
             color: Theme.fgAccent
         }

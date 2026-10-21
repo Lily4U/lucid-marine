@@ -43,8 +43,6 @@ BarPill {
         return root.title;
     }
     readonly property int horizontalPadding: Theme.dp(11)
-    // the looks, from its card on the Bar page
-    readonly property bool chipFace: Prefs.windowModuleStyle === "chip"
     readonly property bool iconOnly: Prefs.windowModuleText === "icon"
     // every window on the workspace in view, in Hyprland's order
     readonly property var here: root.active && root.active.workspace && root.active.workspace.toplevels ? root.active.workspace.toplevels.values.filter((t) => {
@@ -257,15 +255,6 @@ BarPill {
     }
 
     compactContent: [
-        // the chip face: the window on a tinted chip
-        Rectangle {
-            visible: root.chipFace
-            anchors.centerIn: compactRow
-            width: compactRow.width + (root.iconOnly ? Theme.dp(12) : Theme.dp(18))
-            height: Math.min(Theme.dp(26), parent.height - Theme.dp(6))
-            radius: height / 2
-            color: Theme.accentContainer
-        },
         Row {
             id: compactRow
 
@@ -288,10 +277,12 @@ BarPill {
                 anchors.verticalCenter: parent.verticalCenter
                 width: Math.min(implicitWidth, Theme.dp(Prefs.windowModuleWidth))
                 text: root.faceText
-                color: root.chipFace ? Theme.fgAccentContainer : Theme.text
+                color: Theme.text
                 font.family: Theme.fontFamily
                 font.pixelSize: Theme.fontLabelLg
-                font.weight: Font.Medium
+                // the media title's weight, the other title on the bar
+                font.bold: true
+                font.variableAxes: Theme.axes(Theme.fontLabelLg, 640, 0)
                 elide: Text.ElideRight
             }
 

@@ -36,7 +36,7 @@ Item {
         field.reveal = false;
     }
 
-    implicitHeight: 56
+    implicitHeight: Theme.dp(56)
 
     Timer {
         id: vacate
@@ -115,7 +115,7 @@ Item {
         id: pill
 
         anchors.fill: parent
-        radius: height / 2
+        radius: Theme.pill(height)
         color: field.good ? Theme.alpha(Theme.success, 0.16) : (field.bad ? Theme.alpha(Theme.error, 0.14) : Theme.cardHigh)
         border.width: Lock.focused || field.bad || field.good ? 2 : 0
         border.color: field.good ? Theme.success : (field.bad ? Theme.error : Theme.accent)
@@ -141,9 +141,9 @@ Item {
         id: leading
 
         anchors.left: parent.left
-        anchors.leftMargin: 20
+        anchors.leftMargin: Theme.dp(20)
         anchors.verticalCenter: parent.verticalCenter
-        size: 20
+        size: Theme.dp(20)
         name: field.good ? "lockOpen" : "lock"
         color: field.good ? Theme.success : (field.bad ? Theme.error : (Lock.focused ? Theme.accent : Theme.subtext))
 
@@ -159,9 +159,9 @@ Item {
     // what to type, when nothing has been
     Text {
         anchors.left: leading.right
-        anchors.leftMargin: 14
+        anchors.leftMargin: Theme.dp(14)
         anchors.right: trailing.left
-        anchors.rightMargin: 12
+        anchors.rightMargin: Theme.dp(12)
         anchors.verticalCenter: parent.verticalCenter
         transformOrigin: Item.Left
         text: !Lock.needsPassword ? "No password needed" : (Lock.fingerprint ? "Password or fingerprint" : "Password")
@@ -198,11 +198,11 @@ Item {
         id: echo
 
         anchors.left: leading.right
-        anchors.leftMargin: 14
+        anchors.leftMargin: Theme.dp(14)
         anchors.right: trailing.left
-        anchors.rightMargin: 10
+        anchors.rightMargin: Theme.dp(10)
         anchors.verticalCenter: parent.verticalCenter
-        height: 30
+        height: Theme.dp(30)
         text: input.text
         reveal: field.reveal
         busy: Lock.busy
@@ -217,9 +217,9 @@ Item {
         id: input
 
         anchors.left: leading.right
-        anchors.leftMargin: 14
+        anchors.leftMargin: Theme.dp(14)
         anchors.right: trailing.left
-        anchors.rightMargin: 12
+        anchors.rightMargin: Theme.dp(12)
         anchors.verticalCenter: parent.verticalCenter
         readOnly: !Lock.acceptsInput
         echoMode: TextInput.Password
@@ -275,14 +275,14 @@ Item {
         id: trailing
 
         anchors.right: parent.right
-        anchors.rightMargin: 6
+        anchors.rightMargin: Theme.dp(6)
         anchors.verticalCenter: parent.verticalCenter
-        spacing: 2
+        spacing: Theme.dp(2)
 
         IconButton {
             anchors.verticalCenter: parent.verticalCenter
-            diameter: 40
-            glyphSize: 19
+            diameter: Theme.dp(40)
+            glyphSize: Theme.dp(19)
             glyph: field.reveal ? "eyeOff" : "eye"
             glyphColor: Theme.subtext
             visible: input.text.length > 0 && !Lock.busy
@@ -296,9 +296,9 @@ Item {
             id: submit
 
             anchors.verticalCenter: parent.verticalCenter
-            width: 44
-            height: 44
-            radius: 999
+            width: Theme.dp(44)
+            height: Theme.dp(44)
+            radius: Theme.pill(width)
             color: field.good ? Theme.success : (field.canSubmit || Lock.busy ? (submitArea.hovered ? Theme.accentHover : Theme.accent) : Theme.alpha(Theme.outlineStrong, 0.35))
             scale: submitTap.pressed ? 0.9 : 1
 
@@ -319,7 +319,7 @@ Item {
 
             Glyph {
                 anchors.centerIn: parent
-                size: 20
+                size: Theme.dp(20)
                 name: field.good ? "check" : (Lock.fingerprint && input.text.length === 0 ? "finger" : "arrow")
                 color: field.good ? Theme.fgSuccess : (field.canSubmit ? Theme.fgAccent : Theme.subtextDim)
                 opacity: Lock.busy ? 0 : 1
@@ -335,7 +335,7 @@ Item {
 
             Spinner {
                 anchors.centerIn: parent
-                diameter: 22
+                diameter: Theme.dp(22)
                 color: Theme.fgAccent
                 running: Lock.busy
             }

@@ -130,7 +130,8 @@ BarPill {
     }
 
     // the dot face: one mark, in the colour of the most telling use
-    readonly property bool dotFace: Prefs.privacyStyle === "dot"
+    lookPref: Prefs.privacyStyle
+    readonly property bool dotFace: root.look === "dot"
     readonly property string topKind: {
         const kinds = root.rows.map((r) => {
             return r.kind;
