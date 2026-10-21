@@ -51,7 +51,7 @@ Lucid-marine installs to `~/.config/quickshell` and targets **Ultramarine Linux 
 **Hyprland**. Three commands:
 
 ```sh
-git clone [https://github.com/Lily4U/lucid-marine.git](https://github.com/Lily4U/lucid-marine.git) lucid
+git clone https://github.com/Lily4U/lucid-marine.git lucid
 cd lucid
 ./install.sh
 
