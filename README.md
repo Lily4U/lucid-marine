@@ -25,7 +25,7 @@ your wallpaper.
   <a href="https://quickshell.org"><img alt="Built on Quickshell" src="https://img.shields.io/badge/BUILT%20ON-QUICKSHELL-FFC46B?style=for-the-badge&labelColor=14100E"></a>
 </p>
 
-<img src="assets/desktop.webp" alt="The Lucid desktop: the bar along the top, calendar and weather widgets on the left, the clock and what is playing on the right, and the dock along the bottom">
+<img src="assets/desktop-ultramarine.png" alt="The Lucid desktop: the bar along the top, calendar and weather widgets on the left, the clock and what is playing on the right, and the dock along the bottom">
 
 </div>
 
