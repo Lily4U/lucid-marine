@@ -1,0 +1,3 @@
+README.md merge=ours # Manual modification
+CHANGELOG merge=union
+install.sh merge=ours # Specific for Ultramarine, needs manual changes
