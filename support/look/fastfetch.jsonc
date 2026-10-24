@@ -11,9 +11,13 @@
     "logo": {
     	"source": "~/.local/share/fastfetch/images/hypr.png",
     	"type": "kitty",
-    	"height": 18,
+	"recache": "regen",
+    	"height": 10,
+	"width": 40,
     	"padding": {
-    		"top": 2
+    		"top": 8,
+		"right": 0,
+		"left": 0
     	},
     	// the ascii fallback while hypr.png is missing
     	"color": {
@@ -45,7 +49,7 @@
         "break",
         {
             "type": "os",
-            "key": " ",
+            "key": " ",
             "keyColor": "32",  // = color2, the theme's primary
         },
         {
@@ -55,7 +59,7 @@
         },
         {
             "type": "packages",
-            "format": "{} (pacman)",
+            "format": "{rpm} (rpm), {flatpak-all} (flatpak)",
             "key": " ",
             "keyColor": "32",  
         },
