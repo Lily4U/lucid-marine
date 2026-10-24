@@ -1206,6 +1206,8 @@ FloatingWindow {
                                 return "StoragePage.qml";
                             case "search":
                                 return "SearchPage.qml";
+                            case "images":
+                                return "ImageServicesPage.qml";
                             default:
                                 return "AboutPage.qml";
                             }

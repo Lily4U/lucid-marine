@@ -74,6 +74,11 @@ Scope {
             host.show("users");
         }
 
+        // TESTING
+        function images(): void {
+            host.show("images");
+        }
+
         // the page is about accounts; both names reach it
         function accounts(): void {
             host.show("users");

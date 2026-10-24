@@ -61,7 +61,7 @@ That's it — the installer does the rest:
 
 1. **Checks your system** — refuses to run anywhere it can't finish the job,
 rather than leaving you half-installed.
-2. **Installs dependencies** — uses `dnf` to fetch system packages, enabling COPRs and RPM Fusion when needed. It lists everything and asks before touching
+2. **Installs dependencies** — uses `dnf` to fetch system packages, enabling third-party COPRs when needed, always asking first (see [Third-party repositories](#third-party-repositories)). It lists everything and asks before touching
 your system. Say no and it carries on, telling you which features won't work.
 This includes the apps Lucid ships pinned to the dock as Flatpaks. `--no-apps` skips them.
 3. **Compiles the custom C color picker** — builds the lightweight native utility using `make` and `clang`/`gcc` and places it in your PATH (`~/.local/bin/colorpicker`).
@@ -128,11 +128,7 @@ it by hand below, and offers to restart Lucid at the end. The password goes to
 ```sh
 qs ipc call updates status   # what it knows
 qs ipc call updates check    # ask now
-<<<<<<< HEAD
-
-=======
 qs ipc call updates update   # install the new release (warning first)
->>>>>>> upstream/main
 ```
 
 ### Older versions
@@ -140,7 +136,7 @@ qs ipc call updates update   # install the new release (warning first)
 `v0.57 beta` is a tag, so it stays exactly where it is:
 
 ```sh
-git clone --branch v0.57 [https://github.com/Lily4U/lucid-marine.git](https://github.com/Lily4U/lucid-marine.git)
+git clone --branch v0.57 https://github.com/Lily4U/lucid-marine.git
 
 ```
 
@@ -150,7 +146,7 @@ git clone --branch v0.57 [https://github.com/Lily4U/lucid-marine.git](https://gi
 | --- | --- |
 | `--no-theming` | Skips the palette layer. Leaves `~/.config/lucid` and `~/.config/matugen` alone — use this if you already have a matugen setup you don't want touched. |
 | `--no-hypr` | Keeps your Hyprland config. Lucid's binds, window rules, blur and autostart are not installed. |
-| `--no-apps` | Doesn't install the apps the dock ships pinned (Zen, VSCodium, Spotify, Vesktop, Files, Steam, Proton VPN). The dock then pins whatever equivalents you already have. |
+| `--no-apps` | Doesn't install the apps the dock ships pinned (Zen, VSCodium, Spotify, Vesktop, Files, Steam, installed as Flatpaks). The dock then pins whatever equivalents you already have. |
 | `--no-look` | Doesn't touch `kitty.conf`, `starship.toml`, the fastfetch config, your shell rc files, VSCode settings, or the GTK theme and icons. |
 | `--no-wallpapers` | Doesn't copy the bundled wallpapers into `~/Pictures/wallpapers`. They are ~180 MB, so this is worth passing on a small disk or a slow link. |
 | `--with-hypr` | Reinstalls Lucid's Hyprland config even when one is already in place. |
@@ -240,7 +236,7 @@ you know what's being pulled in.
 
 **Required** — the shell won't start without these:
 
-`quickshell` · `qt6-5compat` · `qt6-declarative` · `qt6-multimedia` · `clang` · `make` · `wayland-devel` · `wayland-protocols-devel`
+`quickshell` (0.3 or newer) · `qt6-qt5compat` · `qt6-qtdeclarative` · `qt6-qtmultimedia` · `clang` · `make` · `wayland-devel` · `wayland-protocols-devel`
 
 **Per feature** — a missing one breaks only its own feature:
 
@@ -249,12 +245,12 @@ you know what's being pulled in.
 | `matugen`, `jq` | Wallpaper-derived colours, theme switching |
 | `git` | Importing a theme from a scheme repo on Settings → Theme |
 | `awww` | Setting the wallpaper |
-| `python-pywal` | The Pywal theme |
+| `python3-pywal` | The Pywal theme |
 | `NetworkManager` | Wi-Fi panel |
 | `qrencode` | The QR code that shares a saved Wi-Fi network |
-| `bluez`, `bluez-utils` | Bluetooth panel and settings |
+| `bluez` | Bluetooth panel and settings |
 | `bluez-obexd`, `python3-gobject` | Sending and receiving files over Bluetooth |
-| `kdeconnect`, `python3-gobject` | The KDE Connect page |
+| `kde-connect`, `python3-gobject` | The KDE Connect page |
 | `fuse-sshfs` | Browsing a phone's files |
 | `pulseaudio-utils`, `wireplumber` | Volume, audio devices, and playing Lucid's sounds |
 | `inotify-tools` | The camera on/off toast and sound |
@@ -275,18 +271,11 @@ you know what's being pulled in.
 | `polkit` | Administrator prompts |
 | `accountsservice` | Users and Accounts page |
 | `libnotify` | Notification actions |
-<<<<<<< HEAD
 | `swappy` | Screenshot markup |
 | **`colorpicker`** (custom C binary) | Fast native screen color picking (replaces hyprpicker dependency) |
 | `xdg-utils` | Opening links and files |
-| `librsvg`, `gtk-update-icon-cache` | Pointer shadow and icon cache |
+| `librsvg2`, `gtk-update-icon-cache` | Pointer shadow and icon cache |
 | `google-noto-color-emoji-fonts` | Emoji rendering |
-=======
-| `swappy` | Marking up a screenshot, from its preview card or notification |
-| `hyprpicker` | The Colour mode. Without it the mode says so and picks nothing |
-| `xdg-utils` | Opening links and files from the shell |
-| `librsvg` | Turning the pointer's shadow off — the cursor theme is rendered again from its vector sources |
-| `noto-fonts-emoji` | Emoji rendering |
 
 **The Hyprland config and the look** — installed unless you pass `--no-hypr`
 or `--no-look`. The binds shell out to these, so a missing one is a dead key:
@@ -297,30 +286,38 @@ or `--no-look`. The binds shell out to these, so a missing one is a dead key:
 | `fish` | The shell kitty opens |
 | `nautilus` | Files (`SUPER`+`E`) |
 | `playerctl` | The media keys |
+| `hyprland-guiutils`       | Hyprland's own dialogs and update screen               |
 | `gnome-calculator` | Calculator (`F12`) |
 | `starship` | The prompt |
-| `ttf-jetbrains-mono-nerd` | The glyphs the prompt and kitty are drawn with |
-| `adw-gtk-theme` | Provides `adw-gtk3-dark`, the GTK theme Lucid selects |
+| `JetBrainsMono Nerd Font` | The glyphs the prompt and kitty are drawn with; downloaded by the installer, not packaged for Fedora |
+| `adw-gtk3-theme` | Provides `adw-gtk3-dark`, the GTK theme Lucid selects |
 | `papirus-icon-theme` | Fallback icons — FairyWren declares `Inherits=Papirus` |
 
-**The dock's default pins** — installed unless you pass `--no-apps`. Several
-GB, mostly from the AUR:
+**The dock's default pins** — installed unless you pass `--no-apps`. Several GB, installed as Flatpaks from Flathub because none of them is in Fedora's repos:
 
-`zen-browser-bin` · `vscodium-bin` · `spotify` · `vesktop` · `nautilus` ·
-`steam` · `proton-vpn-gtk-app`
+`app.zen_browser.zen` · `com.vscodium.codium` · `dev.vencord.Vesktop` · `com.spotify.Client` · `com.valvesoftware.Steam`
 
-Anything you already have an equivalent of is left alone — `vscodium` counts
-for `vscodium-bin`, `discord` for `vesktop`, and so on. `steam` is skipped
-unless the `multilib` repo is enabled; with it come the Vulkan drivers for the
-graphics cards the machine has (`vulkan-radeon`, `vulkan-intel`, NVIDIA's own or
-nouveau, and their 32-bit halves), so pacman never has to guess one.
+Files (`nautilus`) comes from the system packages above. Anything you already have an equivalent of is left alone — a `vscodium` or `codium` package counts for the VSCodium Flatpak, `discord` for `vesktop`, and so on. Steam as a Flatpak needs no multilib or 32-bit driver packages on the host. Proton VPN has no Flathub build, so the installer does not install it: add Proton's own repository if you want it.
 
 Lucid uses Hyprland-specific APIs for workspaces and window management. It
 will not work on other compositors.
 
+### Third-party repositories
+
+Some packages are not in Fedora's own repositories. The installer asks before enabling
+each of these [COPR](https://copr.fedorainfracloud.org) repositories, which are unofficial
+and maintained by individuals:
+
+| COPR                       | Provides                                                                 |
+|----------------------------|--------------------------------------------------------------------------|
+| `errornointernet/quickshell` | `quickshell`. Fedora 44 ships 0.2.x, but Lucid needs **0.3 or newer**  |
+| `avengemedia/danklinux`    | `matugen`, `cliphist` and similar helpers                                |
+| `ashbuk/Hyprland-Fedora`   | Hyprland itself. Lucid's Lua config needs Hyprland 0.55 or newer         |
+| `aahsnr-work/base-pkgs`    | `hyprland-guiutils`                                                      |
+
 ### Fonts
 
-The default UI font is **Google Sans**, which is not in the Arch repos. If you
+The default UI font is **Google Sans**, which is not in Fedora's repos. If you
 don't have it, Qt falls back to your default sans and everything still works —
 or pick any installed font in Settings → General.
 
@@ -375,7 +372,6 @@ Every surface is scriptable. `qs ipc call -- <target> <function> [arg]`:
 | `displays` | `list` `settings` `shell <where>` `bar <where>` `dock <where>` — *where* is an output name, `left`/`middle`/`right`, `here`, `next`, `prev` or `auto` |
 | `polkit` | `status` `demo <action-id>` `fail` `grant` `close` — `demo` raises the dialog with no PAM session behind it, for previewing a theme |
 | `debug` | `toggle` `on` `off` — draws input and blur region outlines |
->>>>>>> upstream/main
 
 ## Uninstall
 
@@ -393,7 +389,7 @@ Issues and PRs welcome on the `lucid-marine` fork.
 
 ## License
 
-MIT — see [LICENSE](https://www.google.com/search?q=LICENSE).
+MIT — see [LICENSE](LICENSE).
 
 Built on [Quickshell](https://quickshell.org). Colour generation by
 [matugen](https://github.com/InioX/matugen). Design follows
