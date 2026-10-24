@@ -146,7 +146,7 @@ PKG_REQUIRED=(quickshell qt6-5compat qt6-declarative qt6-multimedia qt6-webengin
 COPR_QUICKSHELL="errornointernet/quickshell"   # quickshell (documented upstream)
 COPR_EXTRAS="avengemedia/danklinux"            # matugen, cliphist and friends
 COPR_HYPRLAND="ashbuk/Hyprland-Fedora"         # Hyprland: not in Fedora's own repos
-
+COPR_HYPRLANDUTILS="aahsnr-work/base-pkgs"     # hyprland-guiutils remain on this repo ;)
 # required — the shell will not start or will visibly break without these
 PKG_REQUIRED=(quickshell qt6-qt5compat qt6-qtdeclarative qt6-qtmultimedia)
 >>>>>>> 8b5bdd7 (Literally everything)
@@ -157,7 +157,7 @@ PKG_FEATURES=(
     kde-connect fuse-sshfs python3-gobject
     pulseaudio-utils wireplumber brightnessctl upower hypridle hyprsunset
     grim wf-recorder ffmpeg-free wl-clipboard wtype cliphist
-    tesseract tesseract-langpack-eng hyprpicker
+    tesseract tesseract-langpack-eng
     python3-pillow python3-numpy python3-fonttools
     cava songrec curl libnotify awww fastfetch
     python3-pywal google-noto-color-emoji-fonts
@@ -200,7 +200,7 @@ PKG_HYPR=(
     starship fish ttf-jetbrains-mono-nerd adw-gtk-theme papirus-icon-theme
 =======
     # Compile tools (for C colorpicker)
-    clang make wayland-protocols-devel 
+    clang make wayland-protocols-devel
 )
 # invoked by the shipped Hyprland binds and the Lucid look. without these the
 # config installs fine but its keys do nothing and the prompt renders as boxes.
@@ -218,6 +218,7 @@ DOCK_FLATPAKS=(
     app.zen_browser.zen com.vscodium.codium dev.vencord.Vesktop
     com.spotify.Client com.valvesoftware.Steam
 )
+
 # a package already covered by an equivalent one the user chose themselves.
 # without this a re-run keeps trying to install ffmpeg-free over ffmpeg
 declare -A PKG_ALTS=(
@@ -289,6 +290,7 @@ step "Resolving dependencies"
 
 WANTED=("${PKG_REQUIRED[@]}" "${PKG_FEATURES[@]}")
 [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && WANTED+=("${PKG_HYPR[@]}")
+command -v Hyprland &>/dev/null && WANTED+=(hyprland-guiutils)
 compute_missing
 
 if [[ ${#missing[@]} -eq 0 ]]; then
@@ -317,9 +319,21 @@ else
             fi
         fi
 
+        # pass 2b: hyprland-guiutils (Hyprland's dialogs and update screen).
+        # separate from quickshell, so it is offered even when quickshell is fine
+        if [[ " ${missing[*]} " == *" hyprland-guiutils "* ]]; then
+            say "  hyprland-guiutils is not in the official repos; it comes from the"
+            say "  ${COPR_HYPRLANDUTILS} COPR (unofficial, community-maintained)"
+            if ask "  Enable that COPR?"; then
+                copr_enable "$COPR_HYPRLANDUTILS" && dnf_install hyprland-guiutils \
+                    || warn "could not install hyprland-guiutils from the COPR"
+                compute_missing
+            fi
+        fi
+
         # pass 3: the helpers that are packaged only outside Fedora
         extras_missing=()
-        for p in matugen cliphist hyprsunset hyprpicker hypridle cava; do
+        for p in matugen cliphist hyprsunset hypridle cava; do
             [[ " ${missing[*]} " == *" $p "* ]] && extras_missing+=("$p")
         done
         if (( ${#extras_missing[@]} )); then
@@ -381,7 +395,7 @@ if [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && [[ $SKIP_DEPS -eq 0 ]] \
     say "  ${COPR_HYPRLAND} COPR builds the stable releases. Lucid's lua"
     say "  config needs Hyprland 0.55 or newer."
     if ask "  Enable that COPR and install hyprland?"; then
-        copr_enable "$COPR_HYPRLAND" && dnf_install hyprland xdg-desktop-portal-hyprland \
+        copr_enable "$COPR_HYPRLAND" && dnf_install hyprland hyprland-guiutils xdg-desktop-portal-hyprland \
             || { DEPS_OK=0; warn "could not install hyprland — do it by hand before logging in"; }
     else
         DEPS_OK=0
@@ -1843,10 +1857,14 @@ fi
 # --- Compile the colorpicker ---
 if [[ -f "$SRC/colorpicker/Makefile" ]]; then
     step "Building the pure C colorpicker"
-    make -C "$SRC/colorpicker"
-    mkdir -p "$HOME/.local/bin"
-    cp "$SRC/colorpicker/colorpicker" "$HOME/.local/bin/colorpicker"
-    say "  colorpicker -> ~/.local/bin/colorpicker"
+    if make -C "$SRC/colorpicker" \
+       && mkdir -p "$HOME/.local/bin" \
+       && cp "$SRC/colorpicker/colorpicker" "$HOME/.local/bin/colorpicker"; then
+        say "  colorpicker -> ~/.local/bin/colorpicker"
+    else
+        DEPS_OK=0
+        warn "could not build the colorpicker (needs clang, make, wayland-devel, wayland-protocols-devel)"
+    fi
 fi
 
 if [[ $DEPS_OK -eq 0 ]]; then
