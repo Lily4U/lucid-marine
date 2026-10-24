@@ -259,7 +259,6 @@ step "Resolving dependencies"
 
 WANTED=("${PKG_REQUIRED[@]}" "${PKG_FEATURES[@]}")
 [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && WANTED+=("${PKG_HYPR[@]}")
-command -v Hyprland &>/dev/null && WANTED+=(hyprland-guiutils)
 compute_missing
 
 if [[ ${#missing[@]} -eq 0 ]]; then
@@ -284,18 +283,6 @@ else
             if ask "  Enable that COPR?"; then
                 copr_enable "$COPR_QUICKSHELL" && dnf_install quickshell \
                     || warn "could not install quickshell from the COPR"
-                compute_missing
-            fi
-        fi
-
-        # pass 2b: hyprland-guiutils (Hyprland's dialogs and update screen).
-        # separate from quickshell, so it is offered even when quickshell is fine
-        if [[ " ${missing[*]} " == *" hyprland-guiutils "* ]]; then
-            say "  hyprland-guiutils is not in the official repos; it comes from the"
-            say "  ${COPR_HYPRLANDUTILS} COPR (unofficial, community-maintained)"
-            if ask "  Enable that COPR?"; then
-                copr_enable "$COPR_HYPRLANDUTILS" && dnf_install hyprland-guiutils \
-                    || warn "could not install hyprland-guiutils from the COPR"
                 compute_missing
             fi
         fi
@@ -364,10 +351,39 @@ if [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && [[ $SKIP_DEPS -eq 0 ]] \
     say "  ${COPR_HYPRLAND} COPR builds the stable releases. Lucid's lua"
     say "  config needs Hyprland 0.55 or newer."
     if ask "  Enable that COPR and install hyprland?"; then
-        copr_enable "$COPR_HYPRLAND" && dnf_install hyprland hyprland-guiutils xdg-desktop-portal-hyprland \
+        copr_enable "$COPR_HYPRLAND" && dnf_install hyprland xdg-desktop-portal-hyprland \
             || { DEPS_OK=0; warn "could not install hyprland — do it by hand before logging in"; }
     else
         DEPS_OK=0
+    fi
+fi
+
+# --- hyprland-guiutils -------------------------------------------------------
+# Hyprland's dialogs and update screen. It is its own package, and which repo
+# carries it depends on where Hyprland came from, so it is settled here, after
+# Hyprland, whichever way Hyprland got installed (or was already there)
+if [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && ! have_pkg hyprland-guiutils; then
+    if ! command -v Hyprland &>/dev/null; then
+        warn "  Hyprland is not installed, so hyprland-guiutils was not set up."
+        warn "  install it together with Hyprland: recent releases rely on it."
+    elif [[ $SKIP_DEPS -eq 1 ]]; then
+        DEPS_OK=0
+        say "  ${ylw}hyprland-guiutils missing (--skip-deps, not installing)${r}"
+    else
+        # whatever is enabled by now first: Fedora, or Hyprland's own COPR
+        dnf_install hyprland-guiutils || true
+        if ! have_pkg hyprland-guiutils; then
+            say "  hyprland-guiutils is not in the enabled repos; it comes from the"
+            say "  ${COPR_HYPRLANDUTILS} COPR (unofficial, community-maintained)"
+            if ask "  Enable that COPR?"; then
+                copr_enable "$COPR_HYPRLANDUTILS" && dnf_install hyprland-guiutils \
+                    || warn "could not install hyprland-guiutils from the COPR"
+            fi
+        fi
+        if ! have_pkg hyprland-guiutils; then
+            DEPS_OK=0
+            warn "hyprland-guiutils is still missing: Hyprland's dialogs will not work"
+        fi
     fi
 fi
 
