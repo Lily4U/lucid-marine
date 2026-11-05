@@ -132,12 +132,11 @@ say "  wallpapers      $([[ $WITH_WALLPAPERS -eq 1 ]] && echo yes || echo 'no (-
 
 # ------------------------------------------------------------- dependencies
 
-#<<<<<<< HEAD
 # required — the shell will not start or will visibly break without these.
-# qt6-webengine is here for the qt pdf module it carries: lumen's preview pane
-# imports it, and a window with an import it can't resolve doesn't load at all,
+# qt6-qtpdf is here for the qt pdf module it carries (QtQuick.Pdf): lumen's preview
+# pane imports it, and a window with an import it can't resolve doesn't load at all,
 # which would take SUPER+E and every app's file dialog with it
-PKG_REQUIRED=(quickshell qt6-5compat qt6-declarative qt6-multimedia qt6-webengine)
+PKG_REQUIRED=(quickshell qt6-qt5compat qt6-qtdeclarative qt6-qtmultimedia qt6-qtpdf)
 
 # COPR repositories are unofficial and maintained by individuals. They are only
 # enabled after asking, and only when something is still missing from the
@@ -147,9 +146,7 @@ COPR_QUICKSHELL="errornointernet/quickshell"   # quickshell (documented upstream
 COPR_EXTRAS="avengemedia/danklinux"            # matugen, cliphist and friends
 COPR_HYPRLAND="ashbuk/Hyprland-Fedora"         # Hyprland: not in Fedora's own repos
 COPR_HYPRLANDUTILS="aahsnr-work/base-pkgs"     # hyprland-guiutils remain on this repo ;)
-# required — the shell will not start or will visibly break without these
-PKG_REQUIRED=(quickshell qt6-qt5compat qt6-qtdeclarative qt6-qtmultimedia)
-# # >>>>>>> 8b5bdd7 (Literally everything)
+
 # each of these backs one feature; missing ones degrade that feature only
 PKG_FEATURES=(
     matugen jq ImageMagick
@@ -181,35 +178,27 @@ PKG_FEATURES=(
     smartmontools udisks2
     # the desktop icons: video and music thumbnails, and the drives and trash they show
     ffmpegthumbnailer gvfs
-#<<<<<<< HEAD
     # lumen's network drives past sftp and ftp, which gvfs reaches alone: windows
-    # shares and most nas drives, nfs, webdav and the computers nearby (through
-    # avahi), and windows computers nearby
-    gvfs-smb gvfs-nfs gvfs-dnssd gvfs-wsdd
+    # shares and most nas drives (gvfs-smb) and nfs (gvfs-nfs). webdav and the
+    # computers nearby (dnssd) are part of the main gvfs package on Fedora
+    gvfs-smb gvfs-nfs
     # pictures: qt draws webp, tiff, tga and icns through its image plugins and
     # avif through kde's, in lens, the photo widget and the what's new sheet.
-    # jpegtran and exiv2 let lens turn a jpeg without encoding it again
-    qt6-imageformats kimageformats libjpeg-turbo exiv2
+    # jpegtran (libjpeg-turbo-utils) and exiv2 let lens turn a jpeg without
+    # encoding it again
+    qt6-qtimageformats kf6-kimageformats libjpeg-turbo-utils exiv2
 )
 # invoked by the shipped Hyprland binds and the Lucid look. without these the
 # config installs fine but its keys do nothing and the prompt renders as boxes.
 # the file manager is not among them: SUPER+E opens lumen, which is part of the
-# shell (lucidlumen/), and lumen is every app's file dialog too
-PKG_HYPR=(
-    kitty playerctl gnome-calculator
-    starship fish ttf-jetbrains-mono-nerd adw-gtk-theme papirus-icon-theme
-
-    # Compile tools (for C colorpicker)
-    clang make wayland-protocols-devel
-)
-# invoked by the shipped Hyprland binds and the Lucid look. without these the
-# config installs fine but its keys do nothing and the prompt renders as boxes.
+# shell (lucidlumen/), and lumen is every app's file dialog too.
 # (the JetBrainsMono Nerd Font is not packaged for Fedora; it is fetched below)
 PKG_HYPR=(
-    kitty nautilus playerctl gnome-calculator
+    kitty playerctl gnome-calculator
     starship fish adw-gtk3-theme papirus-icon-theme
-# >>>>>>> 8b5bdd7 (Literally everything)
 )
+# build tools for the C colorpicker; only wanted when colorpicker/ ships in the repo
+PKG_COLORPICKER=(clang make wayland-devel wayland-protocols-devel)
 # the dock's default pins, installed as Flatpaks from Flathub: none of them is
 # in Fedora's repos, and Flatpak keeps them out of the way of the system. the
 # dock detects them through the flatpak export dirs. --no-apps skips them.
@@ -225,10 +214,6 @@ declare -A PKG_ALTS=(
     [ffmpeg-free]="ffmpeg"
     [qt6ct]="qt6ct-kde"
     [xdg-desktop-portal-gtk]="xdg-desktop-portal-gnome xdg-desktop-portal-kde"
-#<<<<<<< HEAD
-    [kimageformats]="qt6-avif-image-plugin"
-
-    [adw-gtk3-theme]="adw-gtk3"
 )
 # same idea for the dock apps: an RPM or binary the user already has counts
 declare -A DOCK_ALTS=(
@@ -237,7 +222,6 @@ declare -A DOCK_ALTS=(
     [dev.vencord.Vesktop]="vesktop discord"
     [com.spotify.Client]="spotify spotify-launcher"
     [com.valvesoftware.Steam]="steam"
-# >>>>>>> 8b5bdd7 (Literally everything)
 )
 
 # true when the package, or anything standing in for it, is installed. the
@@ -290,6 +274,7 @@ step "Resolving dependencies"
 
 WANTED=("${PKG_REQUIRED[@]}" "${PKG_FEATURES[@]}")
 [[ $WITH_HYPR -eq 1 || $WITH_LOOK -eq 1 ]] && WANTED+=("${PKG_HYPR[@]}")
+[[ -f "$SRC/colorpicker/Makefile" ]] && WANTED+=("${PKG_COLORPICKER[@]}")
 compute_missing
 
 if [[ ${#missing[@]} -eq 0 ]]; then
@@ -623,7 +608,7 @@ detect_pinned() {
         "vscodium codium com.vscodium.codium code code-oss com.visualstudio.code zed dev.zed.Zed"
         "spotify com.spotify.Client spotify-launcher"
         "vesktop dev.vencord.Vesktop discord com.discordapp.Discord webcord"
-        "lucid.lumen org.gnome.Nautilus nautilus org.kde.dolphin dolphin thunar nemo pcmanfm-qt pcmanfm"
+        "lucid.lumen org.kde.dolphin dolphin thunar nemo pcmanfm-qt pcmanfm"
         "steam com.valvesoftware.Steam"
         "proton.vpn.app.gtk protonvpn-app"
         "kitty alacritty foot org.wezfurlong.wezterm Alacritty com.mitchellh.ghostty"
@@ -844,7 +829,6 @@ fi
 HYPR_DIR="$HOME/.config/hypr"
 HYPR_LUA_INSTALLED=0
 
-#<<<<<<< HEAD
 # one of Lucid's modules into a hyprland.lua that is not Lucid's own: the file,
 # and its require line once, the config backed up before its first change
 add_hypr_module() {
@@ -867,7 +851,6 @@ HYPR_SHIPPED="$HYPR_DIR/modules/.lucid-shipped"
 
 # ----- FORK NOTICE ------ #
 # I did not fix the mouse, i would accept pull requests
-# >>>>>>> 8b5bdd7 (Literally everything)
 
 # the cursor that tilts as it moves is a Hyprland plugin (hypr-dynamic-cursors).
 # scripts/cursor-plugin.sh compiles it against the headers the hyprland package
@@ -1187,6 +1170,10 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     install -m755 "$SRC/support/lucid/set-mode.sh"         "$LUCID_DIR/set-mode.sh"
     install -m755 "$SRC/support/lucid/sync-sddm.sh"        "$LUCID_DIR/sync-sddm.sh"
     install -m755 "$SRC/support/lucid/sync-starship.sh"    "$LUCID_DIR/sync-starship.sh"
+    # zen: finds its real profile and wires lucid-zen.css into userChrome.css
+    if [[ -f "$SRC/support/lucid/setup-zen.sh" ]]; then
+        install -m755 "$SRC/support/lucid/setup-zen.sh" "$LUCID_DIR/setup-zen.sh"
+    fi
     install -m644 "$SRC/support/lucid/lucid_palette.py"    "$LUCID_DIR/lucid_palette.py"
     install -m755 "$SRC/support/wallpaper/set-wallpaper.sh" "$WALL_SCRIPT_DIR/set-wallpaper.sh"
     # rules you wrote are yours: only ever placed when there are none
@@ -1251,7 +1238,6 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         rm -f "$MATUGEN_CFG.lucid-tmp"
     fi
 
-#<<<<<<< HEAD
     # firefox and zen keep their chrome css inside a generated profile dir, so
     # the path has to be discovered rather than assumed. zen's comes from its
     # installs.ini: an empty *.Default* folder it never opens often sorts first
@@ -1287,8 +1273,6 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         rm -f "$MATUGEN_CFG.lucid-tmp"
     fi
 
-
-# >>>>>>> 8b5bdd7 (Literally everything)
     # a block is only added when the app it themes is actually present, so
     # matugen never writes colours into a config directory that isn't there.
     # an existing block is always left alone - this config is the user's.
@@ -1320,7 +1304,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
     add_template kitty          "$TPL/kitty.conf"              '~/.config/kitty/matugen-colors.conf' "cmd:kitty" 'killall -SIGUSR1 kitty 2>/dev/null || true'
     # no dir: guard on these two. gtk only creates ~/.config/gtk-{3,4}.0 once
     # an app writes a setting there, so on a fresh machine the guard skipped
-    # both templates, matugen never wrote colors.css, and nautilus kept its
+    # both templates, matugen never wrote colors.css, and GTK apps kept their
     # stock colours forever. add_template creates the directory itself.
     add_template gtk3           "$TPL/gtk-colors.css"          '~/.config/gtk-3.0/colors.css'
     add_template gtk4           "$TPL/gtk-colors.css"          '~/.config/gtk-4.0/colors.css'
@@ -1341,17 +1325,14 @@ if [[ $WITH_THEMING -eq 1 ]]; then
                                 'touch -c ~/.config/qt6ct/qt6ct.conf'
     add_template kde            "$TPL/kde-colors.colors"       '~/.local/share/color-schemes/Lucid.colors' "cmd:qt6ct"
 
-    # firefox and zen keep their chrome css inside a generated profile dir, so
-    # the path has to be discovered rather than assumed
-    FF_PROFILE=$(find "$HOME/.mozilla/firefox" -maxdepth 1 -type d -name '*.default-release' 2>/dev/null | head -1 || true)
-    ZEN_PROFILE=$(find "$HOME/.config/zen" -maxdepth 1 -type d -name '*.Default*' 2>/dev/null | head -1 || true)
+    # (FF_PROFILE and ZEN_PROFILE were discovered above, before the matugen config was read)
     if [[ -n "$FF_PROFILE" ]]; then
         add_template firefox-website-colors "$TPL/firefox-colors.css" "$FF_PROFILE/chrome/colors.css"
     else
         MG_SKIPPED+=(firefox-website-colors)
     fi
     if [[ -n "$ZEN_PROFILE" ]]; then
-        add_template zen "$TPL/zen-userchrome.css" "$ZEN_PROFILE/chrome/userChrome.css"
+        add_template zen "$TPL/zen-userchrome.css" "$ZEN_PROFILE/chrome/lucid-zen.css"
     else
         MG_SKIPPED+=(zen)
     fi
@@ -1404,7 +1385,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         fi
     fi
 
-    # GTK apps - Nautilus included - only read colors.css if gtk.css imports it
+    # GTK apps only read colors.css if gtk.css imports it
     for gtkver in 3.0 4.0; do
         gtkdir="$HOME/.config/gtk-$gtkver"
         mkdir -p "$gtkdir"
