@@ -132,13 +132,13 @@ say "  wallpapers      $([[ $WITH_WALLPAPERS -eq 1 ]] && echo yes || echo 'no (-
 
 # ------------------------------------------------------------- dependencies
 
-<<<<<<< HEAD
+#<<<<<<< HEAD
 # required — the shell will not start or will visibly break without these.
 # qt6-webengine is here for the qt pdf module it carries: lumen's preview pane
 # imports it, and a window with an import it can't resolve doesn't load at all,
 # which would take SUPER+E and every app's file dialog with it
 PKG_REQUIRED=(quickshell qt6-5compat qt6-declarative qt6-multimedia qt6-webengine)
-=======
+
 # COPR repositories are unofficial and maintained by individuals. They are only
 # enabled after asking, and only when something is still missing from the
 # official repos (Fedora, RPM Fusion and Terra, which Ultramarine ships).
@@ -149,7 +149,7 @@ COPR_HYPRLAND="ashbuk/Hyprland-Fedora"         # Hyprland: not in Fedora's own r
 COPR_HYPRLANDUTILS="aahsnr-work/base-pkgs"     # hyprland-guiutils remain on this repo ;)
 # required — the shell will not start or will visibly break without these
 PKG_REQUIRED=(quickshell qt6-qt5compat qt6-qtdeclarative qt6-qtmultimedia)
->>>>>>> 8b5bdd7 (Literally everything)
+# # >>>>>>> 8b5bdd7 (Literally everything)
 # each of these backs one feature; missing ones degrade that feature only
 PKG_FEATURES=(
     matugen jq ImageMagick
@@ -181,7 +181,7 @@ PKG_FEATURES=(
     smartmontools udisks2
     # the desktop icons: video and music thumbnails, and the drives and trash they show
     ffmpegthumbnailer gvfs
-<<<<<<< HEAD
+#<<<<<<< HEAD
     # lumen's network drives past sftp and ftp, which gvfs reaches alone: windows
     # shares and most nas drives, nfs, webdav and the computers nearby (through
     # avahi), and windows computers nearby
@@ -198,7 +198,7 @@ PKG_FEATURES=(
 PKG_HYPR=(
     kitty playerctl gnome-calculator
     starship fish ttf-jetbrains-mono-nerd adw-gtk-theme papirus-icon-theme
-=======
+
     # Compile tools (for C colorpicker)
     clang make wayland-protocols-devel
 )
@@ -208,7 +208,7 @@ PKG_HYPR=(
 PKG_HYPR=(
     kitty nautilus playerctl gnome-calculator
     starship fish adw-gtk3-theme papirus-icon-theme
->>>>>>> 8b5bdd7 (Literally everything)
+# >>>>>>> 8b5bdd7 (Literally everything)
 )
 # the dock's default pins, installed as Flatpaks from Flathub: none of them is
 # in Fedora's repos, and Flatpak keeps them out of the way of the system. the
@@ -225,9 +225,9 @@ declare -A PKG_ALTS=(
     [ffmpeg-free]="ffmpeg"
     [qt6ct]="qt6ct-kde"
     [xdg-desktop-portal-gtk]="xdg-desktop-portal-gnome xdg-desktop-portal-kde"
-<<<<<<< HEAD
+#<<<<<<< HEAD
     [kimageformats]="qt6-avif-image-plugin"
-=======
+
     [adw-gtk3-theme]="adw-gtk3"
 )
 # same idea for the dock apps: an RPM or binary the user already has counts
@@ -237,7 +237,7 @@ declare -A DOCK_ALTS=(
     [dev.vencord.Vesktop]="vesktop discord"
     [com.spotify.Client]="spotify spotify-launcher"
     [com.valvesoftware.Steam]="steam"
->>>>>>> 8b5bdd7 (Literally everything)
+# >>>>>>> 8b5bdd7 (Literally everything)
 )
 
 # true when the package, or anything standing in for it, is installed. the
@@ -844,7 +844,7 @@ fi
 HYPR_DIR="$HOME/.config/hypr"
 HYPR_LUA_INSTALLED=0
 
-<<<<<<< HEAD
+#<<<<<<< HEAD
 # one of Lucid's modules into a hyprland.lua that is not Lucid's own: the file,
 # and its require line once, the config backed up before its first change
 add_hypr_module() {
@@ -864,10 +864,10 @@ add_hypr_module() {
 # what each module was when Lucid installed it, so a refresh can tell a module
 # you changed from one an older release shipped
 HYPR_SHIPPED="$HYPR_DIR/modules/.lucid-shipped"
-=======
+
 # ----- FORK NOTICE ------ #
 # I did not fix the mouse, i would accept pull requests
->>>>>>> 8b5bdd7 (Literally everything)
+# >>>>>>> 8b5bdd7 (Literally everything)
 
 # the cursor that tilts as it moves is a Hyprland plugin (hypr-dynamic-cursors).
 # scripts/cursor-plugin.sh compiles it against the headers the hyprland package
@@ -1251,7 +1251,7 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         rm -f "$MATUGEN_CFG.lucid-tmp"
     fi
 
-<<<<<<< HEAD
+#<<<<<<< HEAD
     # firefox and zen keep their chrome css inside a generated profile dir, so
     # the path has to be discovered rather than assumed. zen's comes from its
     # installs.ini: an empty *.Default* folder it never opens often sorts first
@@ -1287,8 +1287,8 @@ if [[ $WITH_THEMING -eq 1 ]]; then
         rm -f "$MATUGEN_CFG.lucid-tmp"
     fi
 
-=======
->>>>>>> 8b5bdd7 (Literally everything)
+
+# >>>>>>> 8b5bdd7 (Literally everything)
     # a block is only added when the app it themes is actually present, so
     # matugen never writes colours into a config directory that isn't there.
     # an existing block is always left alone - this config is the user's.
