@@ -26,8 +26,8 @@ PanelWindow {
     }
     readonly property real restY: {
         const h = pill.height;
-        // clear of the dock along the bottom
-        const low = hud.height - (Prefs.dockEnabled ? Theme.dp(Prefs.dockIconSize) + Theme.dp(20) + Prefs.effectiveDockBottomMargin : 0) - Theme.dp(40) - h;
+        // clear of the dock along the bottom, or of a bottom bar
+        const low = hud.height - (Prefs.dockOn ? Theme.dp(Prefs.dockIconSize) + Theme.dp(20) + Prefs.effectiveDockBottomMargin : (Prefs.barEnabled && Prefs.barBottom ? Prefs.effectiveBarTopMargin + Theme.dp(Prefs.barHeight) : 0)) - Theme.dp(40) - h;
         if (!hud.area)
             return low;
 
@@ -118,8 +118,8 @@ PanelWindow {
 
         visible: hud.counting
         value: Capture.countdown
-        fill: Theme.errorContainer
-        ink: Theme.fgErrorContainer
+        fill: Theme.primary
+        ink: Theme.fgPrimary
         caption: "Recording starts  ·  click to cancel"
         x: Math.round((hud.area ? hud.area.x + hud.area.w / 2 : hud.width / 2) - width / 2)
         y: Math.round((hud.area ? hud.area.y + hud.area.h / 2 : hud.height / 2) - Theme.dp(88))
@@ -136,7 +136,14 @@ PanelWindow {
         width: implicitWidth
         height: implicitHeight
 
+        HeldPointer {
+            held: pillDrag.active
+            cursor: Qt.ArrowCursor
+        }
+
         DragHandler {
+            id: pillDrag
+
             target: null
             xAxis.enabled: true
             yAxis.enabled: true

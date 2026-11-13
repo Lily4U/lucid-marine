@@ -59,7 +59,8 @@ Singleton {
     // light surfaces come out of matugen near-white, so the accent is what keeps
     // them from reading as flat paper. k also sets how far `surface()` walks off
     // white (k * _tintLift); below ~0.6 the ramp never leaves the tones where no hue can exist
-    readonly property real surfaceTint: pf.surfaceTint >= 0 ? pf.surfaceTint : (root.isLight ? 0.7 : 0)
+    // the installer's seed tints the surfaces too, dark mode included
+    readonly property real surfaceTint: Math.max(root._seeded ? 0.7 : 0, pf.surfaceTint >= 0 ? pf.surfaceTint : (root.isLight ? 0.7 : 0))
     property real accentPunch: pf.accentPunch
     readonly property real motionBaseline: 1.125
     readonly property real motionScale: pf.motionScale * root.motionBaseline
@@ -74,6 +75,9 @@ Singleton {
     // Settings > General > Corner rounding: 0 is square, 1 as shipped, 1.5 rounder
     readonly property real cornerScale: Math.max(0, Math.min(1.5, pf.cornerScale === undefined ? 1 : pf.cornerScale))
     readonly property real fontScale: pf.fontScale * root.typeBaseline * root.uiScale
+    // Settings > Bar > Content size: what the modules draw on the bar, apart from
+    // the bar's own height. their open panels keep dp() and fs()
+    readonly property real barContent: Math.max(0.8, Math.min(1.4, pf.barContentScale || 1))
     readonly property real blurAmount: blurAdapter.value || 0
 
     function setBlurAmount(v) {
@@ -108,10 +112,15 @@ Singleton {
     readonly property real _secondaryHue: -20
     readonly property real _rampShift: root.surfaceTint <= 0 ? 0 : (root.isLight ? Math.max(0, root.toneOf(root.cLowest) - (100 - root.surfaceTint * root._tintLift)) : -(root.surfaceTint * root._tintLift))
 
-    readonly property color cPrimary: m.primary
-    readonly property color cOnPrimary: m.on_primary
-    readonly property color cPrimaryContainer: m.primary_container
-    readonly property color cOnPrimaryContainer: m.on_primary_container
+    // set by the graphical installer to tint the accent from its screenshots; unset in the shell
+    property color seed: "transparent"
+    // the scheme the colours come from; the installer points it at its own light or dark one
+    property string palettePath: Quickshell.env("HOME") + "/.cache/quickshell/matugen.json"
+    readonly property bool _seeded: root.seed.a > 0
+    readonly property color cPrimary: root._seeded ? root.atTone(root.seed, root.isLight ? 40 : 80) : m.primary
+    readonly property color cOnPrimary: root._seeded ? root.atTone(root.seed, root.isLight ? 100 : 20) : m.on_primary
+    readonly property color cPrimaryContainer: root._seeded ? root.atTone(root.seed, root.isLight ? 90 : 30) : m.primary_container
+    readonly property color cOnPrimaryContainer: root._seeded ? root.atTone(root.seed, root.isLight ? 10 : 90) : m.on_primary_container
     readonly property color cSecondary: m.secondary
     readonly property color cSecondaryContainer: m.secondary_container
     readonly property color cTertiary: m.tertiary
@@ -337,6 +346,12 @@ Singleton {
         return Math.round(r[0] * root.fontScale);
     }
 
+    // typeSize() for a module's face on the bar
+    function barType(role) {
+        var r = root.typeRoles[role] || root.typeRoles.bodyMedium;
+        return Math.round(r[0] * root.fontScale * root.barContent);
+    }
+
     function typeWeight(role) {
         var r = root.typeRoles[role] || root.typeRoles.bodyMedium;
         return r[1];
@@ -384,6 +399,15 @@ Singleton {
 
     function dp(px) {
         return Math.round(px * root.uiScale);
+    }
+
+    // dp() and fs() for a module's face on the bar, through its content size
+    function barDp(px) {
+        return Math.round(px * root.uiScale * root.barContent);
+    }
+
+    function barFs(px) {
+        return Math.round(px * root.fontScale * root.barContent);
     }
 
     // a radius through the corner rounding dial as well as the interface size.
@@ -628,7 +652,8 @@ Singleton {
     FontLoader {
         id: flexLoader
 
-        source: "file://" + Quickshell.env("HOME") + "/.config/quickshell/assets/fonts/GoogleSansFlex.ttf"
+        // beside shell.qml: the installed shell, or the source tree the installer runs from
+        source: "file://" + Quickshell.shellDir.replace(/\/$/, "") + "/assets/fonts/GoogleSansFlex.ttf"
     }
 
     // a window whose grab never lands must not hold the palette back
@@ -642,7 +667,7 @@ Singleton {
     FileView {
         id: paletteFile
 
-        path: Quickshell.env("HOME") + "/.cache/quickshell/matugen.json"
+        path: root.palettePath
         watchChanges: true
         onFileChanged: root._beginRecolour()
         // the adapter below lands an event loop turn after this singleton is
@@ -729,6 +754,7 @@ Singleton {
             property real fontScale: 1
             property real uiScale: 1
             property real cornerScale: 1
+            property real barContentScale: 1
         }
 
     }

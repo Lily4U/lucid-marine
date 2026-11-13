@@ -9,6 +9,44 @@ Column {
 
     spacing: Theme.dp(26)
 
+    // with the bar on the bottom edge the dock is off, and a page of its
+    // settings changing nothing on screen says nothing of why
+    SettingCard {
+        visible: Prefs.barBottom && Prefs.barEnabled
+        title: "DOCK OFF"
+
+        SettingRow {
+            title: "The bar is on the bottom edge"
+            description: "The dock gives the edge to the bar, and the launcher rises out of the bar instead. Its apps can come along: the bar's Apps module shows your pinned apps and the open ones, and keeps to the settings below for running applications, icon tiles, the running indicator and tooltips. The rest wait here for the bar to go back to the top."
+            showDivider: false
+            stacked: true
+
+            Row {
+                spacing: Theme.dp(8)
+
+                M3Button {
+                    text: Prefs.showApps ? "Apps settings" : "Turn on Apps"
+                    variant: "filled"
+                    onClicked: {
+                        if (Prefs.showApps)
+                            Prefs.openBarModule("apps");
+                        else
+                            Prefs.showApps = true;
+                    }
+                }
+
+                M3Button {
+                    text: "Move the bar to the top"
+                    variant: "tonal"
+                    onClicked: Prefs.barPosition = "top"
+                }
+
+            }
+
+        }
+
+    }
+
     DockPreview {
         width: parent.width
         visible: !page.inSheet
@@ -68,14 +106,14 @@ Column {
         SettingRow {
             title: "Edge blend"
             resetKey: "dockNotchFlare"
-            description: "How far the dock's lower corners sweep out into the bottom of the screen, so it reads as carved out of the edge rather than resting on it."
-            enabled: Prefs.dockNotch
-            disabledReason: "Only a notch meets the screen edge, so there is nothing to blend into - set Dock style to Notch above."
+            description: "How far the dock's lower corners sweep out into the bottom of the screen, so it reads as carved out of the edge rather than resting on it. A notched OSD sweeps out the same way."
+            enabled: Prefs.dockNotch || Prefs.osdNotch
+            disabledReason: "Only a notch meets the screen edge, so there is nothing to blend into - set Dock style to Notch above, or OSD style to Notch on the General page."
             stacked: true
 
             M3Slider {
                 width: parent.width
-                enabled: Prefs.dockNotch
+                enabled: Prefs.dockNotch || Prefs.osdNotch
                 from: 0
                 to: 40
                 stepSize: 1

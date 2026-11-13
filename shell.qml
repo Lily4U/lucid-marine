@@ -19,6 +19,7 @@ import "./lucidupdate"
 import "./lucidwidgets"
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.lucidicons
@@ -40,8 +41,10 @@ ShellRoot {
     // ever opened, the clipboard, which owns the wl-paste watchers and so
     // has to be up long before the launcher is first opened, and night
     // light, whose schedule runs whether or not the System pill is shown,
-    // the sounds, so their ipc target answers before anything has played, and
-    // storage, which warns when space runs low and empties old trash
+    // the sounds, so their ipc target answers before anything has played,
+    // storage, which warns when space runs low and empties old trash, the
+    // alarms, which ring whether or not anything shows them, and the clock
+    // app's line, which has to be listening before the app is opened
     Component.onCompleted: {
         void KdeConnect.installed;
         void Bt.present;
@@ -50,6 +53,7 @@ ShellRoot {
         void Net.connectivity;
         void Idle.probed;
         void Env.probed;
+        void Pointer.ready;
         void Specials.moduleProbed;
         void Glass.probed;
         void Monitors.probed;
@@ -62,6 +66,8 @@ ShellRoot {
         void Polkit.registered;
         void Chrono.now;
         void Agenda.tick;
+        void Alarms.tick;
+        void ClockLink.peerCount;
         void Zones.offsets;
         void Capture.state;
         void NightLight.active;
@@ -124,6 +130,11 @@ ShellRoot {
 
         }
 
+        // the clock app, on a page or where it was left
+        function app(page: string): void {
+            Quickshell.execDetached(page === "" ? [Quickshell.shellPath("lucidclock/clock")] : [Quickshell.shellPath("lucidclock/clock"), page]);
+        }
+
         function toggle(): void {
             const b = root.mainBar();
             if (b)
@@ -177,6 +188,13 @@ ShellRoot {
             b.mprisModule.startListening();
         }
 
+        function lyrics(): void {
+            const b = root.mainBar();
+            if (b)
+                b.mprisModule.openPanel("lyrics");
+
+        }
+
         function playPause(): void {
             const b = root.mainBar();
             if (b)
@@ -226,6 +244,32 @@ ShellRoot {
 
     }
 
+    IpcHandler {
+        target: "controlcentre"
+
+        function toggle(): void {
+            const b = root.mainBar();
+            if (b)
+                b.systemModule.expanded = !b.systemModule.expanded;
+
+        }
+
+        function open(): void {
+            const b = root.mainBar();
+            if (b)
+                b.systemModule.expanded = true;
+
+        }
+
+        function close(): void {
+            const b = root.mainBar();
+            if (b)
+                b.systemModule.expanded = false;
+
+        }
+
+    }
+
     // one bar, or one on every display when Settings > Displays asks for it
     Variants {
         id: bars
@@ -244,9 +288,13 @@ ShellRoot {
             readonly property var clockModule: clockMod
             readonly property var mprisModule: mprisMod
             readonly property var workspacesModule: workspacesMod
+            readonly property var systemModule: systemMod
 
             PaletteFade {
                 active: bar.visible
+            }
+
+            PointerPoke {
             }
 
             // the display Settings > Displays picks, or this one's own. gated,
@@ -329,49 +377,70 @@ ShellRoot {
             function placeGroup(widths, originX, keys) {
                 const gap = Theme.dp(Prefs.barSpacing) + bar.editGap;
                 const out = [];
-                let x = originX;
+                // on whole pixels: two joined modules meeting mid-pixel would each
+                // antialias the shared edge and let the wallpaper through there
+                let x = Math.round(originX);
+                let end = x;
                 let any = false;
-                let trailing = 0;
                 for (let i = 0; i < widths.length; i++) {
                     out.push(x);
                     const w = widths[i];
                     if (w > 0.5) {
-                        trailing = keys && bar.joinedAfter(keys, widths, i) ? 0 : (gap > 0 ? gap * Math.min(1, w / gap) : 0);
-                        x += w + trailing;
+                        end = x + w;
+                        const trailing = keys && bar.joinedAfter(keys, widths, i) ? 0 : (gap > 0 ? gap * Math.min(1, w / gap) : 0);
+                        x = Math.floor(end + trailing);
                         any = true;
                     }
                 }
-                out.push(any ? Math.max(originX, x - trailing) : originX);
+                out.push(any ? end : originX);
                 return out;
             }
 
-            // whether the module at i is joined to the one right after it. both
-            // have to be in the bar this moment: one that has emptied out (a tray
-            // with no icons, workspaces off in the overview) parts its group there
+            // whether the module at i is joined to the next one in the bar this
+            // moment. ones that have emptied out between them (a tray with no
+            // icons, workspaces off in the overview) carry the join when every
+            // link across them is on, and part the group where one is off
             function joinedAfter(keys, widths, i) {
-                return i + 1 < keys.length && widths[i] > 0.5 && widths[i + 1] > 0.5 && bar.realWidthOf(keys[i]) > 0.5 && bar.realWidthOf(keys[i + 1]) > 0.5 && Prefs.barJoinedNow(keys[i], keys[i + 1]);
+                if (!(widths[i] > 0.5 && bar.realWidthOf(keys[i]) > 0.5))
+                    return false;
+
+                // an edit-mode stand-in has room but nothing in it: it parts the group
+                for (let j = i + 1; j < keys.length; j++) {
+                    if (!Prefs.barJoinedNow(keys[j - 1], keys[j]))
+                        return false;
+
+                    if (widths[j] > 0.5)
+                        return bar.realWidthOf(keys[j]) > 0.5;
+
+                }
+                return false;
             }
 
             // what a module's pill reads to square off the corners it shares
             function joinedLeftOf(key) {
                 const at = bar.placeMap[key];
-                if (!at || at.at === 0)
+                if (!at || bar.realWidthOf(key) <= 0.5)
                     return false;
 
                 const keys = bar.zoneKeys(at.zone);
-                return bar.realWidthOf(key) > 0.5 && bar.realWidthOf(keys[at.at - 1]) > 0.5 && Prefs.barJoinedNow(keys[at.at - 1], key);
+                for (let j = at.at - 1; j >= 0; j--) {
+                    if (!Prefs.barJoinedNow(keys[j], keys[j + 1]))
+                        return false;
+
+                    if (bar.widthOf(keys[j]) > 0.5)
+                        return bar.realWidthOf(keys[j]) > 0.5;
+
+                }
+                return false;
             }
 
             function joinedRightOf(key) {
                 const at = bar.placeMap[key];
-                if (!at)
-                    return false;
-
-                const keys = bar.zoneKeys(at.zone);
-                return at.at + 1 < keys.length && bar.realWidthOf(key) > 0.5 && bar.realWidthOf(keys[at.at + 1]) > 0.5 && Prefs.barJoinedNow(key, keys[at.at + 1]);
+                return !!at && bar.joinedAfter(bar.zoneKeys(at.zone), bar.widthsOf(at.zone), at.at);
             }
 
-            // per module key, radius caps where a hanging panel meets the islands: {corners, tops, sides, fillets}
+            // per module key, radius caps where a hanging panel meets the islands: {corners, tops, sides, fillets},
+            // plus what the full bar fills between merged open panels: {bridges, merged, edges}
             readonly property var hangPlan: bar.planHangs()
 
             function surfaceSpan(mod) {
@@ -379,28 +448,244 @@ ShellRoot {
                 return [l, l + (mod.surfaceWidth !== undefined ? mod.surfaceWidth : mod.width)];
             }
 
+            // the launcher standing on this bar, if it is the one that speaks for the shell
+            readonly property var cover: bar.primary ? dock.barCover : null
+            // whether an island's top runs on under each of the launcher's lower corners
+            function underAt(x) {
+                // the full bar's strip runs under every point, between modules too
+                if (Prefs.barFull)
+                    return true;
+
+                const f = Theme.dp(Prefs.dockNotchFlare);
+                const covered = (p) => {
+                    return bar.modules.some((m) => {
+                        const span = bar.surfaceSpan(m);
+                        return m.visible && span[1] - span[0] > 0.5 && span[0] <= p && span[1] >= p;
+                    });
+                };
+                return covered(x - f) && covered(x + f);
+            }
+
+            Connections {
+                function onBarAutoHideChanged() {
+                    Qt.callLater(() => {
+                        return bar.exclusionTick++;
+                    });
+                }
+
+                target: Prefs
+            }
+
+            Binding {
+                target: dock
+                property: "barUnderLeft"
+                value: !bar.cover || bar.underAt(bar.cover.l)
+                when: bar.primary
+            }
+
+            Binding {
+                target: dock
+                property: "barUnderRight"
+                value: !bar.cover || bar.underAt(bar.cover.r)
+                when: bar.primary
+            }
+
+            // how far a notch module's edge blend reaches into the top edge on one side:
+            // the whole Edge blend, less where a neighbour or the screen side is closer
+            function notchFlareOf(mod, toTheLeft) {
+                if (!Prefs.barNotch || !mod || mod.width <= 0.5 || !mod.visible || (bar.dragLift > 0.5 && bar.pillFor[bar.dragKey] === mod))
+                    return 0;
+
+                // the workspace overview off its slot, until it has fully landed: its seat blends there instead
+                if (mod.detach > 0)
+                    return 0;
+
+                // a side that meets the screen's is filled out to it instead
+                const meets = bar.hangPlan.meets[mod.modId];
+                if (meets && meets[toTheLeft ? "left" : "right"])
+                    return 0;
+
+                const edge = toTheLeft ? mod.x : mod.x + mod.width;
+                const toEdge = toTheLeft ? edge : bar.width - edge;
+                let toNeighbour = 100000;
+                for (const o of bar.modules) {
+                    if (!o || o === mod || o.width <= 0.5 || !o.visible || o.detach > 0)
+                        continue;
+
+                    const d = toTheLeft ? edge - (o.x + o.width) : o.x - edge;
+                    if (d >= 0)
+                        toNeighbour = Math.min(toNeighbour, d);
+
+                }
+                return Math.max(0, Math.min(Theme.dp(Prefs.barNotchFlare), Math.floor(toNeighbour / 2), Math.floor(toEdge)));
+            }
+
+            // how far down the module's side that blend reaches: as far as it sweeps
+            // out, but no further than the side runs straight. past where the far
+            // corner starts to round, the curve's tip would stand off it in a step,
+            // so a short module takes a wide blend as a quarter ellipse instead
+            function notchDepthOf(mod, toTheLeft) {
+                const reach = bar.notchFlareOf(mod, toTheLeft);
+                if (reach <= 0)
+                    return 0;
+
+                const far = toTheLeft ? mod.barBottomLeftRadius : mod.barBottomRightRadius;
+                const side = (mod === workspacesMod ? mod.compactHeight : mod.height) - (far !== undefined ? far : Prefs.barPillRadius);
+                return Math.max(0, Math.min(reach, Math.floor(side)));
+            }
+
+            // full bar: how far the concave corner where an open panel's side meets the
+            // strip's lower edge reaches. it grows with the panel's height, so a folding
+            // panel takes it with it; never past the screen edge, never into the screen
+            // corner that already rounds that side, none where a merged neighbour covers it
+            function panelFlareSize(mod, toTheLeft) {
+                if (!Prefs.barFull || Prefs.barPopupMode || !mod || mod === workspacesMod)
+                    return 0;
+
+                // surfaceOpen, not the height alone: a pill that is only resizing its
+                // compact face is see-through on the full bar
+                const reach = mod.visible && mod.width > 0.5 && mod.surfaceOpen === true ? mod.height - Theme.dp(Prefs.barHeight) : 0;
+                const merged = bar.hangPlan.merged[mod.modId];
+                if (merged && (toTheLeft ? merged.left : merged.right))
+                    return 0;
+
+                const corner = Theme.dp(Prefs.barFullCorner);
+                const toEdge = toTheLeft ? mod.x : bar.width - mod.x - mod.width;
+                const room = toEdge - (toEdge < corner * 2 ? corner : 0);
+                return Math.max(0, Math.floor(Math.min(corner, reach, room)));
+            }
+
             function planHangs() {
                 const plan = ({
                     "corners": ({}),
                     "tops": ({}),
                     "sides": ({}),
-                    "fillets": []
+                    "fillets": [],
+                    "bridges": [],
+                    "merged": ({}),
+                    "edges": ({}),
+                    "meets": ({})
                 });
                 const popups = Prefs.barPopupMode;
-                if (popups && !Prefs.barPopupNotched)
-                    return plan;
-
                 const most = Theme.dp(Prefs.barNotchFlare);
-                const bite = 0.5;
                 const cap = (key, corner, v) => {
                     const c = plan.corners[key] || (plan.corners[key] = ({}));
                     c[corner] = Math.min(c[corner] === undefined ? 1e6 : c[corner], Math.max(0, v));
                 };
-                const fillet = (x, y, size, mirrored, flipped) => {
+                const fillet = (x, y, size, mirrored, flipped, owner) => {
                     if (size >= 1)
-                        plan.fillets.push({ "x": x, "y": y, "size": size, "mirrored": mirrored, "flipped": flipped });
+                        plan.fillets.push({ "x": x, "y": y, "size": size, "mirrored": mirrored, "flipped": flipped, "mod": owner || null });
 
                 };
+                // notches: a module against a screen side curves into it below
+                // its bottom, or below its panel when that is open. one kept off it
+                // by the side margin reaches it all the same, the margin filled in
+                if (Prefs.barNotch && Prefs.barNotchEdge) {
+                    const row = bar.modules.filter((m) => {
+                        return m.visible && m.width > 0.5 && !(m.detach > 0);
+                    }).sort((p, q) => {
+                        return p.x - q.x;
+                    });
+                    const meet = (m, left) => {
+                        const h = m === workspacesMod ? m.compactHeight : m.height;
+                        const y = m.y + h;
+                        cap(m.modId, left ? "bl" : "br", 0);
+                        fillet(left ? 0 : bar.width - most, y, most, left, false, m);
+                        const gap = left ? m.x : bar.width - m.x - m.width;
+                        if (gap > 0.5)
+                            plan.bridges.push({ "x": left ? 0 : Math.floor(m.x + m.width), "y": m.y, "w": left ? Math.ceil(m.x) : bar.width - Math.floor(m.x + m.width), "h": h, "mod": m });
+
+                        // where the curve starts, for edit mode's outline
+                        (plan.meets[m.modId] || (plan.meets[m.modId] = ({})))[left ? "left" : "right"] = ({ "y": y, "size": most });
+                    };
+                    // the overview's seat closing up at a side: the module sliding in behind
+                    // fuses with it, its facing corner matching the seat's as that narrows
+                    // (by its width: the gap is floored to whole pixels and would jitter), so
+                    // it takes the meet over already square
+                    const fuse = (seat, next, left) => {
+                        const f = Math.max(0, Math.min(Prefs.barPillRadius, seat.width / 2));
+                        cap(next.modId, left ? "bl" : "br", f);
+                        cap(seat.modId, left ? "br" : "bl", f);
+                    };
+                    if (row.length > 0 && row[0].x < bar.sideMargin + 0.5) {
+                        meet(row[0], true);
+                        if (row[0] === wsSeat && row.length > 1)
+                            fuse(row[0], row[1], true);
+
+                    }
+                    const last = row.length - 1;
+                    if (last >= 0 && bar.width - row[last].x - row[last].width < bar.sideMargin + 0.5) {
+                        meet(row[last], false);
+                        if (row[last] === wsSeat && last > 0)
+                            fuse(row[last], row[last - 1], false);
+
+                    }
+
+                }
+                if (popups && !Prefs.barPopupNotched)
+                    return plan;
+
+                // full bar and notches: open panels side by side become one shape.
+                // the gap between them fills in, and the shorter one's shared corner
+                // turns into a fillet against the taller one's side
+                if ((Prefs.barFull || Prefs.barNotch) && !popups) {
+                    // a notch has no strip under the gap, so it fills from the top
+                    const strip = Prefs.barFull ? Theme.dp(Prefs.barHeight) : 0;
+                    const corner = Prefs.barFull ? Theme.dp(Prefs.barFullCorner) : most;
+                    // a module an open panel covers fades out where it stood, under it;
+                    // counted, it sorted between two open panels and parted them
+                    const row = bar.modules.filter((m) => {
+                        return m.visible && m.width > 0.5 && m.covered !== true;
+                    }).sort((p, q) => {
+                        return p.x - q.x;
+                    });
+                    for (let i = 0; i + 1 < row.length; i++) {
+                        const a = row[i];
+                        const b = row[i + 1];
+                        // pills easing to new places overlap by a pixel or so mid-move;
+                        // counting that as apart made the corner flicker
+                        const gap = b.x - (a.x + a.width);
+                        if (a === workspacesMod || b === workspacesMod || a.surfaceOpen !== true || b.surfaceOpen !== true || Math.abs(gap) > corner)
+                            continue;
+
+                        const low = Math.min(a.height, b.height);
+                        const diff = Math.abs(a.height - b.height);
+                        const shortLeft = a.height < b.height;
+                        const f = Math.floor(Math.min(corner, diff / 2));
+                        (plan.merged[a.modId] || (plan.merged[a.modId] = ({}))).right = true;
+                        (plan.merged[b.modId] || (plan.merged[b.modId] = ({}))).left = true;
+                        cap(a.modId, "br", shortLeft ? 0 : diff - f);
+                        cap(b.modId, "bl", shortLeft ? diff - f : 0);
+                        // whole pixels, out to both panels: a fill ending mid-pixel against
+                        // a panel's soft edge left a dark seam while they moved
+                        if (gap > 0.5 && low > strip)
+                            plan.bridges.push({ "x": Math.floor(a.x + a.width), "y": a.y + strip, "w": Math.ceil(b.x) - Math.floor(a.x + a.width), "h": low - strip });
+
+                        if (shortLeft)
+                            fillet(b.x - f, a.y + low, f, false, false);
+                        else
+                            fillet(a.x + a.width, a.y + low, f, true, false);
+                    }
+                    // on the full bar, a panel this close to a screen side merges into
+                    // it the same way, the side standing in for an endlessly tall neighbour
+                    const edge = (m, side, gap) => {
+                        if (m === workspacesMod || m.surfaceOpen !== true || Math.abs(gap) > corner)
+                            return ;
+
+                        const left = side === "left";
+                        (plan.merged[m.modId] || (plan.merged[m.modId] = ({})))[side] = true;
+                        plan.edges[side] = true;
+                        cap(m.modId, left ? "bl" : "br", 0);
+                        if (gap > 0.5 && m.height > strip)
+                            plan.bridges.push({ "x": left ? 0 : Math.floor(m.x + m.width), "y": m.y + strip, "w": left ? Math.ceil(m.x) : bar.width - Math.floor(m.x + m.width), "h": m.height - strip });
+
+                        fillet(left ? 0 : bar.width - corner, m.y + m.height, corner, left, false);
+                    };
+                    if (Prefs.barFull && row.length > 0) {
+                        edge(row[0], "left", row[0].x);
+                        edge(row[row.length - 1], "right", bar.width - row[row.length - 1].x - row[row.length - 1].width);
+                    }
+                }
                 // islands: runs of joined modules as they stand
                 const islands = [];
                 const shelves = [];
@@ -409,11 +694,10 @@ ShellRoot {
                     let run = null;
                     for (let i = 0; i < keys.length; i++) {
                         const mod = bar.pillFor[keys[i]];
-                        if (!mod || bar.widthOf(keys[i]) <= 0.5) {
-                            run = null;
+                        if (!mod || bar.widthOf(keys[i]) <= 0.5)
                             continue;
-                        }
-                        if (run && Prefs.barJoinedNow(keys[i - 1], keys[i])) {
+
+                        if (run && bar.joinedLeftOf(keys[i])) {
                             run.keys.push(keys[i]);
                             run.r = bar.surfaceSpan(mod)[1];
                         } else {
@@ -434,19 +718,47 @@ ShellRoot {
                         } else if (isle.keys.length > 1 && m !== workspacesMod && m.height - m.compactHeight > 0.5) {
                             const depth = m.height - m.compactHeight;
                             const side = ({});
-                            if (j > 0) {
-                                const run = m.x - isle.l;
-                                const f = Math.floor(Math.min(most, run / 2, depth / 2));
-                                fillet(m.x - f + bite, isle.bottom - bite, f, false, false);
-                                cap(isle.keys[0], "bl", run - f);
-                                side.bl = depth - f;
+                            // a side merged into an open neighbour has no island bottom to meet
+                            const merged = plan.merged[isle.keys[j]] || ({});
+                            // a neighbour open as well is a side to meet, not the island's
+                            // bottom: the shorter one's shared corner squares off and the
+                            // taller one curves out under it
+                            const openAt = (k) => {
+                                const n = bar.pillFor[isle.keys[k]];
+                                return n !== workspacesMod && n.height - n.compactHeight > 0.5 ? n : null;
+                            };
+                            const meetOpen = (n, left) => {
+                                const below = m.y + m.height - (n.y + n.height);
+                                if (below <= 0.5)
+                                    return 0;
+
+                                const f = Math.floor(Math.min(most, below / 2, n.width / 2));
+                                fillet(left ? m.x - f : m.x + m.width, n.y + n.height, f, !left, false);
+                                return below - f;
+                            };
+                            if (j > 0 && !merged.left) {
+                                const n = openAt(j - 1);
+                                if (n) {
+                                    side.bl = meetOpen(n, true);
+                                } else {
+                                    const run = m.x - isle.l;
+                                    const f = Math.floor(Math.min(most, run / 2, depth / 2));
+                                    fillet(m.x - f, isle.bottom, f, false, false);
+                                    cap(isle.keys[0], "bl", run - f);
+                                    side.bl = depth - f;
+                                }
                             }
-                            if (j < isle.keys.length - 1) {
-                                const run = isle.r - (m.x + m.width);
-                                const f = Math.floor(Math.min(most, run / 2, depth / 2));
-                                fillet(m.x + m.width - bite, isle.bottom - bite, f, true, false);
-                                cap(isle.keys[isle.keys.length - 1], "br", run - f);
-                                side.br = depth - f;
+                            if (j < isle.keys.length - 1 && !merged.right) {
+                                const n = openAt(j + 1);
+                                if (n) {
+                                    side.br = meetOpen(n, false);
+                                } else {
+                                    const run = isle.r - (m.x + m.width);
+                                    const f = Math.floor(Math.min(most, run / 2, depth / 2));
+                                    fillet(m.x + m.width, isle.bottom, f, true, false);
+                                    cap(isle.keys[isle.keys.length - 1], "br", run - f);
+                                    side.br = depth - f;
+                                }
                             }
                             plan.sides[isle.keys[j]] = side;
                         }
@@ -470,16 +782,16 @@ ShellRoot {
                         const dl = isle.l - shelf.l;
                         if (k > 0) {
                             const f = Math.floor(Math.min(most, (isle.l - over[k - 1].r) / 2, tall));
-                            fillet(isle.l - f + bite, shelf.y - f + bite, f, false, true);
+                            fillet(isle.l - f, shelf.y - f, f, false, true);
                             cap(first, "bl", 0);
                         } else if (dl > 0.5) {
                             const f = Math.floor(Math.min(most, dl / 2, tall));
-                            fillet(isle.l - f + bite, shelf.y - f + bite, f, false, true);
+                            fillet(isle.l - f, shelf.y - f, f, false, true);
                             cap(first, "bl", 0);
                             top.tl = dl - f;
                         } else if (dl < -0.5) {
                             const f = Math.floor(Math.min(most, -dl / 2, shelf.depth / 2));
-                            fillet(shelf.l - f + bite, shelf.y - bite, f, false, false);
+                            fillet(shelf.l - f, shelf.y, f, false, false);
                             cap(first, "bl", -dl - f);
                             top.tl = 0;
                         } else {
@@ -489,16 +801,16 @@ ShellRoot {
                         const dr = shelf.r - isle.r;
                         if (k < over.length - 1) {
                             const f = Math.floor(Math.min(most, (over[k + 1].l - isle.r) / 2, tall));
-                            fillet(isle.r - bite, shelf.y - f + bite, f, true, true);
+                            fillet(isle.r, shelf.y - f, f, true, true);
                             cap(last, "br", 0);
                         } else if (dr > 0.5) {
                             const f = Math.floor(Math.min(most, dr / 2, tall));
-                            fillet(isle.r - bite, shelf.y - f + bite, f, true, true);
+                            fillet(isle.r, shelf.y - f, f, true, true);
                             cap(last, "br", 0);
                             top.tr = dr - f;
                         } else if (dr < -0.5) {
                             const f = Math.floor(Math.min(most, -dr / 2, shelf.depth / 2));
-                            fillet(shelf.r - bite, shelf.y - bite, f, true, false);
+                            fillet(shelf.r, shelf.y, f, true, false);
                             cap(last, "br", -dr - f);
                             top.tr = 0;
                         } else {
@@ -524,11 +836,12 @@ ShellRoot {
                 "privacy": privacyMod,
                 "power": powerMod,
                 "window": windowMod,
-                "start": startMod
+                "start": startMod,
+                "apps": appsMod
             })
             // what BarPill looks itself up in, for a right click to its card
             readonly property var moduleById: bar.pillFor
-            readonly property var modules: [workspacesMod, mprisMod, sysTrayMod, clockMod, notifMod, systemMod, privacyMod, powerMod, windowMod, startMod]
+            readonly property var modules: [workspacesMod, mprisMod, sysTrayMod, clockMod, notifMod, systemMod, privacyMod, powerMod, windowMod, startMod, appsMod, launcherPanel, wsSeat]
 
             // which modules switched on have left the bar for now, for the Bar
             // page's arrangement
@@ -587,13 +900,17 @@ ShellRoot {
             }
 
             // workspaces empties its slot as it flies to the screen centre, so the
-            // rest of its zone closes up behind it
+            // rest of its zone closes up behind it. the slot is the pill's, not the
+            // growing card's: that widened it first and pushed the neighbours away
             function realWidthOf(key) {
                 const it = bar.pillFor[key];
                 if (!it)
                     return 0;
 
-                return it === workspacesMod ? it.width * bar.wsCollapse : it.width;
+                if (it === workspacesMod && bar.wsCollapse < 1)
+                    return (it.shown ? it.compactWidth : 0) * bar.wsCollapse;
+
+                return it.width;
             }
 
             // in edit mode a module with nothing to show keeps a stand-in's room
@@ -668,6 +985,8 @@ ShellRoot {
                 }
 
             }
+            // kept when notches meet the screen sides too: the end modules reach the
+            // sides across it, and it keeps their contents off them
             readonly property real sideMargin: Theme.dp(Prefs.barSideMargin)
 
             // busy: a panel is open somewhere on the bar, so it stays out
@@ -677,19 +996,48 @@ ShellRoot {
                 return m.expanded === true || m.anyOpen === true;
             })
             property bool slidingAway: false
-            readonly property bool heldByPointer: revealArea.containsMouse || (!bar.slidingAway && bar.modules.some((m) => {
+            readonly property bool pointerOnBar: revealArea.containsMouse || (!bar.slidingAway && bar.modules.some((m) => {
                 return m.visible && (m.surfaceHovered === true || m.compactHovered === true);
             }))
-            readonly property bool barRevealed: !Prefs.barAutoHide || bar.barBusy || bar.heldByPointer || Edit.active
-            // how far the compact content sits above its resting y=0 while
-            // hidden - past the window's own top edge, so it clips away for free
-            property real hiddenOffset: bar.barRevealed ? 0 : -(Theme.dp(Prefs.barHeight) + Prefs.effectiveBarTopMargin + Theme.dp(4))
+            // let go a beat after the pointer leaves: passing between the strip
+            // and a pill can read as off both for a moment, and the slide away
+            // would start in that gap
+            property bool heldByPointer: false
+            // a write to exclusiveZone puts exclusionMode back to Normal, so the mode is
+            // asked for again once auto-hide has been switched
+            property int exclusionTick: 0
 
-            Behavior on hiddenOffset {
+            onPointerOnBarChanged: {
+                if (bar.pointerOnBar) {
+                    letGoTimer.stop();
+                    bar.heldByPointer = true;
+                } else {
+                    letGoTimer.restart();
+                }
+            }
+
+            Timer {
+                id: letGoTimer
+
+                interval: 180
+                onTriggered: bar.heldByPointer = bar.pointerOnBar
+            }
+
+            readonly property bool barRevealed: (!Prefs.barAutoHide || bar.barBusy || bar.heldByPointer || Edit.active) && !Prefs.barRelocating
+            // auto-hide puts the window's top at the screen's own edge and lowers
+            // the row by the gap instead, so the bar slides out from the edge
+            // rather than appearing at the gap's lower line
+            readonly property real topInset: Prefs.barAutoHide ? Prefs.effectiveBarTopMargin : 0
+            // where the compact row sits in the window: below the gap while out,
+            // and past the window's top edge while hidden, so it clips away for free
+            property real rowY: bar.barRevealed ? bar.topInset : -(Theme.dp(Prefs.barHeight) + Theme.dp(4))
+
+            Behavior on rowY {
                 NumberAnimation {
                     duration: Theme.durLong
                     easing.type: Easing.Bezier
-                    easing.bezierCurve: Theme.easeEmphasizedDecel
+                    // leaving for the other edge it picks up speed, so it is seen to go
+                    easing.bezierCurve: Prefs.barRelocating ? Theme.easeEmphasizedAccel : Theme.easeEmphasizedDecel
                 }
 
             }
@@ -711,7 +1059,10 @@ ShellRoot {
                 onTriggered: bar.slidingAway = false
             }
 
-            Component.onCompleted: laidOutTimer.start()
+            Component.onCompleted: {
+                bar.contentItem.transform = [barMirror];
+                laidOutTimer.start();
+            }
 
             Timer {
                 id: laidOutTimer
@@ -721,18 +1072,31 @@ ShellRoot {
             }
 
             color: "transparent"
-            implicitHeight: bar.screen ? bar.screen.height - Prefs.effectiveBarTopMargin : Theme.dp(800)
-            exclusiveZone: (Prefs.barEnabled && bar.anyModuleShown && !Prefs.barAutoHide) ? Theme.dp(Prefs.barHeight) + Prefs.shellGap : 0
+            implicitHeight: bar.screen ? bar.screen.height - (Prefs.barBottom ? bar.margins.bottom : bar.margins.top) : Theme.dp(800)
+            // auto-hide first, so a hiding bar never writes its zone again
+            exclusiveZone: (!Prefs.barAutoHide && Prefs.barEnabled && bar.anyModuleShown) ? Theme.dp(Prefs.barHeight) + Prefs.shellGap : 0
+            // a hiding bar comes out of the edge itself, not above a dock's zone
+            exclusionMode: (bar.exclusionTick, Prefs.barAutoHide) ? ExclusionMode.Ignore : ExclusionMode.Normal
 
             anchors {
-                top: true
-                bottom: false
+                top: !Prefs.barBottom
+                bottom: Prefs.barBottom
                 left: true
                 right: true
             }
 
             margins {
-                top: Prefs.effectiveBarTopMargin
+                top: Prefs.barBottom ? 0 : Prefs.effectiveBarTopMargin - bar.topInset
+                bottom: Prefs.barBottom ? Prefs.effectiveBarTopMargin - bar.topInset : 0
+            }
+
+            // a bottom bar is the top bar mirrored: every shape keeps its maths,
+            // and the modules turn their own content back the right way up
+            Scale {
+                id: barMirror
+
+                origin.y: bar.height / 2
+                yScale: Prefs.barBottom ? -1 : 1
             }
 
             // full bar: one strip across the whole top edge, under every module
@@ -741,7 +1105,7 @@ ShellRoot {
 
                 visible: Prefs.barFull && bar.anyModuleShown
                 x: 0
-                y: bar.hiddenOffset
+                y: bar.rowY
                 z: -2
                 width: bar.width
                 height: Theme.dp(Prefs.barHeight)
@@ -759,21 +1123,66 @@ ShellRoot {
 
             }
 
-            // rounded corners hanging off the strip where it meets the screen sides
+            // a launcher wider than the bar stands on a strip the bar puts out
+            // to its width, curving into the screen edge where it passes the bar
+            Rectangle {
+                id: coverStrip
+
+                // fades once the launcher has sunk, so nothing is left standing on the bar
+                opacity: bar.cover && bar.cover.up ? 1 : 0
+                visible: !!bar.cover && !Prefs.barFull && opacity > 0
+                x: bar.cover ? bar.cover.l : 0
+                y: bar.rowY
+                z: -2
+                width: bar.cover ? bar.cover.r - bar.cover.l : 0
+                height: Theme.dp(Prefs.barHeight)
+                color: Theme.bg
+
+                Behavior on opacity {
+                    NumberAnimation {
+                        duration: Theme.durShort
+                    }
+
+                }
+
+            }
+
             BarFlare {
-                visible: fullStrip.visible && size > 0
-                mirrored: true
-                size: Theme.dp(Prefs.barFullCorner)
-                x: 0
-                y: Theme.dp(Prefs.barHeight) + bar.hiddenOffset
+                visible: coverStrip.visible && !dock.barUnderLeft
+                opacity: coverStrip.opacity
+                size: Theme.dp(Prefs.barNotchFlare)
+                depth: Math.min(size, Theme.dp(Prefs.barHeight))
+                x: coverStrip.x - width
+                y: bar.rowY
                 z: -2
             }
 
             BarFlare {
-                visible: fullStrip.visible && size > 0
+                visible: coverStrip.visible && !dock.barUnderRight
+                opacity: coverStrip.opacity
+                mirrored: true
+                size: Theme.dp(Prefs.barNotchFlare)
+                depth: Math.min(size, Theme.dp(Prefs.barHeight))
+                x: coverStrip.x + coverStrip.width
+                y: bar.rowY
+                z: -2
+            }
+
+            // rounded corners hanging off the strip where it meets the screen sides
+            BarFlare {
+                visible: fullStrip.visible && size > 0 && !bar.hangPlan.edges.left
+                mirrored: true
+                size: Theme.dp(Prefs.barFullCorner)
+                x: 0
+                y: Theme.dp(Prefs.barHeight) + bar.rowY
+                z: -2
+            }
+
+            BarFlare {
+                visible: fullStrip.visible && size > 0 && !bar.hangPlan.edges.right
                 size: Theme.dp(Prefs.barFullCorner)
                 x: bar.width - width
-                y: Theme.dp(Prefs.barHeight) + bar.hiddenOffset
+                y: Theme.dp(Prefs.barHeight) + bar.rowY
                 z: -2
             }
 
@@ -790,33 +1199,20 @@ ShellRoot {
 
                     required property var modelData
 
-                    // surfaceOpen, not the height alone: a pill that is only
-                    // resizing its compact face is see-through on the full bar
-                    readonly property real reach: (panelFlares.modelData.visible && panelFlares.modelData.surfaceOpen === true) ? panelFlares.modelData.height - Theme.dp(Prefs.barHeight) : 0
-
-                    // never past the screen edge, and never into the screen corner
-                    // that already rounds that side
-                    function sizeFor(toTheLeft) {
-                        var m = panelFlares.modelData;
-                        var corner = Theme.dp(Prefs.barFullCorner);
-                        var toEdge = toTheLeft ? m.x : bar.width - m.x - m.width;
-                        var room = toEdge - (toEdge < corner * 2 ? corner : 0);
-                        return Math.max(0, Math.floor(Math.min(corner, panelFlares.reach, room)));
-                    }
-
                     anchors.fill: parent
                     z: -1
 
                     BarFlare {
-                        size: panelFlares.sizeFor(true)
-                        x: panelFlares.modelData.x - width + 0.5
+                        size: bar.panelFlareSize(panelFlares.modelData, true)
+                        // butted against the panel: half a pixel over it was a second coat on its edge
+                        x: panelFlares.modelData.x - width
                         y: Theme.dp(Prefs.barHeight)
                     }
 
                     BarFlare {
                         mirrored: true
-                        size: panelFlares.sizeFor(false)
-                        x: panelFlares.modelData.x + panelFlares.modelData.width - 0.5
+                        size: bar.panelFlareSize(panelFlares.modelData, false)
+                        x: panelFlares.modelData.x + panelFlares.modelData.width
                         y: Theme.dp(Prefs.barHeight)
                     }
 
@@ -833,7 +1229,7 @@ ShellRoot {
                 x: bar.xOf("media")
                 editLifted: bar.dragKey === "media"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("media")
+                anchors.topMargin: bar.rowY + bar.liftOf("media")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "media"
@@ -857,7 +1253,7 @@ ShellRoot {
                 x: bar.xOf("tray")
                 editLifted: bar.dragKey === "tray"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("tray")
+                anchors.topMargin: bar.rowY + bar.liftOf("tray")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "tray"
@@ -879,7 +1275,7 @@ ShellRoot {
 
                 hostWindow: bar
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("clock")
+                anchors.topMargin: bar.rowY + bar.liftOf("clock")
                 x: bar.xOf("clock")
                 editLifted: bar.dragKey === "clock"
 
@@ -906,7 +1302,7 @@ ShellRoot {
                 x: bar.xOf("notifications")
                 editLifted: bar.dragKey === "notifications"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("notifications")
+                anchors.topMargin: bar.rowY + bar.liftOf("notifications")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "notifications"
@@ -931,7 +1327,7 @@ ShellRoot {
                 x: bar.xOf("privacy")
                 editLifted: bar.dragKey === "privacy"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("privacy")
+                anchors.topMargin: bar.rowY + bar.liftOf("privacy")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "privacy"
@@ -955,7 +1351,7 @@ ShellRoot {
                 x: bar.xOf("power")
                 editLifted: bar.dragKey === "power"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("power")
+                anchors.topMargin: bar.rowY + bar.liftOf("power")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "power"
@@ -970,6 +1366,17 @@ ShellRoot {
 
             }
 
+            // the launcher, when this bar draws it: centred on the strip it grows out of
+            LauncherPanel {
+                id: launcherPanel
+
+                hostWindow: bar
+                dockMod: dock
+                x: Math.round((bar.width - width) / 2)
+                anchors.top: parent.top
+                anchors.topMargin: bar.rowY
+            }
+
             StartButton {
                 id: startMod
 
@@ -980,10 +1387,34 @@ ShellRoot {
                 x: bar.xOf("start")
                 editLifted: bar.dragKey === "start"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("start")
+                anchors.topMargin: bar.rowY + bar.liftOf("start")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "start"
+
+                    NumberAnimation {
+                        duration: Theme.barDurEnter
+                        easing.type: Easing.Bezier
+                        easing.bezierCurve: Theme.easeEmphasizedDecel
+                    }
+
+                }
+
+            }
+
+            Apps {
+                id: appsMod
+
+                popupAlign: bar.alignOf("apps")
+
+                hostWindow: bar
+                dockMod: dock
+                x: bar.placeFor("apps")
+                anchors.top: parent.top
+                anchors.topMargin: bar.rowY
+
+                Behavior on x {
+                    enabled: bar.laidOut && bar.shuffling
 
                     NumberAnimation {
                         duration: Theme.barDurEnter
@@ -1004,7 +1435,7 @@ ShellRoot {
                 x: bar.xOf("window")
                 editLifted: bar.dragKey === "window"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("window")
+                anchors.topMargin: bar.rowY + bar.liftOf("window")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "window"
@@ -1029,7 +1460,7 @@ ShellRoot {
                 x: bar.xOf("system")
                 editLifted: bar.dragKey === "system"
                 anchors.top: parent.top
-                anchors.topMargin: bar.hiddenOffset + bar.liftOf("system")
+                anchors.topMargin: bar.rowY + bar.liftOf("system")
 
                 Behavior on x {
                     enabled: bar.laidOut && bar.shuffling && bar.dragKey !== "system"
@@ -1055,46 +1486,27 @@ ShellRoot {
                     readonly property bool present: flares.modelData && flares.modelData.width > 0.5 && flares.modelData.visible && !(bar.dragLift > 0.5 && bar.pillFor[bar.dragKey] === flares.modelData)
                     readonly property bool modHovered: flares.modelData ? (flares.modelData.compactHovered === true && flares.modelData !== workspacesMod) : false
 
-                    function flareFor(toTheLeft) {
-                        if (!flares.present)
-                            return 0;
-
-                        var mods = bar.modules;
-                        var edge = toTheLeft ? flares.modelData.x : flares.modelData.x + flares.modelData.width;
-                        var toEdge = toTheLeft ? edge : bar.width - edge;
-                        var toNeighbour = 100000;
-                        for (var i = 0; i < mods.length; i++) {
-                            var o = mods[i];
-                            if (!o || o === flares.modelData || o.width <= 0.5 || !o.visible)
-                                continue;
-
-                            var d = toTheLeft ? edge - (o.x + o.width) : o.x - edge;
-                            if (d >= 0)
-                                toNeighbour = Math.min(toNeighbour, d);
-
-                        }
-                        return Math.max(0, Math.min(Theme.dp(Prefs.barNotchFlare), Math.floor(toNeighbour / 2), Math.floor(toEdge)));
-                    }
-
                     anchors.fill: parent
                     z: -1
                     visible: Prefs.barNotch && flares.present
 
-                    readonly property real bite: 0.5
-
+                    // butted against the module, not tucked under it: an overlap is
+                    // a second coat of the translucent fill, a light seam down the side
                     BarFlare {
                         hovered: flares.modHovered
-                        size: flares.flareFor(true)
-                        x: flares.modelData ? flares.modelData.x - width + flares.bite : 0
-                        y: bar.hiddenOffset
+                        size: bar.notchFlareOf(flares.modelData, true)
+                        depth: bar.notchDepthOf(flares.modelData, true)
+                        x: flares.modelData ? flares.modelData.x - width : 0
+                        y: bar.rowY
                     }
 
                     BarFlare {
                         hovered: flares.modHovered
                         mirrored: true
-                        size: flares.flareFor(false)
-                        x: flares.modelData ? flares.modelData.x + flares.modelData.width - flares.bite : 0
-                        y: bar.hiddenOffset
+                        size: bar.notchFlareOf(flares.modelData, false)
+                        depth: bar.notchDepthOf(flares.modelData, false)
+                        x: flares.modelData ? flares.modelData.x + flares.modelData.width : 0
+                        y: bar.rowY
                     }
 
                 }
@@ -1108,8 +1520,11 @@ ShellRoot {
                 BarFlare {
                     required property int index
                     readonly property var spec: bar.hangPlan.fillets.length > index ? bar.hangPlan.fillets[index] : null
+                    // the curve a module meets the screen side with lights up with it
+                    readonly property var owner: spec && spec.mod ? spec.mod : null
 
                     z: 0
+                    hovered: owner !== null && owner !== workspacesMod && owner.compactHovered === true && owner.anyOpen !== true
                     size: spec ? spec.size : 0
                     mirrored: spec ? spec.mirrored : false
                     flipped: spec ? spec.flipped : false
@@ -1119,13 +1534,94 @@ ShellRoot {
 
             }
 
+            // the gaps filled between open panels the bar merges, and between a
+            // notch and the screen side it meets across the side margin
+            Repeater {
+                model: 8
+
+                Rectangle {
+                    id: bridge
+
+                    required property int index
+                    readonly property var spec: bar.hangPlan.bridges.length > index ? bar.hangPlan.bridges[index] : null
+                    // a module's own stretch lights up with it, as its edge blends do
+                    readonly property var owner: bridge.spec && bridge.spec.mod ? bridge.spec.mod : null
+
+                    z: 0
+                    visible: spec !== null
+                    x: spec ? spec.x : 0
+                    y: spec ? spec.y : 0
+                    width: spec ? spec.w : 0
+                    height: spec ? spec.h : 0
+                    color: Theme.bg
+
+                    Rectangle {
+                        anchors.fill: parent
+                        visible: opacity > 0
+                        color: Theme.text
+                        opacity: bridge.owner && bridge.owner !== workspacesMod && bridge.owner.compactHovered === true && bridge.owner.anyOpen !== true ? Theme.stateHover : 0
+
+                        Behavior on opacity {
+                            NumberAnimation {
+                                duration: Theme.barMs(150)
+                                easing.type: Easing.OutCubic
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+            // where the workspace overview sat, on a notch bar, while its card is off it:
+            // the slot stays a stretch of the bar, closing up as the zone slides in (and
+            // opening as the card comes home), so its side meet and blends hand over to
+            // the next module instead of vanishing there and turning up on it
+            Rectangle {
+                id: wsSeat
+
+                readonly property string modId: "workspacesSeat"
+                readonly property var hostWindow: bar
+                readonly property bool active: Prefs.barNotch && workspacesMod.shown && workspacesMod.detach > 0
+                readonly property real compactHeight: workspacesMod.compactHeight
+                readonly property var hangCorners: bar.hangPlan.corners[wsSeat.modId] || null
+                readonly property int pillRadius: Prefs.barPillRadius
+                // the corners ModuleRegion's blur follows
+                readonly property int barRadius: wsSeat.pillRadius
+                readonly property int barTopRadius: 0
+                readonly property int topRadius: 0
+                readonly property int cornerRadius: wsSeat.pillRadius
+                readonly property real barTopLeftRadius: 0
+                readonly property real barTopRightRadius: 0
+                readonly property real barBottomLeftRadius: wsSeat.bottomLeftRadius
+                readonly property real barBottomRightRadius: wsSeat.bottomRightRadius
+
+                function capped(corner, v) {
+                    return wsSeat.hangCorners && wsSeat.hangCorners[corner] !== undefined ? Math.max(0, Math.min(v, wsSeat.hangCorners[corner])) : v;
+                }
+
+                z: 0
+                visible: wsSeat.active && !bar.covers(wsSeat)
+                x: bar.xOf("workspaces")
+                y: workspacesMod.restY
+                width: wsSeat.active ? bar.realWidthOf("workspaces") : 0
+                height: wsSeat.compactHeight
+                color: Theme.bg
+                topLeftRadius: 0
+                topRightRadius: 0
+                bottomLeftRadius: wsSeat.capped("bl", bar.joinedLeftOf("workspaces") ? 0 : wsSeat.pillRadius)
+                bottomRightRadius: wsSeat.capped("br", bar.joinedRightOf("workspaces") ? 0 : wsSeat.pillRadius)
+            }
+
             Workspaces {
                 id: workspacesMod
 
                 hostWindow: bar
                 dockMod: dock
                 restX: bar.xOf("workspaces")
-                restY: bar.hiddenOffset + bar.liftOf("workspaces")
+                restY: bar.rowY + bar.liftOf("workspaces")
                 z: bar.dragKey === "workspaces" ? 120 : (workspacesMod.popupOpen ? 100 : 1)
 
                 Behavior on restX {
@@ -1183,13 +1679,65 @@ ShellRoot {
                     mod: startMod
                 }
 
+                ModuleRegion {
+                    mod: appsMod
+                }
+
+                ModuleRegion {
+                    mod: launcherPanel
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 0
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 1
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 2
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 3
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 4
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 5
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 6
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 7
+                }
+
+                // by numbers, not by item: the window does not see the mirror
                 Region {
-                    item: Prefs.barAutoHide ? revealArea : null
+                    y: Prefs.barBottom ? bar.height - revealArea.height : 0
+                    width: Prefs.barAutoHide ? revealArea.width : 0
+                    height: revealArea.height
                 }
 
                 Region {
+                    y: Prefs.barBottom ? bar.height - height : 0
                     width: bar.dragHeld || Edit.active ? bar.width : 0
-                    height: bar.dragHeld ? bar.height : (Edit.active ? Theme.dp(Prefs.barHeight) + Theme.dp(4) : 0)
+                    height: bar.dragHeld ? bar.height : (Edit.active ? bar.topInset + Theme.dp(Prefs.barHeight) + Theme.dp(4) : 0)
                 }
 
             }
@@ -1200,18 +1748,105 @@ ShellRoot {
                 host: bar
             }
 
-            // touching this strip reveals the bar
+            // touching this strip at the screen's edge reveals the bar. once the
+            // pointer has it out, it reaches through the gap and the row under
+            // the pills, so neither drops it on the way to a pill
             MouseArea {
                 id: revealArea
 
                 x: 0
                 y: 0
                 width: bar.width
-                height: Theme.dp(4)
+                height: bar.heldByPointer ? bar.topInset + Theme.dp(Prefs.barHeight) : Theme.dp(4)
                 hoverEnabled: true
                 acceptedButtons: Qt.NoButton
                 enabled: Prefs.barAutoHide
                 visible: Prefs.barAutoHide
+            }
+
+            // with the bar on the bottom edge the launcher stands where its panels
+            // open, so a panel and the launcher shut each other as well
+            readonly property bool panelExpanded: bar.modules.some((m) => {
+                return m !== workspacesMod && m.expanded === true;
+            })
+
+            readonly property bool launcherUp: bar.primary && Prefs.barHoldsBottom && dock.menuInDock
+
+            onPanelExpandedChanged: {
+                if (bar.panelExpanded && bar.primary && Prefs.barHoldsBottom && dock.menuInDock)
+                    dock.menuOpen = false;
+
+            }
+
+            // an open panel too wide for its place stands over other modules, as one
+            // can only once the centre is too narrow for it: then the whole bar steps
+            // aside while it is open, not just the modules under it
+            readonly property bool panelOverBar: bar.modules.some((m) => {
+                return m.width > 0.5 && m.surfaceOpen !== true && bar.overlapped(m);
+            })
+
+            // a whole pixel or more: placeGroup starts a joined neighbour at the floor of
+            // this one's end, so while a width animates the two share under a pixel.
+            // read as standing over it, that faded the whole bar out and back every frame
+            function overlapped(mod) {
+                const l = mod.x;
+                const r = mod.x + mod.width;
+                return bar.modules.some((o) => {
+                    return o !== mod && o.surfaceOpen === true && o.popupMode !== true && o.coversBar !== false && o.x <= r - 1 && o.x + o.width >= l + 1;
+                });
+            }
+
+            function covers(mod) {
+                return !!mod && mod.surfaceOpen !== true && bar.panelOverBar;
+            }
+
+            // a fullscreen window hides the bar's layer, so while one of its panels is
+            // open there, and as it shuts, the bar goes up to the overlay with it
+            readonly property bool fullscreenHere: {
+                const m = Hyprland.monitorFor(bar.screen);
+                return !!m && !!m.activeWorkspace && m.activeWorkspace.hasFullscreen;
+            }
+            readonly property bool panelUp: bar.modules.some((m) => {
+                return m.expanded === true;
+            })
+
+            onPanelUpChanged: {
+                if (bar.panelUp)
+                    panelDownTimer.stop();
+                else
+                    panelDownTimer.restart();
+            }
+
+            Timer {
+                id: panelDownTimer
+
+                interval: Theme.barDurEnter + Theme.barMs(80)
+            }
+
+            WlrLayershell.layer: bar.fullscreenHere && (bar.panelUp || panelDownTimer.running) ? WlrLayer.Overlay : WlrLayer.Top
+
+            // the Start module linked to the Apps module lights as the first icon of its
+            // row. the link as set, on the full bar too, which draws no joins
+            readonly property bool startJoinsApps: Prefs.barJoined("start", "apps") && startMod.shown && appsMod.shown && bar.adjacent("start", "apps")
+
+            // on a full bottom bar the bar draws the launcher, so it grows out of the strip
+            // as one piece of glass with it; elsewhere the dock keeps it
+            readonly property bool hostsLauncher: Prefs.barFull && Prefs.barHoldsBottom && !Prefs.barPopupMode
+
+            Binding {
+                target: dock
+                property: "barLauncher"
+                value: bar.hostsLauncher ? launcherPanel : null
+                when: bar.primary
+            }
+
+            // the launcher's search takes the keyboard here while the bar holds it
+            WlrLayershell.keyboardFocus: dock.launcherHost === launcherPanel ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+
+            function adjacent(a, b) {
+                const p = bar.placeMap[a];
+                const q = bar.placeMap[b];
+                return !!p && !!q && p.zone === q.zone && Math.abs(p.at - q.at) === 1;
             }
 
             // the overview and the dock menu shut each other
@@ -1227,9 +1862,18 @@ ShellRoot {
 
             Connections {
                 function onMenuOpenChanged() {
-                    if (dock.menuOpen)
-                        workspacesMod.expanded = false;
+                    if (!dock.menuOpen)
+                        return ;
 
+                    workspacesMod.expanded = false;
+                    // the launcher is a panel of the bar's own now, or stands where they open
+                    if (bar.primary && (dock.launcherHost || Prefs.barHoldsBottom)) {
+                        for (const m of bar.modules) {
+                            if (m.expanded === true && m !== dock.launcherHost)
+                                m.expanded = false;
+
+                        }
+                    }
                 }
 
                 target: dock
@@ -1246,14 +1890,26 @@ ShellRoot {
 
                 Region {
                     x: 0
-                    y: fullStrip.visible ? bar.hiddenOffset : 0
+                    y: !fullStrip.visible ? 0 : (Prefs.barBottom ? bar.height - bar.rowY - height : bar.rowY)
                     width: fullStrip.visible ? Math.round(bar.width) : 0
                     height: fullStrip.visible ? Theme.dp(Prefs.barHeight) : 0
+                }
+
+                Region {
+                    x: coverStrip.visible ? Math.round(coverStrip.x) : 0
+                    y: Prefs.barBottom ? bar.height - bar.rowY - Theme.dp(Prefs.barHeight) : bar.rowY
+                    width: coverStrip.visible && coverStrip.opacity > 0.5 ? Math.round(coverStrip.width) : 0
+                    height: coverStrip.visible ? Theme.dp(Prefs.barHeight) : 0
                 }
 
                 ModuleRegion {
                     blur: true
                     mod: workspacesMod
+                }
+
+                ModuleRegion {
+                    blur: true
+                    mod: wsSeat
                 }
 
                 ModuleRegion {
@@ -1301,6 +1957,99 @@ ShellRoot {
                     mod: startMod
                 }
 
+                ModuleRegion {
+                    blur: true
+                    mod: appsMod
+                }
+
+                ModuleRegion {
+                    blur: true
+                    mod: launcherPanel
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 0
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 1
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 2
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 3
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 4
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 5
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 6
+                }
+
+                BridgeRegion {
+                    host: bar
+                    index: 7
+                }
+
+                // the concave corners the bar draws outside any module: the full
+                // strip's ends at the screen sides, a cover strip's ends, and the
+                // hang plan's fillets. the modules' own come with their regions
+                FlareRegion {
+                    host: bar
+                    on: fullStrip.visible && !bar.hangPlan.edges.left
+                    mirrored: true
+                    size: Theme.dp(Prefs.barFullCorner)
+                    fx: 0
+                    fy: Theme.dp(Prefs.barHeight) + bar.rowY
+                }
+
+                FlareRegion {
+                    host: bar
+                    on: fullStrip.visible && !bar.hangPlan.edges.right
+                    size: Theme.dp(Prefs.barFullCorner)
+                    fx: bar.width - size
+                    fy: Theme.dp(Prefs.barHeight) + bar.rowY
+                }
+
+                FlareRegion {
+                    host: bar
+                    on: coverStrip.visible && coverStrip.opacity > 0.5 && !dock.barUnderLeft
+                    size: Theme.dp(Prefs.barNotchFlare)
+                    depth: Math.min(size, Theme.dp(Prefs.barHeight))
+                    fx: coverStrip.x - size
+                    fy: bar.rowY
+                }
+
+                FlareRegion {
+                    host: bar
+                    on: coverStrip.visible && coverStrip.opacity > 0.5 && !dock.barUnderRight
+                    mirrored: true
+                    size: Theme.dp(Prefs.barNotchFlare)
+                    depth: Math.min(size, Theme.dp(Prefs.barHeight))
+                    fx: coverStrip.x + coverStrip.width
+                    fy: bar.rowY
+                }
+
+                FilletRegions {
+                    host: bar
+                }
+
             }
 
         }
@@ -1309,6 +2058,8 @@ ShellRoot {
 
     Dock {
         id: dock
+
+        osd: osdMod
     }
 
     // edit mode's toolbar and its sheet of options, over everything
@@ -1446,6 +2197,8 @@ ShellRoot {
 
     Osd {
         id: osdMod
+
+        dockWindow: dock
     }
 
     PinnedWindows {
@@ -1460,6 +2213,7 @@ ShellRoot {
 
     ToastEvents {
         toast: toastMod
+        osd: osdMod
     }
 
     Lock {
@@ -1531,7 +2285,7 @@ ShellRoot {
     PanelWindow {
         id: clickCatcher
 
-        visible: dock.menuOpen && Monitors.surfacesUp
+        visible: dock.menuInDock && Monitors.surfacesUp
         color: "transparent"
         exclusiveZone: 0
         WlrLayershell.layer: WlrLayer.Top

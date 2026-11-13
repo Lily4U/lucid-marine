@@ -253,6 +253,7 @@ BarPill {
     readonly property string repeatGlyph: "repeat"
     readonly property string repeatOneGlyph: "repeat_one"
     readonly property string identifyGlyph: "graphic_eq"
+    readonly property string lyricsGlyph: "lyrics"
     readonly property string backGlyph: "arrow_back"
     readonly property string openGlyph: "open_in_new"
     readonly property string copyGlyph: "content_copy"
@@ -603,9 +604,9 @@ BarPill {
 
     shown: Prefs.barHas("media") && !(Prefs.mediaHideIdle && root.player === null)
 
-    compactWidth: compactRow.implicitWidth + Theme.dp(20)
+    compactWidth: compactRow.implicitWidth + Theme.barDp(20)
     panelWidth: Math.min(root.miniPanel ? Theme.dp(320) : Theme.dp(400), root.screenW - Theme.dp(34))
-    panelHeight: root.pad * 2 + (root.page === "player" ? playerColumn.implicitHeight : shazamColumn.implicitHeight)
+    panelHeight: root.pad * 2 + (root.page === "player" ? playerColumn.implicitHeight : (root.page === "lyrics" ? lyricsColumn.implicitHeight : shazamColumn.implicitHeight))
     expandedRadius: Theme.radiusXl
     compactCollapseScale: 0.94
     compactInteractive: false
@@ -857,13 +858,13 @@ BarPill {
             id: compactRow
 
             anchors.centerIn: parent
-            spacing: Theme.dp(8)
+            spacing: Theme.barDp(8)
 
             // Controls: previous, play and next before the track
             Row {
                 visible: root.controlsFace && root.player !== null
                 anchors.verticalCenter: parent.verticalCenter
-                spacing: Theme.dp(2)
+                spacing: Theme.barDp(2)
 
                 BarSkip {
                     glyph: root.prevGlyph
@@ -872,9 +873,9 @@ BarPill {
                 }
 
                 Rectangle {
-                    width: Math.round(Theme.dp(24) * 1.3)
-                    height: Theme.dp(24)
-                    radius: controlsPlay.pressed ? Theme.dp(8) : Theme.dp(12)
+                    width: Math.round(Theme.barDp(24) * 1.3)
+                    height: Theme.barDp(24)
+                    radius: controlsPlay.pressed ? Theme.barDp(8) : Theme.barDp(12)
                     anchors.verticalCenter: parent.verticalCenter
                     color: Theme.accent
                     opacity: root.player !== null && root.player.canTogglePlaying ? 1 : 0.4
@@ -882,7 +883,7 @@ BarPill {
                     Icon {
                         anchors.centerIn: parent
                         name: root.isPlaying ? root.pauseGlyph : root.playGlyph
-                        size: Theme.dp(16)
+                        size: Theme.barDp(16)
                         fill: 1
                         color: Theme.fgAccent
                     }
@@ -908,7 +909,7 @@ BarPill {
 
             Item {
                 visible: !(root.controlsFace && root.player !== null)
-                width: root.coverFace ? Theme.dp(22) : Theme.dp(26)
+                width: root.coverFace ? Theme.barDp(22) : Theme.barDp(26)
                 height: width
                 anchors.verticalCenter: parent.verticalCenter
 
@@ -926,9 +927,9 @@ BarPill {
                     id: compactArt
 
                     anchors.centerIn: parent
-                    width: Theme.dp(18)
-                    height: Theme.dp(18)
-                    radius: Theme.dp(9)
+                    width: Theme.barDp(18)
+                    height: Theme.barDp(18)
+                    radius: Theme.barDp(9)
                     color: Theme.surfaceHighest
                     visible: root.player !== null && compactArtImg.status === Image.Ready && root.discFace
 
@@ -939,8 +940,8 @@ BarPill {
                         source: root.discFace ? root.artSource : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
-                        sourceSize.width: Theme.dp(64)
-                        sourceSize.height: Theme.dp(64)
+                        sourceSize.width: Theme.barDp(64)
+                        sourceSize.height: Theme.barDp(64)
                     }
 
                     RotationAnimation on rotation {
@@ -958,7 +959,7 @@ BarPill {
                     id: coverArt
 
                     anchors.fill: parent
-                    radius: Theme.dp(6)
+                    radius: Theme.barDp(6)
                     color: Theme.surfaceHighest
                     visible: root.player !== null && coverArtImg.status === Image.Ready
 
@@ -969,8 +970,8 @@ BarPill {
                         source: root.coverFace ? root.artSource : ""
                         fillMode: Image.PreserveAspectCrop
                         asynchronous: true
-                        sourceSize.width: Theme.dp(64)
-                        sourceSize.height: Theme.dp(64)
+                        sourceSize.width: Theme.barDp(64)
+                        sourceSize.height: Theme.barDp(64)
                     }
 
                 }
@@ -979,7 +980,7 @@ BarPill {
                     id: compactBars
 
                     anchors.centerIn: parent
-                    spacing: Theme.dp(2)
+                    spacing: Theme.barDp(2)
                     visible: root.player !== null && !compactArt.visible && !coverArt.visible
 
                     Repeater {
@@ -989,10 +990,10 @@ BarPill {
                             required property int index
 
                             width: 2.5
-                            radius: Theme.dp(999)
+                            radius: Theme.barDp(999)
                             color: Theme.accent
                             anchors.verticalCenter: parent.verticalCenter
-                            height: root.isPlaying ? Math.max(Theme.dp(3), root.bandLevel(1 + index * 11, 10 + index * 11) * 11) : Theme.dp(3)
+                            height: root.isPlaying ? Math.max(Theme.barDp(3), root.bandLevel(1 + index * 11, 10 + index * 11) * 11 * Theme.barContent) : Theme.barDp(3)
 
                             Behavior on height {
                                 NumberAnimation {
@@ -1012,7 +1013,7 @@ BarPill {
                     anchors.centerIn: parent
                     visible: root.player === null
                     name: "music_note"
-                    size: Theme.dp(16)
+                    size: Theme.barDp(16)
                     fill: 1
                     color: Theme.accent
                 }
@@ -1023,8 +1024,8 @@ BarPill {
                 id: compactTitleSlot
 
                 visible: !root.compactFace || root.volumeFlash
-                width: root.volumeFlash ? volumeFlashRow.implicitWidth : Math.min(Theme.dp(Prefs.mediaTitleWidth), Math.max(Theme.dp(60), compactTitle.naturalWidth))
-                height: Theme.dp(18)
+                width: root.volumeFlash ? volumeFlashRow.implicitWidth : Math.min(Theme.barDp(Prefs.mediaTitleWidth), Math.max(Theme.barDp(60), compactTitle.naturalWidth))
+                height: Theme.barDp(18)
                 anchors.verticalCenter: parent.verticalCenter
 
                 Marquee {
@@ -1035,7 +1036,7 @@ BarPill {
                     content: root.displayTitle
                     scrolling: root.isPlaying
                     bold: true
-                    pixelSize: Theme.fs(13)
+                    pixelSize: Theme.barFs(13)
                     opacity: root.volumeFlash ? 0 : 1
 
                     Behavior on opacity {
@@ -1051,13 +1052,13 @@ BarPill {
                     id: volumeFlashRow
 
                     anchors.centerIn: parent
-                    spacing: Theme.dp(5)
+                    spacing: Theme.barDp(5)
                     opacity: root.volumeFlash ? 1 : 0
 
                     Icon {
                         anchors.verticalCenter: parent.verticalCenter
                         name: root.playerVolume <= 0 ? "volume_off" : (root.playerVolume < 0.5 ? "volume_down" : "volume_up")
-                        size: Theme.dp(16)
+                        size: Theme.barDp(16)
                         fill: 1
                         color: Theme.accent
                     }
@@ -1065,7 +1066,7 @@ BarPill {
                     LText {
                         anchors.verticalCenter: parent.verticalCenter
                         role: "labelLarge"
-                        size: Theme.fs(13)
+                        size: Theme.barFs(13)
                         weight: 640
                         text: Math.round(root.playerVolume * 100) + "%"
                     }
@@ -1083,9 +1084,9 @@ BarPill {
 
             Rectangle {
                 visible: Prefs.mediaPlayButton && !(root.controlsFace && root.player !== null)
-                width: Math.round(Theme.dp(24) * 1.3)
-                height: Theme.dp(24)
-                radius: playArea.pressed ? Theme.dp(8) : Theme.dp(12)
+                width: Math.round(Theme.barDp(24) * 1.3)
+                height: Theme.barDp(24)
+                radius: playArea.pressed ? Theme.barDp(8) : Theme.barDp(12)
                 anchors.verticalCenter: parent.verticalCenter
                 color: Theme.accent
                 opacity: root.player !== null && root.player.canTogglePlaying ? 1 : 0.4
@@ -1102,7 +1103,7 @@ BarPill {
                 Icon {
                     anchors.centerIn: parent
                     name: root.isPlaying ? "pause" : "play_arrow"
-                    size: Theme.dp(16)
+                    size: Theme.barDp(16)
                     fill: 1
                     color: Theme.fgAccent
                 }
@@ -1123,13 +1124,14 @@ BarPill {
 
     panelContent: [
     // backdrop: the cover blurred across the whole panel, under a scrim the
-    // text reads on. clipped to the panel's own corners
+    // text reads on. clipped to the panel's own corners, which a bottom bar
+    // draws upside down under content turned back the right way up
     ClippingRectangle {
         anchors.fill: parent
-        topLeftRadius: root.popupItem.topLeftRadius
-        topRightRadius: root.popupItem.topRightRadius
-        bottomLeftRadius: root.popupItem.bottomLeftRadius
-        bottomRightRadius: root.popupItem.bottomRightRadius
+        topLeftRadius: Prefs.barBottom ? root.popupItem.bottomLeftRadius : root.popupItem.topLeftRadius
+        topRightRadius: Prefs.barBottom ? root.popupItem.bottomRightRadius : root.popupItem.topRightRadius
+        bottomLeftRadius: Prefs.barBottom ? root.popupItem.topLeftRadius : root.popupItem.bottomLeftRadius
+        bottomRightRadius: Prefs.barBottom ? root.popupItem.topRightRadius : root.popupItem.bottomRightRadius
         color: "transparent"
         visible: root.backdropPanel && root.player !== null && backdropArt.status === Image.Ready
 
@@ -1477,7 +1479,7 @@ BarPill {
 
                 Column {
                     anchors.verticalCenter: parent.verticalCenter
-                    width: parent.width - Theme.dp(62)
+                    width: parent.width - Theme.dp(Prefs.mediaLyrics ? 92 : 62)
                     spacing: Theme.dp(1)
                     opacity: heroVol.open ? 0 : 1
 
@@ -1510,6 +1512,27 @@ BarPill {
                 }
 
                 IconButton {
+                    anchors.right: heroIdentify.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    size: "xs"
+                    icon: root.lyricsGlyph
+                    tintOverride: Theme.subtext
+                    opacity: heroVol.open ? 0 : 1
+                    visible: Prefs.mediaLyrics && opacity > 0.01
+                    onClicked: root.openPanel("lyrics")
+
+                    Behavior on opacity {
+                        NumberAnimation {
+                            duration: Theme.barDurShort
+                        }
+
+                    }
+
+                }
+
+                IconButton {
+                    id: heroIdentify
+
                     anchors.right: heroVol.left
                     anchors.verticalCenter: parent.verticalCenter
                     size: "xs"
@@ -1771,6 +1794,8 @@ BarPill {
                 }
 
                 IconButton {
+                    id: sideIdentify
+
                     anchors.right: parent.right
                     anchors.rightMargin: -Theme.dp(6)
                     anchors.top: parent.top
@@ -1779,6 +1804,16 @@ BarPill {
                     icon: root.identifyGlyph
                     tintOverride: Theme.subtext
                     onClicked: root.openPanel("shazam")
+                }
+
+                IconButton {
+                    anchors.right: sideIdentify.right
+                    anchors.top: sideIdentify.bottom
+                    size: "xs"
+                    visible: root.player !== null && Prefs.mediaLyrics
+                    icon: root.lyricsGlyph
+                    tintOverride: Theme.subtext
+                    onClicked: root.openPanel("lyrics")
                 }
 
                 // the player's own volume; its icon mutes and unmutes
@@ -2037,6 +2072,12 @@ BarPill {
                             onWheel: (wheel) => {
                                 return root.seekTo(root.livePosSec + (wheel.angleDelta.y > 0 ? 5 : -5), true);
                             }
+
+                            HeldPointer {
+                                held: trackHitArea.dragging
+                                cursor: Qt.PointingHandCursor
+                            }
+
                         }
 
                     }
@@ -2797,6 +2838,266 @@ BarPill {
         }
 
     }
+,
+    Item {
+        id: lyricsPage
+
+        y: 0
+        width: parent.width
+        height: parent.height
+        x: root.page === "lyrics" ? 0 : root.panelWidth
+        visible: lyricsPage.x < root.panelWidth - 0.5
+
+        Behavior on x {
+            enabled: root.pageSwitching
+
+            NumberAnimation {
+                duration: root.morphDuration
+                easing.type: Easing.Bezier
+                easing.bezierCurve: root.morphEasing
+            }
+
+        }
+
+        LyricsSource {
+            id: panelLyrics
+
+            player: root.player
+            active: root.expanded && root.page === "lyrics"
+        }
+
+        Column {
+            id: lyricsColumn
+
+            x: root.pad
+            y: root.pad
+            width: root.contentWidth
+            spacing: Theme.dp(8)
+
+            Item {
+                width: root.contentWidth
+                height: Theme.dp(36)
+
+                IconButton {
+                    id: lyricsBack
+
+                    anchors.left: parent.left
+                    anchors.leftMargin: -Theme.dp(8)
+                    anchors.verticalCenter: parent.verticalCenter
+                    icon: root.backGlyph
+                    tintOverride: Theme.text
+                    onClicked: root.setPage("player")
+                }
+
+                Column {
+                    anchors.left: lyricsBack.right
+                    anchors.leftMargin: Theme.dp(4)
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    Marquee {
+                        width: parent.width
+                        content: root.title
+                        scrolling: root.isPlaying
+                        bold: true
+                        weight: 600
+                        textColor: Theme.text
+                        pixelSize: Theme.typeSize("titleSmall")
+                    }
+
+                    Marquee {
+                        width: parent.width
+                        visible: content !== ""
+                        content: root.artist
+                        scrolling: root.isPlaying
+                        textColor: Theme.subtext
+                        pixelSize: Theme.typeSize("bodySmall")
+                    }
+
+                }
+
+            }
+
+            Item {
+                width: root.contentWidth
+                height: Theme.dp(320)
+
+                ListView {
+                    id: lyricList
+
+                    anchors.fill: parent
+                    clip: true
+                    visible: panelLyrics.status === "found"
+                    model: panelLyrics.lines
+                    spacing: Theme.dp(10)
+                    boundsBehavior: Flickable.StopAtBounds
+                    currentIndex: panelLyrics.index
+                    // the line being sung rides a third of the way down; a flick still reads ahead, until the next line
+                    highlightRangeMode: panelLyrics.synced ? ListView.ApplyRange : ListView.NoHighlightRange
+                    preferredHighlightBegin: Math.round(height * 0.32)
+                    preferredHighlightEnd: Math.round(height * 0.32) + Theme.dp(40)
+                    highlightMoveDuration: Theme.durLong
+                    highlightMoveVelocity: -1
+                    // ms into the lines rising in, one after another, when the page opens or a song's words come in
+                    property real entryT: 1e6
+
+                    // opened mid-song, or the words just came in: straight to the line being sung
+                    onCountChanged: Qt.callLater(lyricList.snapToLine)
+                    function snapToLine() {
+                        if (lyricList.currentIndex >= 0)
+                            lyricList.positionViewAtIndex(lyricList.currentIndex, ListView.Center);
+
+                        if (lyricList.count > 0)
+                            lyricEntry.restart();
+
+                    }
+
+                    NumberAnimation {
+                        id: lyricEntry
+
+                        target: lyricList
+                        property: "entryT"
+                        from: 0
+                        to: Theme.durLong + 10 * 45
+                        duration: Theme.durLong + 10 * 45
+                    }
+
+                    Connections {
+                        function onActiveChanged() {
+                            if (panelLyrics.active)
+                                Qt.callLater(lyricList.snapToLine);
+
+                        }
+
+                        target: panelLyrics
+                    }
+
+                    header: Item {
+                        width: 1
+                        height: Theme.dp(4)
+                    }
+                    footer: Item {
+                        width: 1
+                        height: panelLyrics.synced ? Math.round(lyricList.height * 0.6) : Theme.dp(4)
+                    }
+
+                    delegate: Item {
+                        id: lyricLine
+
+                        required property var modelData
+                        required property int index
+                        readonly property int away: lyricLine.index - panelLyrics.index
+                        readonly property bool current: panelLyrics.synced && lyricLine.away === 0
+                        // 0..1 into its own rise, a beat after the line above it
+                        readonly property real entry: {
+                            const at = Math.max(0, Math.min(10, lyricLine.index - Math.max(0, panelLyrics.index - 2)));
+                            const x = Math.max(0, Math.min(1, (lyricList.entryT - at * 45) / Math.max(1, Theme.durLong)));
+                            return 1 - Math.pow(1 - x, 3);
+                        }
+
+                        width: lyricList.width
+                        height: lyricWords.implicitHeight
+                        // the line being sung comes up to full size; the rest wait smaller, and fainter the further off
+                        transformOrigin: Item.Left
+                        scale: (!panelLyrics.synced || lyricLine.current ? 1 : 0.86) * (0.94 + 0.06 * lyricLine.entry)
+                        opacity: lyricLine.entry * (!panelLyrics.synced ? 1 : Math.max(0.6, 1 - Math.max(0, Math.abs(lyricLine.away) - 1) * 0.13))
+
+                        LyricLine {
+                            id: lyricWords
+
+                            width: parent.width
+                            line: lyricLine.modelData
+                            synced: panelLyrics.synced
+                            when: !panelLyrics.synced ? 1 : (lyricLine.away < 0 ? -1 : (lyricLine.away === 0 ? 0 : 1))
+                            pos: lyricLine.current ? panelLyrics.pos : 0
+                            px: Theme.typeSize("titleMedium")
+                            weight: 640
+                            ink: panelLyrics.synced ? Theme.subtext : Theme.text
+                            inkAhead: Theme.text
+                            inkLit: Theme.accent
+                            transform: Translate {
+                                y: Math.round((1 - lyricLine.entry) * Theme.dp(18))
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            enabled: panelLyrics.synced && root.player !== null && root.player.canSeek
+                            cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                            onClicked: panelLyrics.seekLine(lyricLine.index)
+                        }
+
+                        Behavior on scale {
+                            enabled: lyricList.entryT > Theme.durLong + 10 * 45 - 1
+
+                            NumberAnimation {
+                                duration: Theme.durLong
+                                easing.type: Theme.jelly > 0 ? Easing.OutBack : Easing.OutCubic
+                                easing.overshoot: 1 + Theme.jelly
+                            }
+
+                        }
+
+                        Behavior on opacity {
+                            enabled: lyricList.entryT > Theme.durLong + 10 * 45 - 1
+
+                            NumberAnimation {
+                                duration: Theme.durMedium
+                            }
+
+                        }
+
+                    }
+
+                }
+
+                Column {
+                    anchors.centerIn: parent
+                    width: parent.width - Theme.dp(32)
+                    spacing: Theme.dp(10)
+                    visible: panelLyrics.status !== "found"
+
+                    LoadingIndicator {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: panelLyrics.status === "loading"
+                    }
+
+                    Icon {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        visible: panelLyrics.status !== "loading"
+                        name: root.lyricsGlyph
+                        size: Theme.dp(32)
+                        color: Theme.subtextDim
+                    }
+
+                    LText {
+                        width: parent.width
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.Wrap
+                        role: "bodyMedium"
+                        color: Theme.subtext
+                        text: {
+                            switch (panelLyrics.status) {
+                            case "loading":
+                                return "Looking for the words";
+                            case "instrumental":
+                                return "Instrumental";
+                            case "none":
+                                return "No lyrics for this track";
+                            case "offline":
+                                return "Couldn't reach lrclib.net";
+                            }
+                            return "Nothing playing";
+                        }
+                    }
+
+                }
+
+            }
+
+        }
+
+    }
     ]
 
     // previous or next on the bar, for the Controls look
@@ -2807,15 +3108,15 @@ BarPill {
 
         signal activated()
 
-        width: Theme.dp(24)
-        height: Theme.dp(24)
+        width: Theme.barDp(24)
+        height: Theme.barDp(24)
         anchors.verticalCenter: parent.verticalCenter
         opacity: skipBtn.enabled ? 1 : 0.4
 
         Icon {
             anchors.centerIn: parent
             name: skipBtn.glyph
-            size: Theme.dp(18)
+            size: Theme.barDp(18)
             fill: 1
             color: Theme.text
         }

@@ -13,6 +13,9 @@ FloatingWindow {
         active: win.visible
     }
 
+    PointerPoke {
+    }
+
     readonly property int wheelStep: 190
     readonly property int flickDecel: 6000
     readonly property int maxFlick: 9000
@@ -362,6 +365,8 @@ FloatingWindow {
                 Prefs.resetKeys(Prefs.monitorKeys);
             else if (action.indexOf("special-delete:") === 0)
                 Specials.remove(action.substring(15));
+            else if (action.indexOf("prefs:") === 0)
+                Prefs.resetKeys(action.substring(6).split(","));
             else if (action.indexOf("hypr:") === 0)
                 HyprConfig.resetKeys(action.substring(5).split(","));
             else if (action.indexOf("keybind-delete:") === 0) {
@@ -385,6 +390,8 @@ FloatingWindow {
                 Prefs.removeBuiltinTheme(action.substring(11));
             else if (action.indexOf("widget-preset:") === 0)
                 Widgets.deletePreset(action.substring(14));
+            else if (action.indexOf("cc-layout:") === 0)
+                Prefs.deleteSystemLayout(action.substring(10));
             else if (action.indexOf("storage-clean:") === 0)
                 Storage.clean(action.substring(14));
             else if (action.indexOf("storage-trash:") === 0)
@@ -553,6 +560,8 @@ FloatingWindow {
 
     Connections {
         function onResetConfirmRequested(title, body, confirmLabel, action) {
+            // enter and escape answer the dialog, whatever held the keys before it
+            focusSink.forceActiveFocus();
             confirmDialog.ask(title, body, confirmLabel, action);
         }
 
@@ -1478,6 +1487,7 @@ FloatingWindow {
 
                         anchors.verticalCenter: parent.verticalCenter
                         visible: surfaceToggle.key !== ""
+                        enabled: !Prefs.surfaceLocked(surfaceToggle.key)
                         checked: surfaceToggle.key !== "" ? Prefs[surfaceToggle.key] : false
                         onToggled: (v) => {
                             return Prefs.setSurface(surfaceToggle.key, v);

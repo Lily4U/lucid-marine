@@ -121,6 +121,22 @@ Item {
 
     }
 
+    // a height in the pill's own coordinates, in the overlay's. On the bottom edge
+    // the overlay stands upright, turned over its own height, so it counts from
+    // the other end; worked out rather than mapped, so it follows the overlay as
+    // it grows instead of catching it halfway
+    function overlayFromPill(y) {
+        return Prefs.barBottom ? overlayHolder.height - y : y;
+    }
+
+    // where something `h` tall the module lays over the screen goes in the
+    // overlay: `gap` off `fromY`, going away from the bar, so up from it on the
+    // bottom edge
+    function overlayY(fromY, gap, h) {
+        const edge = pill.overlayFromPill(fromY);
+        return Prefs.barBottom ? edge - gap - h : edge + gap;
+    }
+
     // the id the bar knows this pill by
     function moduleId() {
         const map = pill.hostWindow && pill.hostWindow.moduleById ? pill.hostWindow.moduleById : {};
@@ -157,7 +173,7 @@ Item {
             jelly.rest();
             pillJelly.kickAfter(-0.15, Math.round(Theme.barDurExit * 0.9));
         } else {
-            jelly.kickAfter(-0.15, Math.round(pill.morphDuration * 0.5));
+            jelly.kickAfter(-0.15, Math.round(pill.morphDuration * 0.7));
         }
         openWobble.restart();
     }
@@ -193,8 +209,27 @@ Item {
     property int popupMorphDuration: pill.morphDuration
     property var popupMorphCurve: Theme.easeEmphasizedDecel
 
+    // a close takes as long as the open, but slow at first and soft at the end:
+    // the enter curve went most of the way in its first frame, and whatever the
+    // panel pushed aside jumped back. only while it closes: the face's own width
+    // changes keep the enter curve
+    property bool closing: false
+    readonly property var closeCurve: [0.4, 0, 0.2, 1, 1, 1]
+
+    Timer {
+        id: closingTimer
+
+        interval: pill.morphDuration
+        onTriggered: pill.closing = false
+    }
+
     function syncFadeTimings() {
         var open = pill.expanded || pill.altOpen;
+        pill.closing = !open;
+        if (open)
+            closingTimer.stop();
+        else
+            closingTimer.restart();
         pill.popupMorphDuration = open ? pill.morphDuration : Theme.barDurExit;
         pill.popupMorphCurve = open ? Theme.easeEmphasizedDecel : Theme.easeEmphasizedAccel;
         pill.panelFadePause = Theme.barMs(pill.expanded ? 150 : 0);
@@ -227,9 +262,9 @@ Item {
         return limits && limits[corner] !== undefined ? Math.max(0, Math.min(v, limits[corner])) : v;
     }
 
-    // growing sideways would run into a joined neighbour, so a joined pill lights
-    // up in place instead
-    readonly property bool hoverLift: Prefs.barHoverGrow > 0 && pill.compactHovered && !pill.anyOpen && pill.shown && !pill.joined
+    // growing sideways would run into a joined neighbour, or a notch's own edge
+    // blends, so those light up in place instead, blends and all
+    readonly property bool hoverLift: Prefs.barHoverGrow > 0 && pill.compactHovered && !pill.anyOpen && pill.shown && !pill.joined && !Prefs.barNotch
     property real hoverGrow: pill.hoverLift ? Math.min(Theme.dp(Prefs.barHoverGrow), Math.max(0, Theme.dp(Prefs.barSpacing) / 2)) : 0
 
     property int hoverGrowDuration: Theme.barMs(150)
@@ -256,7 +291,8 @@ Item {
     // pill promotes it to an ordinary clicked-open panel, grab and all.
     // off for a pill that is only a button, with nothing to unfold
     property bool opensOnHover: true
-    readonly property bool hoverOpens: Prefs.barHoverOpen && pill.shown && pill.opensOnHover && !Edit.active
+    // not while the launcher stands on a bottom bar: a hover would shut it again
+    readonly property bool hoverOpens: Prefs.barHoverOpen && pill.shown && pill.opensOnHover && !Edit.active && !(pill.hostWindow && pill.hostWindow.launcherUp === true)
     property bool hoverOpen: false
     readonly property bool surfaceHovered: pill.compactHovered || shellHover.hovered || pillHover.hovered
 
@@ -331,6 +367,9 @@ Item {
     // still taller than the pill: a closing panel keeps its colour until it has
     // folded away, or on the full bar its fading contents float over the desktop
     readonly property bool surfaceOpen: pill.anyOpen || pill.height > pill.compactHeight + 0.5
+    // on the full bar the strip already paints the band an open panel stands in, so
+    // the panel paints only what hangs below it: both at once doubled the tint
+    readonly property bool bodyBelowStrip: Prefs.barFull && !pill.popupMode && pill.surfaceOpen && !pill.editLifted
     readonly property int barRadius: pill.popupMode ? Prefs.barPillRadius : pill.cornerRadius
     readonly property int barTopRadius: pill.popupMode ? pill.pillTopRadius : pill.topRadius
 
@@ -391,12 +430,15 @@ Item {
 
     implicitWidth: !pill.shown ? 0 : (pill.popupMode ? pill.compactWidth : pill.openWidth)
     implicitHeight: !pill.shown ? 0 : (pill.popupMode ? pill.compactHeight : pill.openHeight)
-    opacity: pill.shown ? 1 : 0
+    // an open panel standing over it: out of the way until it shuts, not cut off at its edge
+    readonly property bool covered: !!pill.hostWindow && !!pill.hostWindow.covers && pill.hostWindow.covers(pill)
+    opacity: pill.shown && !pill.covered ? 1 : 0
     scale: pill.shown ? 1 : 0.86
     transformOrigin: Item.Center
     visible: pill.opacity > 0.01
     clip: !pill.popupMode && pill.anyOpen && !pill.overlayOpen && !jelly.wobbling
-    z: pill.editLifted ? 120 : ((pill.popupOpen || pill.overlayOpen) ? 100 : 1)
+    // open in place, a panel stands over its neighbours, as wide as it may be
+    z: pill.editLifted ? 120 : ((pill.popupOpen || pill.overlayOpen) ? 100 : (pill.surfaceOpen && !pill.popupMode ? 50 : 1))
 
     Behavior on opacity {
         SequentialAnimation {
@@ -425,7 +467,7 @@ Item {
         NumberAnimation {
             duration: pill.exiting ? Theme.barMs(360) : pill.morphDuration
             easing.type: Easing.Bezier
-            easing.bezierCurve: pill.exiting ? Theme.curveStandard : pill.morphEasing
+            easing.bezierCurve: pill.exiting ? Theme.curveStandard : (pill.closing ? pill.closeCurve : pill.morphEasing)
         }
 
     }
@@ -504,7 +546,7 @@ Item {
             NumberAnimation {
                 duration: pill.exiting ? 0 : pill.morphDuration
                 easing.type: Easing.Bezier
-                easing.bezierCurve: pill.morphEasing
+                easing.bezierCurve: pill.closing ? pill.closeCurve : pill.morphEasing
             }
 
         }
@@ -519,6 +561,13 @@ Item {
         width: (pill.overlayOpen && pill.hostWindow) ? Math.max(pill.width, pill.hostWindow.width - pill.x) : pill.width
         height: (pill.overlayOpen && pill.hostWindow) ? Math.max(pill.height, pill.hostWindow.height - pill.y) : pill.height
         z: 200
+
+        // the bar is mirrored on the bottom edge; the content stands upright
+        transform: Scale {
+            origin.y: overlayHolder.height / 2
+            yScale: Prefs.barBottom ? -1 : 1
+        }
+
     }
 
     Timer {
@@ -610,7 +659,7 @@ Item {
         x: pill.popupMode && pill.anyOpen ? pill.popupX : (pill.notchedPopup ? 0 : pill.restX)
         y: pill.popupMode && (pill.anyOpen || pill.notchedPopup) ? pill.compactHeight + (pill.notchedPopup ? 0 : Theme.dp(Prefs.barPopupGap)) : 0
         visible: !pill.popupMode || (pill.notchedPopup ? shell.height > 0.5 : shell.y > 0.5)
-        color: (pill.popupMode || pill.surfaceOpen) ? Theme.bg : pill.restingColor
+        color: (pill.popupMode || pill.surfaceOpen) && !pill.bodyBelowStrip ? Theme.bg : pill.restingColor
         radius: pill.cornerRadius
         // opened in place, the panel hangs from its own stretch of the group: the
         // shared top corners stay square, the bottom ones round off below it
@@ -631,6 +680,18 @@ Item {
             anchorY: (pill.popupMode || pill.surfaceOpen || Prefs.barFlush) ? 0 : 0.5
             spread: pill.jellyPinned ? 0 : jelly.naturalSpread
             frequency: pill.surfaceOpen ? 3.2 : 5
+        }
+
+        // the panel below the strip. it starts where the strip ends on screen, so a
+        // bob of the jelly opens no gap between them
+        Rectangle {
+            visible: pill.bodyBelowStrip
+            y: Math.min(shell.height, pill.compactHeight / Math.max(0.5, jelly.yScale))
+            width: shell.width
+            height: Math.max(0, shell.height - y)
+            color: Theme.bg
+            bottomLeftRadius: shell.bottomLeftRadius
+            bottomRightRadius: shell.bottomRightRadius
         }
 
         // handlers on the surface itself, so hovering the panel's own contents
@@ -742,10 +803,10 @@ Item {
 
             }
 
-            // a joined pill doesn't grow on hover, so its stretch of the group lights up
+            // a joined pill or a notch doesn't grow on hover, so it lights up as its edge blends do
             Rectangle {
                 anchors.fill: parent
-                visible: pill.joined && opacity > 0
+                visible: (pill.joined || Prefs.barNotch) && opacity > 0
                 color: Theme.text
                 opacity: pill.compactHovered && !pill.anyOpen ? Theme.stateHover : 0
                 topLeftRadius: compactFace.parent ? compactFace.parent.topLeftRadius : 0
@@ -816,6 +877,13 @@ Item {
                 y: Math.round((compactFace.height - compactHolder.height) / 2)
                 width: pill.compactWidth
                 height: pill.compactHeight
+
+                // the bar is mirrored on the bottom edge; the content stands upright
+                transform: Scale {
+                    origin.y: compactHolder.height / 2
+                    yScale: Prefs.barBottom ? -1 : 1
+                }
+
             }
 
             Behavior on opacity {
@@ -856,6 +924,12 @@ Item {
                     easing.type: Easing.OutCubic
                 }
 
+            }
+
+            // the bar is mirrored on the bottom edge; the content stands upright
+            transform: Scale {
+                origin.y: altHolder.height / 2
+                yScale: Prefs.barBottom ? -1 : 1
             }
 
         }
@@ -903,6 +977,12 @@ Item {
 
                 }
 
+            }
+
+            // the bar is mirrored on the bottom edge; the content stands upright
+            transform: Scale {
+                origin.y: panelHolder.height / 2
+                yScale: Prefs.barBottom ? -1 : 1
             }
 
         }

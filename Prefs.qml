@@ -30,6 +30,55 @@ Singleton {
 
     readonly property bool barNotch: root.barStyle === "notch"
     readonly property bool barFull: root.barStyle === "full"
+    // the bar is drawn as a top bar and mirrored onto the bottom edge
+    readonly property bool barBottom: (root.barShownPosition !== "" ? root.barShownPosition : root.barPosition) === "bottom"
+    // the edge the bar is drawn on lags the one asked for: on a change the bar
+    // slides out of the old edge, moves while out of sight, and slides in at the new
+    property string barShownPosition: ""
+    readonly property bool barRelocating: root.barShownPosition !== "" && root.barShownPosition !== root.barPosition
+
+    onBarRelocatingChanged: {
+        if (root.barRelocating)
+            barMoveTimer.restart();
+
+    }
+
+    Timer {
+        id: barMoveTimer
+
+        interval: Theme.durLong
+        onTriggered: root.barShownPosition = root.barPosition
+    }
+    // a bottom bar that keeps its strip: what would sit flush on that edge floats above it
+    readonly property bool barHoldsBottom: root.barBottom && root.barEnabled && !root.barAutoHide
+    // the bottom edge belongs to the bar while it is there: the dock steps aside, and
+    // comes back when the bar goes to the top
+    readonly property bool dockOn: root.dockEnabled && !(root.barBottom && root.barEnabled)
+    // and its switch goes with it: off as the bar moves down, on again as the bar
+    // leaves, when it was the bar that switched it off
+    readonly property bool barTakesDockEdge: root.barPosition === "bottom" && root.barEnabled
+
+    // after the rest of a reload has landed, or its later keys undo this
+    onBarTakesDockEdgeChanged: Qt.callLater(root.syncDockAside)
+    onLoadedChanged: Qt.callLater(root.syncDockAside)
+
+    function syncDockAside() {
+        if (!root.loaded)
+            return ;
+
+        if (root.barTakesDockEdge && root.dockEnabled) {
+            root.dockAsideForBar = true;
+            root.dockEnabled = false;
+        } else if (!root.barTakesDockEdge && root.dockAsideForBar) {
+            root.dockAsideForBar = false;
+            root.dockEnabled = true;
+        }
+    }
+
+    // a surface switch that cannot be turned on as things stand
+    function surfaceLocked(key) {
+        return key === "dockEnabled" && root.barTakesDockEdge;
+    }
     // notches and the full bar both sit flush against the top edge
     readonly property bool barFlush: root.barNotch || root.barFull
     readonly property bool dockNotch: root.dockStyle === "notch"
@@ -119,9 +168,20 @@ Singleton {
         root.barRetiring = null;
     }
 
-    // every tile the system panel's grid can carry. the panel shows the ones
-    // named in systemTiles, in that order, and its editor offers the rest
-    readonly property var systemTileCatalog: [
+    // every tile the system panel's grid can carry, Lucid's and the user's
+    // own. the panel shows the ones named in systemTiles, in that order, and
+    // the shelf on its card offers the rest
+    readonly property var systemTileCatalog: root.systemTileBuiltins.concat(root.systemOwnTileList.map((t) => {
+        return {
+            "key": t.key,
+            "icon": t.icon,
+            "name": t.name,
+            "own": true
+        };
+    }))
+    readonly property var systemTileBuiltins: [
+        { "key": "wifi", "icon": "wifi", "name": "Wi-Fi" },
+        { "key": "bluetooth", "icon": "bluetooth", "name": "Bluetooth" },
         { "key": "dnd", "icon": "do_not_disturb_on", "name": "Silence" },
         { "key": "awake", "icon": "coffee", "name": "Awake" },
         { "key": "dark", "icon": "dark_mode", "name": "Dark" },
@@ -157,6 +217,83 @@ Singleton {
         { "key": "clear", "icon": "clear_all", "name": "Clear" }
     ]
 
+    // the user's own tiles, each keyed "own<id>". one with a command to turn
+    // it off is a switch, kept in step by the status command (exit 0 is on)
+    // where there is one; one with only the first is a button that runs it
+    readonly property var systemOwnTileList: {
+        let v = [];
+        try {
+            v = JSON.parse(root.systemOwnTiles || "[]");
+        } catch (e) {
+        }
+        return (Array.isArray(v) ? v : []).filter((t) => {
+            return t && Number(t.id) > 0;
+        }).map((t) => {
+            return {
+                "key": "own" + Math.round(Number(t.id)),
+                "id": Math.round(Number(t.id)),
+                "name": String(t.name || "").trim() || "My tile",
+                "icon": String(t.icon || "").trim() || "star",
+                "on": String(t.on || ""),
+                "off": String(t.off || ""),
+                "status": String(t.status || "")
+            };
+        });
+    }
+
+    function systemOwnTile(key) {
+        return root.systemOwnTileList.find((t) => {
+            return t.key === key;
+        }) || null;
+    }
+
+    function setSystemOwnTiles(list) {
+        root.systemOwnTiles = list.length === 0 ? "" : JSON.stringify(list.map((t) => {
+            return {
+                "id": t.id,
+                "name": t.name,
+                "icon": t.icon,
+                "on": t.on,
+                "off": t.off,
+                "status": t.status
+            };
+        }));
+    }
+
+    // a new one goes straight onto the panel, with the small tiles
+    function addSystemOwnTile() {
+        const id = root.systemOwnTileList.reduce((n, t) => {
+            return Math.max(n, t.id);
+        }, 0) + 1;
+        root.setSystemOwnTiles(root.systemOwnTileList.concat([{
+            "id": id,
+            "name": "My tile",
+            "icon": "star",
+            "on": "",
+            "off": "",
+            "status": ""
+        }]));
+        root.setSystemTiles(root.systemTileKeys.concat(["own" + id]));
+        return "own" + id;
+    }
+
+    function setSystemOwnTile(key, fields) {
+        root.setSystemOwnTiles(root.systemOwnTileList.map((t) => {
+            return t.key === key ? Object.assign({}, t, fields) : t;
+        }));
+    }
+
+    function removeSystemOwnTile(key) {
+        if (root.systemTileKeys.indexOf(key) !== -1)
+            root.setSystemTiles(root.systemTileKeys.filter((k) => {
+                return k !== key;
+            }));
+
+        root.setSystemOwnTiles(root.systemOwnTileList.filter((t) => {
+            return t.key !== key;
+        }));
+    }
+
     function systemTileAt(key) {
         for (var i = 0; i < root.systemTileCatalog.length; i++) {
             if (root.systemTileCatalog[i].key === key)
@@ -166,10 +303,12 @@ Singleton {
         return null;
     }
 
-    // same rules as the bar zones: no repeats, nothing the catalogue lacks
-    readonly property var systemTileKeys: String(root.systemTiles).split(",").map((x) => {
+    // same rules as the bar zones: no repeats, nothing the catalogue lacks.
+    // Wi-Fi and Bluetooth sat above the grid before they were tiles of it, so
+    // until the tiles are edited they lead it and a list saved before keeps them
+    readonly property var systemTileKeys: (root.systemTilesRadios ? [] : ["wifi", "bluetooth"]).concat(String(root.systemTiles).split(",").map((x) => {
         return x.trim();
-    }).filter((x, i, all) => {
+    })).filter((x, i, all) => {
         return x !== "" && all.indexOf(x) === i && root.systemTileAt(x) !== null;
     })
     readonly property var systemTileSpare: root.systemTileCatalog.filter((t) => {
@@ -180,6 +319,530 @@ Singleton {
 
     function setSystemTiles(keys) {
         root.systemTiles = keys.join(",");
+        root.systemTilesRadios = true;
+    }
+
+    // a big tile takes half a row, with its name and what it is doing. the
+    // big ones and the small ones are blocks of their own, each in the order
+    // systemTiles keeps
+    readonly property var systemBigKeys: root.prefList(root.systemBigTiles, root.systemTileCatalog)
+    readonly property var systemBigTileKeys: root.systemTileKeys.filter((k) => {
+        return root.systemBigKeys.indexOf(k) !== -1;
+    })
+    readonly property var systemSmallTileKeys: root.systemTileKeys.filter((k) => {
+        return root.systemBigKeys.indexOf(k) === -1;
+    })
+
+    // both tile blocks at once: which are big, and the order of each
+    function setSystemTileBlocks(big, small) {
+        root.systemBigTiles = big.join(",");
+        root.setSystemTiles(big.concat(small));
+    }
+
+    function setTileBig(key, big) {
+        const l = root.systemBigKeys.filter((k) => {
+            return k !== key;
+        });
+        if (big)
+            l.push(key);
+
+        root.systemBigTiles = l.join(",");
+    }
+
+    // the control centre's blocks, and what the sliders and gauges hold; the
+    // tile blocks hold the tiles above
+    readonly property var systemBlockCatalog: [
+        { "key": "sliders", "icon": "tune", "name": "Sliders" },
+        { "key": "bigtiles", "icon": "dashboard", "name": "Big tiles" },
+        { "key": "tiles", "icon": "apps", "name": "Tiles" },
+        { "key": "media", "icon": "music_note", "name": "Media" },
+        { "key": "gauges", "icon": "speed", "name": "Gauges" },
+        { "key": "weather", "icon": "partly_cloudy_day", "name": "Weather", "whole": true },
+        { "key": "network", "icon": "swap_vert", "name": "Network", "whole": true },
+        { "key": "power", "icon": "eco", "name": "Power", "whole": true },
+        { "key": "agenda", "icon": "event", "name": "Up next", "whole": true }
+    ]
+    // a block that is one piece, as media is: nothing to add to it or take off
+    function systemBlockWhole(key) {
+        return key === "media" || !!(root.systemBlockCatalog.find((c) => {
+            return c.key === key;
+        }) || {}).whole;
+    }
+    readonly property var systemSliderCatalog: [
+        { "key": "brightness", "icon": "brightness_medium", "name": "Brightness" },
+        { "key": "volume", "icon": "volume_up", "name": "Volume" },
+        { "key": "mic", "icon": "mic", "name": "Microphone" }
+    ]
+    readonly property var systemInfoCatalog: [
+        { "key": "cpu", "icon": "memory", "name": "CPU" },
+        { "key": "ram", "icon": "memory_alt", "name": "Memory" },
+        { "key": "disk", "icon": "hard_drive", "name": "Disk" },
+        { "key": "battery", "icon": "battery_full", "name": "Battery" }
+    ]
+    // there were three blocks once: toggles held both kinds of tile, and
+    // system the media card (when it was on its list) and the gauges
+    readonly property var systemBlockKeys: {
+        const out = [];
+        const legacyMedia = String(root.systemInfo).split(",").map((x) => {
+            return x.trim();
+        }).indexOf("media") !== -1;
+        for (const k of String(root.systemBlocks || "").split(",").map((x) => {
+            return x.trim();
+        })) {
+            const keys = k === "toggles" ? ["bigtiles", "tiles"] : (k === "system" ? (legacyMedia ? ["media", "gauges"] : ["gauges"]) : [k]);
+            for (const x of keys) {
+                if (out.indexOf(x) === -1 && root.systemBlockCatalog.some((c) => {
+                    return c.key === x;
+                }))
+                    out.push(x);
+
+            }
+        }
+        return out;
+    }
+    readonly property bool systemLegacy: /\b(toggles|system)\b/.test(String(root.systemBlocks)) || /"(toggles|system)"/.test(String(root.systemGrid))
+
+    // writes the three old blocks out as the five, once the layout is edited
+    function systemMigrate() {
+        if (!root.systemLegacy)
+            return ;
+
+        root.systemGrid = JSON.stringify(root.systemGridSaved);
+        root.systemBlocks = root.systemBlockKeys.join(",");
+    }
+    readonly property var systemSliderKeys: root.prefList(root.systemSliders, root.systemSliderCatalog)
+    readonly property var systemInfoKeys: root.prefList(root.systemInfo, root.systemInfoCatalog)
+
+    // the control centre is a grid, bento style: each block sits at a column
+    // and a row and spans as many of each as it is given. a column is a tile
+    // wide and a row a thin strip, so a block is as tall as it is made, never
+    // less than what it holds. systemGrid keeps { key: { x, y, w, h, lie } },
+    // lie laying the sliders down
+    readonly property int systemGridCols: 16
+    readonly property var systemGridSaved: {
+        let v;
+        try {
+            v = JSON.parse(root.systemGrid || "{}");
+        } catch (e) {
+            return {};
+        }
+        if (!v || typeof v !== "object" || Array.isArray(v))
+            return {};
+
+        // an old block leaves its spot to the two it became, one over the other
+        const split = (old, top, under) => {
+            const r = v[old];
+            delete v[old];
+            if (!r)
+                return ;
+
+            if (!v[top])
+                v[top] = Object.assign({}, r, {
+                "h": 1
+            });
+
+            if (!v[under])
+                v[under] = Object.assign({}, r, {
+                "y": (Number(r.y) || 0) + 1,
+                "h": 1
+            });
+
+        };
+        split("toggles", "bigtiles", "tiles");
+        split("system", "media", "gauges");
+        return v;
+    }
+
+    // the fewest columns a block can do with: a standing slider each, room
+    // for the lying sliders' value and the media card, three tiles a row
+    function systemGridMinW(key, lie) {
+        if (key === "sliders")
+            return lie ? 3 : Math.max(1, root.systemSliderKeys.length);
+
+        if (key === "media")
+            return 4;
+
+        if (key === "gauges")
+            return 2;
+
+        if (key === "agenda")
+            return 4;
+
+        return 3;
+    }
+
+    // a width the block can take: standing sliders take whole columns each
+    function systemGridSnapW(key, lie, w) {
+        const least = root.systemGridMinW(key, lie);
+        // standing sliders a column or more each, big tiles three each
+        const n = key === "sliders" && !lie ? least : (key === "bigtiles" ? 3 : 1);
+        if (n > 1)
+            return Math.max(n, Math.min(Math.floor(root.systemGridCols / n), Math.round(w / n)) * n);
+
+        return Math.max(least, Math.min(root.systemGridCols, w));
+    }
+
+    function systemGridOverlap(a, b) {
+        return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    }
+
+    // a spot made whole: whole cells, inside the grid, no narrower than the
+    // block allows and no shorter than the rows its pieces need. until they
+    // are given a place the blocks make the one column the panel always had,
+    // six tiles wide, with the sliders lying down
+    function systemGridFit(key, r, need) {
+        const lie = r.lie === undefined ? true : !!r.lie;
+        const w = root.systemGridSnapW(key, lie, Math.round(Number(r.w) || 6));
+        return {
+            "x": Math.max(0, Math.min(root.systemGridCols - w, Math.round(Number(r.x) || 0))),
+            "y": Math.max(0, Math.round(Number(r.y) || 0)),
+            "w": w,
+            "h": Math.max(1, need || 1, Math.round(Number(r.h) || 0)),
+            "lie": lie
+        };
+    }
+
+    // where each of keys sits, given the rows each needs. top to bottom, each
+    // rises as far as the blocks above it in its columns let it, so a block that
+    // grew pushes the ones under it down and no empty rows are left between;
+    // one never placed goes under all the rest. grid, when given, stands in
+    // for the saved one, so a layout not in use can be drawn too
+    function systemGridPlace(keys, needs, grid) {
+        const need = needs || {};
+        const saved = grid || root.systemGridSaved;
+        const out = {};
+        // two on the same row keep the order of keys, whatever the sort does with a tie
+        const placed = keys.filter((k) => {
+            return !!saved[k];
+        }).map((k, i) => {
+            return {
+                "key": k,
+                "i": i,
+                "r": root.systemGridFit(k, saved[k], need[k])
+            };
+        }).sort((a, b) => {
+            return a.r.y - b.r.y || a.r.x - b.r.x || a.i - b.i;
+        });
+        const taken = [];
+        for (const p of placed) {
+            p.r.y = taken.reduce((y, t) => {
+                return t.x < p.r.x + p.r.w && p.r.x < t.x + t.w ? Math.max(y, t.y + t.h) : y;
+            }, 0);
+            out[p.key] = p.r;
+            taken.push(p.r);
+        }
+        for (const k of keys) {
+            if (out[k])
+                continue;
+
+            const r = root.systemGridFit(k, {}, need[k]);
+            r.y = taken.reduce((y, t) => {
+                return Math.max(y, t.y + t.h);
+            }, 0);
+            out[k] = r;
+            taken.push(r);
+        }
+        return out;
+    }
+
+    // a block that puts more height to use: standing sliders, gauges drawn as
+    // tiles or curves, the network's curves
+    function systemGridStretches(key, lie) {
+        if (key === "sliders")
+            return !lie;
+
+        if (key === "gauges")
+            return ["tiles", "graph"].indexOf(root.systemBlockStyle(key)) !== -1;
+
+        return key === "network" && root.systemBlockStyle(key) !== "line";
+    }
+
+    // the same, each block with nothing under it in its columns drawn down to the
+    // lowest one's foot, so the columns end together: always, for one that puts
+    // the height to use, and the rest only the strip or two rounding left
+    function systemGridFill(place, keys) {
+        const bottom = keys.reduce((y, k) => {
+            return place[k] ? Math.max(y, place[k].y + place[k].h) : y;
+        }, 0);
+        const out = {};
+        for (const k of keys) {
+            const r = place[k];
+            if (!r)
+                continue;
+
+            const under = keys.some((o) => {
+                const q = place[o];
+                return o !== k && !!q && q.y >= r.y + r.h && q.x < r.x + r.w && r.x < q.x + q.w;
+            });
+            const room = bottom - r.y - r.h;
+            out[k] = under || room === 0 || (room > 2 && !root.systemGridStretches(k, r.lie)) ? r : Object.assign({}, r, {
+                "h": bottom - r.y
+            });
+        }
+        return out;
+    }
+
+    // a layout still the one column, every block six across from the left edge,
+    // the sliders lying and nothing stretched by hand: the panel draws it as the
+    // column it always was, so a first change in the editor leaves it be
+    function systemGridColumnar(keys) {
+        const saved = root.systemGridSaved;
+        return keys.every((k) => {
+            const r = saved[k];
+            if (!r)
+                return true;
+
+            return Math.round(Number(r.x) || 0) === 0 && Math.round(Number(r.w) || 6) === 6 && Math.round(Number(r.h) || 0) <= 1 && (k !== "sliders" || r.lie === undefined || !!r.lie);
+        });
+    }
+
+    // puts a block at a new spot or size. a block it lands on takes the spot
+    // it left if it fits there, or else goes under it
+    // the height a block was given by hand, without what its pieces add. what
+    // is saved keeps to that, so a block that holds less later shrinks back
+    function systemGridOwnH(key) {
+        const r = root.systemGridSaved[key];
+        return Math.max(1, Math.round(Number(r && r.h) || 0));
+    }
+
+    function systemGridSet(key, spot, needs) {
+        root.systemGrid = JSON.stringify(root.systemGridPlan(key, spot, needs));
+    }
+
+    // the grid a move would leave, without writing it: the studio shows it live
+    // while a block is carried, the others stepping aside to where they would go
+    function systemGridPlan(key, spot, needs) {
+        const need = needs || {};
+        const now = root.systemGridPlace(root.systemBlockKeys, need);
+        const old = now[key] || root.systemGridFit(key, {}, need[key]);
+        const next = Object.assign({}, root.systemGridSaved);
+        for (const k of root.systemBlockKeys)
+            next[k] = Object.assign({}, now[k], {
+            "h": root.systemGridOwnH(k)
+        });
+        const moved = root.systemGridFit(key, Object.assign({}, old, spot), need[key]);
+        next[key] = Object.assign({}, moved, {
+            "h": spot.h === undefined ? root.systemGridOwnH(key) : moved.h
+        });
+        const taken = [moved];
+        const pushed = [];
+        for (const k of root.systemBlockKeys) {
+            if (k === key)
+                continue;
+
+            if (root.systemGridOverlap(now[k], moved))
+                pushed.push(k);
+            else
+                taken.push(now[k]);
+        }
+        // the ones that go under it keep the order they were in
+        const top = pushed.reduce((y, k) => {
+            return Math.min(y, now[k].y);
+        }, Infinity);
+        for (const k of pushed) {
+            const there = root.systemGridFit(k, Object.assign({}, now[k], {
+                "x": old.x,
+                "y": old.y
+            }), need[k]);
+            const r = taken.some((t) => {
+                return root.systemGridOverlap(there, t);
+            }) ? Object.assign({}, now[k], {
+                "y": moved.y + moved.h + now[k].y - top
+            }) : there;
+            next[k] = Object.assign({}, r, {
+                "h": root.systemGridOwnH(k)
+            });
+            taken.push(r);
+        }
+        return next;
+    }
+
+    // everything the control centre's layout is: which blocks, where, and
+    // what each holds. a saved layout, and each step undo goes back, is these
+    readonly property var systemLayoutKeys: ["systemBlocks", "systemGrid", "systemTiles", "systemTilesRadios", "systemBigTiles", "systemSliders", "systemInfo", "systemBlockStyles"]
+
+    // the looks each block can take; the first is the one it always had
+    readonly property var systemStyleCatalog: ({
+        "sliders": [{ "key": "plain", "name": "Plain" }, { "key": "bold", "name": "Bold" }, { "key": "thin", "name": "Thin" }, { "key": "wavy", "name": "Wavy" }],
+        "bigtiles": [{ "key": "pill", "name": "Pill" }, { "key": "shapes", "name": "Shapes" }, { "key": "compact", "name": "Compact" }, { "key": "outline", "name": "Outline" }],
+        "tiles": [{ "key": "round", "name": "Round" }, { "key": "shapes", "name": "Shapes" }, { "key": "icons", "name": "Icons only" }, { "key": "square", "name": "Square" }],
+        "media": [{ "key": "card", "name": "Card" }, { "key": "disc", "name": "Disc" }, { "key": "backdrop", "name": "Backdrop" }, { "key": "mini", "name": "Mini" }, { "key": "wave", "name": "Wave" }, { "key": "cover", "name": "Cover" }],
+        "gauges": [{ "key": "rings", "name": "Rings" }, { "key": "bars", "name": "Bars" }, { "key": "tiles", "name": "Tiles" }, { "key": "compact", "name": "Compact" }, { "key": "graph", "name": "Graph" }, { "key": "dial", "name": "Dial" }],
+        "weather": [{ "key": "card", "name": "Card" }, { "key": "hours", "name": "Hours" }, { "key": "days", "name": "Days" }, { "key": "line", "name": "One line" }],
+        "network": [{ "key": "graph", "name": "Graph" }, { "key": "split", "name": "Side by side" }, { "key": "line", "name": "One line" }],
+        "power": [{ "key": "buttons", "name": "Buttons" }, { "key": "icons", "name": "Icons only" }, { "key": "list", "name": "List" }],
+        "agenda": [{ "key": "list", "name": "List" }, { "key": "next", "name": "Next only" }]
+    })
+    // systemBlockStyles as JSON { block: look }, only the looks the catalogue knows
+    readonly property var systemStyleMap: {
+        let v = {};
+        try {
+            v = JSON.parse(root.systemBlockStyles || "{}");
+        } catch (e) {
+        }
+        const out = {};
+        for (const k in root.systemStyleCatalog) {
+            if (v && root.systemStyleCatalog[k].some((c) => {
+                return c.key === v[k];
+            }))
+                out[k] = v[k];
+
+        }
+        return out;
+    }
+
+    function systemBlockStyle(key) {
+        const l = root.systemStyleCatalog[key];
+        return root.systemStyleMap[key] || (l ? l[0].key : "");
+    }
+
+    // the first look is kept as no entry at all
+    function setSystemBlockStyle(key, look) {
+        const l = root.systemStyleCatalog[key];
+        if (!l)
+            return ;
+
+        const next = Object.assign({}, root.systemStyleMap);
+        if (look === l[0].key)
+            delete next[key];
+        else
+            next[key] = look;
+        root.systemBlockStyles = Object.keys(next).length === 0 ? "" : JSON.stringify(next);
+    }
+
+    function systemLayoutNow() {
+        const out = {};
+        for (const k of root.systemLayoutKeys)
+            out[k] = root[k];
+        return out;
+    }
+
+    function systemLayoutSame(a, b) {
+        return root.systemLayoutKeys.every((k) => {
+            return a[k] === b[k];
+        });
+    }
+
+    // only what a layout knows, and only when it is a value of the right kind
+    function systemLayoutApply(v) {
+        for (const k of root.systemLayoutKeys) {
+            if (v && v[k] !== undefined && typeof v[k] === typeof root[k] && root[k] !== v[k])
+                root[k] = v[k];
+
+        }
+    }
+
+    // the blocks a layout shows and where, without the legacy names
+    function systemLayoutGrid(v) {
+        try {
+            const g = JSON.parse(v.systemGrid || "{}");
+            return g && typeof g === "object" && !Array.isArray(g) ? g : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    // the user's own, as JSON [{ id, name, saved, layout }]
+    readonly property var systemLayoutList: {
+        let v = [];
+        try {
+            v = JSON.parse(root.systemLayouts || "[]");
+        } catch (e) {
+        }
+        return (Array.isArray(v) ? v : []).filter((l) => {
+            return l && l.id && l.layout && typeof l.layout === "object";
+        });
+    }
+
+    function systemLayoutNamed(name) {
+        const n = String(name).trim().toLowerCase();
+        return root.systemLayoutList.find((l) => {
+            return String(l.name).toLowerCase() === n;
+        }) || null;
+    }
+
+    // saving under a name already used updates that one
+    function saveSystemLayout(name) {
+        const n = String(name).trim();
+        if (n === "")
+            return ;
+
+        const was = root.systemLayoutNamed(n);
+        const entry = {
+            "id": was ? was.id : String(Date.now()),
+            "name": n,
+            "saved": Date.now(),
+            "layout": root.systemLayoutNow()
+        };
+        const list = root.systemLayoutList.filter((l) => {
+            return !was || l.id !== was.id;
+        });
+        root.systemLayouts = JSON.stringify(list.concat([entry]));
+    }
+
+    function deleteSystemLayout(id) {
+        const list = root.systemLayoutList.filter((l) => {
+            return l.id !== id;
+        });
+        root.systemLayouts = list.length === 0 ? "" : JSON.stringify(list);
+    }
+
+    function applySystemLayout(id) {
+        const l = root.systemLayoutList.find((x) => {
+            return x.id === id;
+        });
+        if (l)
+            root.systemLayoutApply(l.layout);
+
+    }
+
+    // ready-made arrangements of the blocks that are on: what each holds is left alone
+    readonly property var systemLayoutPresets: [
+        { "id": "column", "name": "Column", "blurb": "One under another, six tiles wide" },
+        { "id": "pair", "name": "Two columns", "blurb": "Sliders and tiles, then media and gauges beside them" },
+        { "id": "wide", "name": "Wide", "blurb": "Standing sliders, the tiles, then media and gauges" }
+    ]
+
+    function systemPresetGrid(id) {
+        if (id === "pair")
+            return {
+                "sliders": { "x": 0, "y": 0, "w": 6, "lie": true },
+                "bigtiles": { "x": 0, "y": 1, "w": 6 },
+                "tiles": { "x": 0, "y": 2, "w": 6 },
+                "media": { "x": 6, "y": 0, "w": 6 },
+                "gauges": { "x": 6, "y": 1, "w": 6 }
+            };
+
+        // standing sliders down the left, the tiles beside them, media and the
+        // gauges at the right; each column runs down as far as the longest.
+        // three sliders take a third column, and the rest move over for it
+        if (id === "wide") {
+            const sw = root.systemGridMinW("sliders", false);
+            return {
+                "sliders": { "x": 0, "y": 0, "w": sw, "lie": false },
+                "bigtiles": { "x": sw, "y": 0, "w": 6 },
+                "tiles": { "x": sw, "y": 1, "w": 6 },
+                "media": { "x": sw + 6, "y": 0, "w": 5 },
+                "gauges": { "x": sw + 6, "y": 1, "w": 5 }
+            };
+        }
+        return {};
+    }
+
+    function applySystemPreset(id) {
+        const g = root.systemPresetGrid(id);
+        root.systemGrid = Object.keys(g).length === 0 ? "" : JSON.stringify(g);
+    }
+
+    // a comma list kept in a pref, as the keys a catalogue knows, once each
+    function prefList(text, catalogue) {
+        return String(text || "").split(",").map((x) => {
+            return x.trim();
+        }).filter((x, i, all) => {
+            return x !== "" && all.indexOf(x) === i && catalogue.some((c) => {
+                return c.key === x;
+            });
+        });
     }
 
     // every bar module, in one place: the id barLayout arranges it by, the
@@ -214,7 +877,7 @@ Singleton {
         "name": "Media",
         "desc": "Now-playing pill and player controls",
         "when": "while something plays",
-        "options": ["mediaHideIdle", "mediaArtist", "mediaTitleWidth", "mediaPlayButton", "mediaWheelVolume"],
+        "options": ["mediaHideIdle", "mediaArtist", "mediaTitleWidth", "mediaPlayButton", "mediaWheelVolume", "mediaLyrics"],
         "style": "mediaStyle",
         "styles": [
             {"key": "disc", "name": "Disc", "blurb": "The cover turning in a ring that fills as it plays"},
@@ -243,8 +906,8 @@ Singleton {
         "options": ["trayHidden", "trayIconColor"],
         "style": "trayStyle",
         "styles": [
-            {"key": "collapsed", "name": "Collapsed", "blurb": "One icon and how many are running"},
-            {"key": "icons", "name": "Icons", "blurb": "Each app's icon in the bar"}
+            {"key": "collapsed", "name": "Collapsed", "blurb": "The first three apps stacked, then how many more"},
+            {"key": "icons", "name": "Icons", "blurb": "Each app in a slot of its own, named when you point at it"}
         ]
     },
     {
@@ -287,8 +950,9 @@ Singleton {
         "home": "right",
         "name": "System",
         "desc": "Battery, volume, brightness and quick settings",
-        "more": "Its tiles are set with Edit tiles in the control centre itself; the keyboard layout sign and game mode are on the Bar page in Settings.",
-        "page": "bar"
+        "more": "What it shows in the bar and game mode are on the Bar page in Settings.",
+        "page": "bar",
+        "options": ["systemTiles", "systemTilesRadios", "systemBigTiles", "systemBlocks", "systemGrid", "systemBlockCards", "systemBlockStyles", "systemOwnTiles", "systemSliders", "systemInfo", "systemHeaderButtons"]
     },
     {
         "id": "privacy",
@@ -345,12 +1009,21 @@ Singleton {
         "desc": "A button for the launcher, at the start of the bar: a click opens it or puts it away",
         "style": "startModuleStyle",
         "styles": [
-            {"key": "logo", "name": "Logo", "blurb": "Lucid's mark, as on the dock"},
-            {"key": "grid", "name": "Grid", "blurb": "Nine dots, the middle one in the accent"},
+            {"key": "grid", "name": "Launcher", "blurb": "The dock's launcher button, its squares rounding while the launcher is open"},
+            {"key": "logo", "name": "Logo", "blurb": "Lucid's mark, as at the top of the launcher"},
             {"key": "distro", "name": "Distro", "blurb": "Your distribution's logo, in the accent"},
             {"key": "avatar", "name": "Avatar", "blurb": "Your profile picture"},
             {"key": "label", "name": "Label", "blurb": "The word Start on a chip in the accent"}
         ]
+    },
+    {
+        "id": "apps",
+        "key": "showApps",
+        "home": "center",
+        "name": "Apps",
+        "desc": "The dock's pinned apps and the ones open, on the bar: a click opens an app or brings it up; with several windows, or on a right click, a panel lists them",
+        "when": "while there is an app pinned or open",
+        "options": ["dockShowRunning", "dockShowIndicators", "dockShowTooltips", "dockIconTiles"]
     }
     ]
 
@@ -368,13 +1041,17 @@ Singleton {
             out[m.id] = m.home;
         return out;
     }
+    // the part of a module's card to bring into view as its sheet opens ("" for
+    // the top of it)
+    property string barModulePart: ""
     // the ids of the modules switched on that the bar leaves out right now,
     // having nothing to show (an empty tray); the bar keeps it up to date, and
     // a module's "when" in barModules says when it comes back
     property var barModulesAway: []
 
     // a module's options live in edit mode's sheet now
-    function openBarModule(id) {
+    function openBarModule(id, part) {
+        root.barModulePart = part || "";
         Edit.openSheet("module", id, "", "");
     }
 
@@ -387,13 +1064,14 @@ Singleton {
     readonly property var barLayoutGroups: root.parseBarLayout(root.barLayout)
     readonly property var widgetKeys: ["widgetsEnabled", "widgetSnap", "widgetLockAll", "widgetHideFullscreen", "widgetOnTop"]
     readonly property var idleKeys: ["idleDim", "idleDimAfter", "idleDimLevel", "idleDimKeyboard", "idleLock", "idleLockAfter", "idleScreenOff", "idleScreenOffAfter", "idleSuspend", "idleSuspendAfter", "idleSuspendOnAc", "idleLockBeforeSleep", "idleWakeAfterSleep", "idleRespectInhibitors", "idleWhileMedia"]
-    readonly property var envKeys: ["envCursorTheme", "envCursorSize", "envCursorShadow", "envIconTheme", "envLegacyIcons", "envIconSet", "envGtkTheme", "envQtStyle", "envQtPlatformTheme", "envColorScheme", "envFontSync", "envAppFont", "envAppFontSize", "envDocumentFont", "envDocumentFontSize", "envMonoFont", "envMonoFontSize", "envApplyGtk", "envApplyQt", "envApplyHypr", "envAdopted"]
+    readonly property var envKeys: ["envCursorTheme", "envCursorSize", "envCursorShadow", "envLegacyCursor", "envCursorStyle", "envIconTheme", "envLegacyIcons", "envIconSet", "envGtkTheme", "envQtStyle", "envQtPlatformTheme", "envColorScheme", "envFontSync", "envAppFont", "envAppFontSize", "envDocumentFont", "envDocumentFontSize", "envMonoFont", "envMonoFontSize", "envApplyGtk", "envApplyQt", "envApplyHypr", "envAdopted"]
     readonly property var specialKeys: ["specialScratchpad", "specialMusic", "specialComms", "specialTodo", "specialSysmon", "specialMusicApps", "specialCommsApps", "specialTodoApps", "specialSysmonApps", "specialKeepApps", "specialHideOnSwitch", "specialDim", "specialBlur", "specialGaps"]
     readonly property var glassKeys: ["glassApps", "glassValues"]
     readonly property var monitorKeys: ["monitorSetups", "monitorShellScreen", "monitorBarScreen", "monitorDockScreen", "monitorWorkspaces"]
     readonly property var notifKeys: ["toastEnabled", "toastTimeout", "toastUseAppTimeout", "toastCriticalSticky", "toastShowBody", "toastShowActions", "toastBodyLines", "notifShowIcons", "notifMaxHistory", "doNotDisturb", "dndAllowCritical", "dndFullscreen", "quietHours", "quietFrom", "quietTo", "notifSound", "notifSoundName", "notifSoundVolume", "notifSoundUrgentOnly", "notifMutedApps", "notifGrouping", "notifTimestamps", "notifProgress", "notifInlineReply", "toastMaxVisible"]
 
     property alias barStyle: s.barStyle
+    property alias barPosition: s.barPosition
     property alias dockStyle: s.dockStyle
     property alias accentPunch: s.accentPunch
     property alias surfaceDarkness: s.surfaceDarkness
@@ -473,6 +1151,7 @@ Singleton {
     property alias barPopupGap: s.barPopupGap
     property alias barPopupNotched: s.barPopupNotched
     property alias barHeight: s.barHeight
+    property alias barContentScale: s.barContentScale
     property alias barTopMargin: s.barTopMargin
     property alias barSideMargin: s.barSideMargin
     property alias barSpacing: s.barSpacing
@@ -490,6 +1169,17 @@ Singleton {
 
     property alias barZoneGap: s.barZoneGap
     property alias systemTiles: s.systemTiles
+    property alias systemTilesRadios: s.systemTilesRadios
+    property alias systemBigTiles: s.systemBigTiles
+    property alias systemBlocks: s.systemBlocks
+    property alias systemSliders: s.systemSliders
+    property alias systemInfo: s.systemInfo
+    property alias systemGrid: s.systemGrid
+    property alias systemBlockCards: s.systemBlockCards
+    property alias systemOwnTiles: s.systemOwnTiles
+    property alias systemBlockStyles: s.systemBlockStyles
+    property alias systemLayouts: s.systemLayouts
+    property alias systemHeaderButtons: s.systemHeaderButtons
     property alias barLayout: s.barLayout
     property alias barJoins: s.barJoins
     property alias barJoinDividers: s.barJoinDividers
@@ -497,6 +1187,7 @@ Singleton {
     property alias showMedia: s.showMedia
     property alias showTray: s.showTray
     property alias showKbLayout: s.showKbLayout
+    property alias systemBarItems: s.systemBarItems
     property alias gameModeOnCmd: s.gameModeOnCmd
     property alias gameModeOffCmd: s.gameModeOffCmd
     property alias gameModeStatusCmd: s.gameModeStatusCmd
@@ -547,6 +1238,7 @@ Singleton {
     property alias windowModuleMiddleClose: s.windowModuleMiddleClose
     property alias showStart: s.showStart
     property alias startModuleStyle: s.startModuleStyle
+    property alias showApps: s.showApps
     property alias workspacesByDisplay: s.workspacesByDisplay
     property alias audioMeters: s.audioMeters
     property alias clockStyle: s.clockStyle
@@ -558,6 +1250,7 @@ Singleton {
     property alias mediaTitleWidth: s.mediaTitleWidth
     property alias mediaPlayButton: s.mediaPlayButton
     property alias mediaWheelVolume: s.mediaWheelVolume
+    property alias mediaLyrics: s.mediaLyrics
     property alias workspacesStyle: s.workspacesStyle
     property alias workspacesShown: s.workspacesShown
     property alias workspacesWheel: s.workspacesWheel
@@ -580,6 +1273,13 @@ Singleton {
     property alias locationTz: s.locationTz
     property alias timeZoneAuto: s.timeZoneAuto
     property alias doNotDisturb: s.doNotDisturb
+    readonly property bool osdNotch: root.osdStyle === "notch"
+    // caps lock, num lock and the microphone show as a toast instead of on the osd
+    readonly property bool osdTogglesToast: root.osdToggles === "toast"
+    property alias osdStyle: s.osdStyle
+    // with the dock a notch too, the dock itself turns into the osd
+    property alias osdDockMorph: s.osdDockMorph
+    property alias osdToggles: s.osdToggles
     property alias toastTimeout: s.toastTimeout
     property alias toastOnLayout: s.toastOnLayout
     property alias toastOnGameMode: s.toastOnGameMode
@@ -630,6 +1330,7 @@ Singleton {
     property alias toastMaxVisible: s.toastMaxVisible
 
     property alias dockEnabled: s.dockEnabled
+    property alias dockAsideForBar: s.dockAsideForBar
     property alias dockIconSize: s.dockIconSize
     property alias dockSpacing: s.dockSpacing
     property alias dockRadius: s.dockRadius
@@ -641,6 +1342,8 @@ Singleton {
     property alias barNotchFlare: s.barNotchFlare
     // the concave corners the full bar hangs against the screen sides
     property alias barFullCorner: s.barFullCorner
+    // notches: the modules at either end sit against the screen sides and curve into them
+    property alias barNotchEdge: s.barNotchEdge
     property alias barHoverOpen: s.barHoverOpen
     property alias barAutoHide: s.barAutoHide
     property alias dockNotchFlare: s.dockNotchFlare
@@ -778,6 +1481,10 @@ Singleton {
     property alias envCursorTheme: s.envCursorTheme
     property alias envCursorSize: s.envCursorSize
     property alias envCursorShadow: s.envCursorShadow
+    // an installed cursor theme instead of lucid's own pointer
+    property alias envLegacyCursor: s.envLegacyCursor
+    // how lucid's own pointer takes the palette: an id from Pointer.styles
+    property alias envCursorStyle: s.envCursorStyle
     property alias envIconTheme: s.envIconTheme
     property alias envLegacyIcons: s.envLegacyIcons
     // lucid's own icon set while legacy icons are off: an id from LucidIcons.sets
@@ -865,7 +1572,7 @@ Singleton {
     // every settings page, for the app's rail and for the launcher's search
     readonly property var settingsPages: [
         { "key": "users", "icon": "account_circle", "keys": "user account password avatar login admin sudo", "group": "Account", "label": "Account", "title": "Users and Accounts", "blurb": "Who may sign in to this machine, what they are called and what they are allowed to do", "hidden": true },
-        { "key": "general", "icon": "tune", "keys": "style islands notches accent darkness surface tint motion animation speed font scale typography interface size zoom smaller bigger density", "group": "Appearance", "label": "General", "title": "General", "blurb": "Size, shape, colour and motion across the whole shell" },
+        { "key": "general", "icon": "tune", "keys": "style islands notches osd accent darkness surface tint motion animation speed font scale typography interface size zoom smaller bigger density", "group": "Appearance", "label": "General", "title": "General", "blurb": "Size, shape, colour and motion across the whole shell" },
         { "key": "glass", "icon": "blur_on", "keys": "blur transparency opacity translucent frosted kitty terminal windows", "group": "Appearance", "label": "Glass", "title": "Glass", "blurb": "How far the desktop shows through the shell, the terminal and your windows" },
         { "key": "theme", "icon": "palette", "keys": "colour color scheme wallpaper picker arrow keys live video animated mp4 decoder matugen pywal catppuccin gruvbox nord dark light mode import", "group": "Appearance", "label": "Theme", "title": "Theme and Appearance", "blurb": "Colour schemes, wallpapers and themes you import" },
         { "key": "colours", "icon": "format_color_fill", "keys": "matugen style scheme contrast your colour hex picker templates apps render variables", "group": "Appearance", "label": "Colours", "title": "Colours", "blurb": "How Matugen and Your colour build a palette, the applications that follow it, and templates of your own" },
@@ -886,7 +1593,7 @@ Singleton {
         { "key": "bluetooth", "icon": "bluetooth", "keys": "devices pair headphones", "group": "Devices", "label": "Bluetooth", "title": "Bluetooth and Devices", "blurb": "The radio, what it is paired with, and the phone you connect to it" },
         { "key": "kdeconnect", "icon": "smartphone", "keys": "phone kde connect files notifications clipboard", "group": "Devices", "label": "Phone", "title": "Phone", "blurb": "Your phone on this machine over KDE Connect: files, notifications, clipboard and a remote", "toggle": "kdeConnectEnabled" },
         { "key": "startup", "icon": "start", "keys": "autostart login apps open at login run startup environment variables env xdg session", "group": "System", "label": "Startup", "title": "Startup", "blurb": "Apps opened when you log in, system autostart and environment variables" },
-        { "key": "notifications", "icon": "notifications", "keys": "popups toasts do not disturb dnd quiet hours sound muted apps", "group": "System", "label": "Notifications", "title": "Notifications", "blurb": "Popups, quiet hours, sound and which applications may interrupt you", "toggle": "barNotifications" },
+        { "key": "notifications", "icon": "notifications", "keys": "popups toasts do not disturb dnd quiet hours sound muted apps caps lock num lock microphone", "group": "System", "label": "Notifications", "title": "Notifications", "blurb": "Popups, quiet hours, sound and which applications may interrupt you", "toggle": "barNotifications" },
         { "key": "idle", "icon": "bedtime", "keys": "sleep suspend lock dim screen off hypridle caffeine", "group": "System", "label": "Idle", "title": "Idle and Sleep", "blurb": "What happens when you walk away: dimming, locking, screen off and suspend", "toggle": "idleEnabled" },
         { "key": "datetime", "icon": "schedule", "keys": "clock time zone location 24 hour seconds week monday sunday units metric imperial celsius fahrenheit temperature wind mph timer pomodoro focus break alarm world", "group": "System", "label": "Date & Time", "title": "Date and Time", "blurb": "Where you are, the clock, and its timers" },
         { "key": "storage", "icon": "hard_drive", "keys": "disk space storage usage free full clean cleanup cache trash duplicates large files drives ssd health smart trim mount", "group": "System", "label": "Storage", "title": "Storage", "blurb": "What fills your drives, what could go, and the drives themselves" },
@@ -977,6 +1684,7 @@ Singleton {
 
     readonly property var defaults: ({
         "barStyle": "island",
+        "barPosition": "top",
         "dockStyle": "island",
         "accentPunch": 1,
         "surfaceDarkness": -1,
@@ -1023,6 +1731,7 @@ Singleton {
         "barPopupGap": 10,
         "barPopupNotched": false,
         "barHeight": 35,
+        "barContentScale": 1,
         "barTopMargin": 22,
         "barSideMargin": 17,
         "barSpacing": 8,
@@ -1030,6 +1739,16 @@ Singleton {
         "autoColorMode": false,
         "barZoneGap": 26,
         "systemTiles": "dnd,awake,dark,airplane,location,mic,capture,record,picker,keyboard,timer,session",
+        "systemTilesRadios": false,
+        "systemBigTiles": "wifi,bluetooth",
+        "systemBlocks": "sliders,bigtiles,tiles,media,gauges",
+        "systemSliders": "brightness,volume",
+        "systemInfo": "cpu,ram,disk,battery",
+        "systemGrid": "",
+        "systemBlockCards": false,
+        "systemOwnTiles": "",
+        "systemBlockStyles": "",
+        "systemHeaderButtons": "edit,settings,lock,power",
         "barLayout": "{\"left\":[\"workspaces\",\"media\",\"tray\"],\"center\":[\"clock\"],\"right\":[\"notifications\",\"system\"]}",
         "barJoins": "[]",
         "barJoinDividers": true,
@@ -1037,6 +1756,7 @@ Singleton {
         "showMedia": true,
         "showTray": true,
         "showKbLayout": true,
+        "systemBarItems": "wifi,bluetooth,volume,level,mic,battery",
         "gameModeOnCmd": "",
         "gameModeOffCmd": "",
         "gameModeStatusCmd": "",
@@ -1060,7 +1780,8 @@ Singleton {
         "windowModuleScroll": true,
         "windowModuleMiddleClose": false,
         "showStart": false,
-        "startModuleStyle": "logo",
+        "startModuleStyle": "grid",
+        "showApps": false,
         "workspacesByDisplay": true,
         "audioMeters": true,
         "clockStyle": "accent",
@@ -1072,6 +1793,7 @@ Singleton {
         "mediaTitleWidth": 170,
         "mediaPlayButton": true,
         "mediaWheelVolume": true,
+        "mediaLyrics": true,
         "workspacesStyle": "dots",
         "workspacesShown": 6,
         "workspacesWheel": true,
@@ -1094,6 +1816,9 @@ Singleton {
         "locationTz": "",
         "timeZoneAuto": true,
         "doNotDisturb": false,
+        "osdStyle": "island",
+        "osdDockMorph": true,
+        "osdToggles": "osd",
         "toastTimeout": 5,
         "toastOnLayout": true,
         "toastOnGameMode": true,
@@ -1152,6 +1877,7 @@ Singleton {
         "barMotionScale": 1.35,
         "barNotchFlare": 14,
         "barFullCorner": 18,
+        "barNotchEdge": false,
         "barHoverOpen": false,
         "barAutoHide": false,
         "dockNotchFlare": 14,
@@ -1166,7 +1892,7 @@ Singleton {
         "widgetsEnabled": true,
         "widgetSnap": true,
         "widgetLockAll": false,
-        "widgetHideFullscreen": true,
+        "widgetHideFullscreen": false,
         "widgetOnTop": false,
         "btScanOnOpen": true,
         "btShowUnnamed": false,
@@ -1237,6 +1963,8 @@ Singleton {
         "envCursorTheme": "",
         "envCursorSize": 24,
         "envCursorShadow": true,
+        "envLegacyCursor": false,
+        "envCursorStyle": "dark",
         "envIconTheme": "",
         "envLegacyIcons": false,
         "envIconSet": "gravity",
@@ -1491,6 +2219,11 @@ Singleton {
 
             root.barEnabled = v;
         } else if (key === "dockEnabled") {
+            if (root.surfaceLocked(key))
+                return ;
+
+            // set by hand, it stays as set when the bar moves
+            root.dockAsideForBar = false;
             root.dockEnabled = v;
         } else if (key === "widgetsEnabled") {
             root.widgetsEnabled = v;
@@ -1710,13 +2443,20 @@ Singleton {
         watchChanges: true
         onFileChanged: reload()
         onAdapterUpdated: writeDebounce.restart()
-        onLoaded: root.loaded = true
+        onLoaded: {
+            // only the first load: a reload after a write must not skip the slide
+            if (root.barShownPosition === "")
+                root.barShownPosition = root.barPosition;
+
+            root.loaded = true;
+        }
         onLoadFailed: root.loaded = true
 
         adapter: JsonAdapter {
             id: s
 
             property string barStyle: "island"
+            property string barPosition: "top"
             property string dockStyle: "island"
             property real accentPunch: 1
             property real surfaceDarkness: -1
@@ -1768,6 +2508,7 @@ Singleton {
             property int barPopupGap: 10
             property bool barPopupNotched: false
             property int barHeight: 35
+            property real barContentScale: 1
             property int barTopMargin: 22
             property int barSideMargin: 17
             property int barSpacing: 8
@@ -1775,6 +2516,27 @@ Singleton {
             property bool autoColorMode: false
             property int barZoneGap: 26
             property string systemTiles: "dnd,awake,dark,airplane,location,mic,capture,record,picker,keyboard,timer,session"
+            // the control centre: its blocks, and what each holds, in order
+            property bool systemTilesRadios: false
+            property string systemBigTiles: "wifi,bluetooth"
+            property string systemBlocks: "sliders,bigtiles,tiles,media,gauges"
+            property string systemSliders: "brightness,volume"
+            property string systemInfo: "cpu,ram,disk,battery"
+            // where each block sits on the panel's grid, as JSON; empty lays
+            // them one under another in the order above
+            property string systemGrid: ""
+            // a card behind the tiles and the sliders too, as media and the gauges have
+            property bool systemBlockCards: false
+            // tiles that run the user's commands, as a JSON list of
+            // { id, name, icon, on, off, status }
+            property string systemOwnTiles: ""
+            // the look each block takes, as JSON { block: look }; one not
+            // named keeps the look it always had
+            property string systemBlockStyles: ""
+            // control centre layouts the user saved, as JSON; kept out of
+            // the defaults, so no reset throws them away
+            property string systemLayouts: ""
+            property string systemHeaderButtons: "edit,settings,lock,power"
             property string barLayout: "{\"left\":[\"workspaces\",\"media\",\"tray\"],\"center\":[\"clock\"],\"right\":[\"notifications\",\"system\"]}"
             property string barJoins: "[]"
             property bool barJoinDividers: true
@@ -1782,6 +2544,7 @@ Singleton {
             property bool showMedia: true
             property bool showTray: true
             property bool showKbLayout: true
+            property string systemBarItems: "wifi,bluetooth,volume,level,mic,battery"
             property string gameModeOnCmd: ""
             property string gameModeOffCmd: ""
             property string gameModeStatusCmd: ""
@@ -1805,7 +2568,8 @@ Singleton {
             property bool windowModuleScroll: true
             property bool windowModuleMiddleClose: false
             property bool showStart: false
-            property string startModuleStyle: "logo"
+            property string startModuleStyle: "grid"
+            property bool showApps: false
             property bool workspacesByDisplay: true
             property bool audioMeters: true
             property string clockStyle: "accent"
@@ -1817,6 +2581,7 @@ Singleton {
             property int mediaTitleWidth: 170
             property bool mediaPlayButton: true
             property bool mediaWheelVolume: true
+            property bool mediaLyrics: true
             property string workspacesStyle: "dots"
             property int workspacesShown: 6
             property bool workspacesWheel: true
@@ -1839,6 +2604,9 @@ Singleton {
             property string locationTz: ""
             property bool timeZoneAuto: true
             property bool doNotDisturb: false
+            property string osdStyle: "island"
+            property bool osdDockMorph: true
+            property string osdToggles: "osd"
             property int toastTimeout: 5
             property bool toastOnLayout: true
             property bool toastOnGameMode: true
@@ -1887,6 +2655,8 @@ Singleton {
             property bool notifInlineReply: true
             property int toastMaxVisible: 3
             property bool dockEnabled: true
+            // switched off by the bar taking the bottom edge, not by hand
+            property bool dockAsideForBar: false
             property int dockIconSize: 41
             property int dockSpacing: 12
             property int dockRadius: 40
@@ -1897,6 +2667,7 @@ Singleton {
             property real barMotionScale: 1.35
             property int barNotchFlare: 14
             property int barFullCorner: 18
+            property bool barNotchEdge: false
             property bool barHoverOpen: false
             property bool barAutoHide: false
             property int dockNotchFlare: 14
@@ -1911,7 +2682,7 @@ Singleton {
             property bool widgetsEnabled: true
             property bool widgetSnap: true
             property bool widgetLockAll: false
-            property bool widgetHideFullscreen: true
+            property bool widgetHideFullscreen: false
             property bool widgetOnTop: false
             property bool btScanOnOpen: true
             property bool btShowUnnamed: false
@@ -1987,6 +2758,8 @@ Singleton {
             property string envCursorTheme: ""
             property int envCursorSize: 24
             property bool envCursorShadow: true
+            property bool envLegacyCursor: false
+            property string envCursorStyle: "dark"
             property string envIconTheme: ""
             property bool envLegacyIcons: false
             property string envIconSet: "gravity"

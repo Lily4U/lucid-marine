@@ -60,9 +60,9 @@ Singleton {
     // the layer covers the whole output, so a card can be dragged under the bar or
     // the dock on purpose. a freshly spawned one should still land clear of them:
     // these mirror the two windows' own exclusive zones
-    readonly property real spawnTop: Prefs.barEnabled ? Prefs.effectiveBarTopMargin + Theme.dp(Prefs.barHeight) + Prefs.shellGap : 0
+    readonly property real spawnTop: Prefs.barEnabled && !Prefs.barBottom ? Prefs.effectiveBarTopMargin + Theme.dp(Prefs.barHeight) + Prefs.shellGap : 0
     // a dynamic dock has no zone but is up whenever the desktop is
-    readonly property real spawnBottom: (Prefs.dockEnabled && (!Prefs.dockAutoHide || Prefs.dockDynamicHide)) ? Theme.dp(Prefs.dockIconSize + 20) + Prefs.effectiveDockBottomMargin + Prefs.shellGap : 0
+    readonly property real spawnBottom: Math.max((Prefs.dockOn && (!Prefs.dockAutoHide || Prefs.dockDynamicHide)) ? Theme.dp(Prefs.dockIconSize + 20) + Prefs.effectiveDockBottomMargin + Prefs.shellGap : 0, Prefs.barEnabled && Prefs.barBottom ? Prefs.effectiveBarTopMargin + Theme.dp(Prefs.barHeight) + Prefs.shellGap : 0)
 
     // one entry per category; a variant is another face on the same data, not another widget
     readonly property var catalogue: [{
@@ -708,6 +708,74 @@ Singleton {
         }, {
             "key": "idleFade",
             "label": "Hide when silent",
+            "type": "bool",
+            "def": true
+        }]
+    }, {
+        "id": "lyrics",
+        "name": "Lyrics",
+        "blurb": "The words of whatever is playing, in time with it. Looked up on lrclib.net.",
+        "variants": [{
+            "id": "words",
+            "name": "Word by word",
+            "blurb": "Words pop in as they're sung, like video captions.",
+            "w": 560,
+            "h": 140,
+            "resizable": true,
+            "minW": 200,
+            "minH": 70,
+            "maxW": 3840,
+            "maxH": 600
+        }, {
+            "id": "karaoke",
+            "name": "Karaoke",
+            "blurb": "The line fills letter by letter as it is sung.",
+            "w": 620,
+            "h": 150,
+            "resizable": true,
+            "minW": 240,
+            "minH": 80,
+            "maxW": 3840,
+            "maxH": 600
+        }, {
+            "id": "classic",
+            "name": "Classic",
+            "blurb": "The whole song scrolling by, the sung line lit.",
+            "w": 380,
+            "h": 320,
+            "resizable": true,
+            "minW": 200,
+            "minH": 140,
+            "maxW": 1600,
+            "maxH": 2000
+        }],
+        "options": [{
+            "key": "card",
+            "label": "Card behind the words",
+            "type": "bool",
+            "def": true
+        }, {
+            "key": "outline",
+            "label": "Outline a word now and then",
+            "type": "bool",
+            "def": true,
+            "variants": ["words"]
+        }, {
+            "key": "lines",
+            "label": "Lines",
+            "type": "choice",
+            "def": "two",
+            "choices": [{
+                "key": "one",
+                "label": "One"
+            }, {
+                "key": "two",
+                "label": "Two"
+            }],
+            "variants": ["words"]
+        }, {
+            "key": "idleFade",
+            "label": "Hide without lyrics",
             "type": "bool",
             "def": true
         }]
@@ -1724,6 +1792,10 @@ Singleton {
         if (name === "")
             return ;
 
+        // the panel is part of edit mode, so asking for it from anywhere starts that
+        if (!Edit.active)
+            Edit.enter(name);
+
         // the panel is where widgets are put out, so they come back with it
         Prefs.widgetsEnabled = true;
         root.menuUid = "";
@@ -2703,6 +2775,17 @@ Singleton {
         }
 
         target: Prefs
+    }
+
+    // and it goes when edit mode ends
+    Connections {
+        function onActiveChanged() {
+            if (!Edit.active)
+                root.closePanel();
+
+        }
+
+        target: Edit
     }
 
     ListModel {
