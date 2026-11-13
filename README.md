@@ -1,33 +1,35 @@
 <div align="center">
 
-<img src="assets/logo.svg" width="96" alt="Lucid">
+<img src="assets/logo.svg" width="96" alt="Lucid Marine">
 
-# Lucid
+# Lucid Marine
 
-### Lucid is an ecosystem.
+### Lucid, for Fedora and Ultramarine Linux.
 
-A Material 3 Expressive desktop for Hyprland, built on [Quickshell](https://quickshell.org).<br>
+A port of [Lucid](https://github.com/Sn3akyy1/lucid) to the Fedora ecosystem: a Material 3 Expressive desktop for Hyprland, built on [Quickshell](https://quickshell.org).<br>
 The shell, its own apps, its own icons, pointer and login screen, all coloured by your wallpaper.
 
-**[Website](https://sn3akyy1.github.io/lucid/)** &nbsp;·&nbsp;
 **[Install](#install)** &nbsp;·&nbsp;
+**[Fedora port](#differences-from-upstream)** &nbsp;·&nbsp;
 **[Tour](#a-tour)** &nbsp;·&nbsp;
 **[What's in it](#whats-in-it)** &nbsp;·&nbsp;
 **[Keybinds](#keybinds)** &nbsp;·&nbsp;
 **[IPC](#ipc-reference)** &nbsp;·&nbsp;
-**[Changelog](CHANGELOG.md)**
+**[Changelog](CHANGELOG.md)** &nbsp;·&nbsp;
+**[Upstream website](https://sn3akyy1.github.io/lucid/)**
 
 <p>
-  <a href="https://github.com/Sn3akyy1/lucid/releases"><img alt="Version" src="https://img.shields.io/badge/VERSION-v1.21-00F0FF?style=for-the-badge&labelColor=0C1213"></a>
-  <a href="https://github.com/Sn3akyy1/lucid/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Sn3akyy1/lucid?style=for-the-badge&label=STARS&labelColor=0C1213&color=B7C7EA"></a>
-  <a href="https://github.com/Sn3akyy1/lucid/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Sn3akyy1/lucid?style=for-the-badge&label=LAST%20COMMIT&labelColor=0C1213&color=80D4DC"></a>
+  <a href="https://github.com/Lily4U/lucid-marine/releases"><img alt="Version" src="https://img.shields.io/github/v/release/Lily4U/lucid-marine?style=for-the-badge&label=VERSION&labelColor=0C1213&color=00F0FF"></a>
+  <a href="https://github.com/Lily4U/lucid-marine/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/Lily4U/lucid-marine?style=for-the-badge&label=STARS&labelColor=0C1213&color=B7C7EA"></a>
+  <a href="https://github.com/Lily4U/lucid-marine/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/Lily4U/lucid-marine?style=for-the-badge&label=LAST%20COMMIT&labelColor=0C1213&color=80D4DC"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/LICENSE-MIT-80CBC4?style=for-the-badge&labelColor=0C1213"></a>
 </p>
 <p>
-  <img alt="Arch Linux" src="https://img.shields.io/badge/ARCH%20LINUX-80D4DC?style=for-the-badge&logo=archlinux&logoColor=0C1213">
+  <img alt="Fedora" src="https://img.shields.io/badge/FEDORA-80D4DC?style=for-the-badge&logo=fedora&logoColor=0C1213">
+  <img alt="Ultramarine Linux" src="https://img.shields.io/badge/ULTRAMARINE%20LINUX-80CBC4?style=for-the-badge&labelColor=0C1213">
   <img alt="Hyprland" src="https://img.shields.io/badge/HYPRLAND%200.55%2B-80CBC4?style=for-the-badge&labelColor=0C1213">
   <a href="https://quickshell.org"><img alt="Built on Quickshell" src="https://img.shields.io/badge/BUILT%20ON-QUICKSHELL-B7C7EA?style=for-the-badge&labelColor=0C1213"></a>
-  <a href="https://sn3akyy1.github.io/lucid/"><img alt="Website" src="https://img.shields.io/badge/WEBSITE-SN3AKYY1.GITHUB.IO%2FLUCID-00F0FF?style=for-the-badge&labelColor=0C1213"></a>
+  <a href="https://github.com/Sn3akyy1/lucid"><img alt="Upstream" src="https://img.shields.io/badge/UPSTREAM-SN3AKYY1%2FLUCID-00F0FF?style=for-the-badge&labelColor=0C1213"></a>
 </p>
 
 <img src="assets/desktop-ultramarine.png" alt="The Lucid desktop: the bar along the top, calendar and weather widgets on the left, the clock and what is playing on the right, and the dock along the bottom">
@@ -42,10 +44,15 @@ The shell, its own apps, its own icons, pointer and login screen, all coloured b
 > The shell shows the highlights once after you update; everything is in the
 > [changelog](CHANGELOG.md#v121--2026-11-13).
 
+> [!IMPORTANT]
+> **This is a port.** Lucid is the work of Sn3akyy1 and its contributors, written
+> for Arch Linux. Lucid Marine brings it to Fedora and Ultramarine Linux (the
+> installer, the packages, the dock's apps) and merges upstream's changes as they
+> land. [What differs](#differences-from-upstream) is in one place below.
+
 > [!NOTE]
 > **Hear about new versions** with **Watch → Custom → Releases** at the top of
-> this page, or let Lucid tell you: it asks GitHub once a day and updates itself
-> from *Settings → About* when a release is out. See [Updating](#updating).
+> this page. See [Updating](#updating).
 
 ## The ecosystem
 
@@ -118,54 +125,75 @@ Google Sans Flex, built in
 
 ## Install
 
-Lucid needs **Arch Linux** and **Hyprland 0.55 or newer** (the installer brings
-Hyprland if it is missing), and installs to `~/.config/quickshell`:
+Lucid Marine needs **Ultramarine Linux**, **Fedora** or a derivative of it (the
+installer checks `ID` and `ID_LIKE`), with `dnf`, and **Hyprland 0.55 or newer**
+(the installer brings Hyprland from a COPR if it is missing). It installs to
+`~/.config/quickshell`:
 
 ```sh
-git clone https://github.com/Sn3akyy1/lucid.git
-cd lucid
+git clone https://github.com/Lily4U/lucid-marine.git
+cd lucid-marine
 ./install.sh
 ```
 
-In a Wayland session that opens the installer in a window, with a tour of Lucid
-playing while it works: pick what comes with it with switches, enter your
-password once, and answer anything it asks with buttons. **Start Lucid** at the
-end puts the new binds live and starts the shell. Without a Wayland session,
-with any option on the command line, or with `--terminal`, it runs in the
-terminal instead. Set a wallpaper from **Settings → General** on first run;
-that is what your colours come from.
+The installer runs in the terminal and asks before it installs anything: answer
+`Y/n`, or pass `-y` to accept every prompt. Don't run it as root; it asks for
+`sudo` when it needs it. At the end, `hyprctl reload` puts the new binds live
+(log out and back in to pick up the autostart too), and `qs` starts the shell.
+Set a wallpaper from **Settings → General** on first run; that is what your
+colours come from.
 
 <details>
 <summary><b>What the installer does</b></summary>
 <br>
 
-1. **Checks your system** and refuses to start anything it cannot finish,
-   rather than leaving you half-installed.
-2. **Installs dependencies** through `paru` or `yay` when there is one, `pacman`
-   otherwise. It lists everything and asks first; say no and it carries on,
-   naming the features that won't work. This includes the apps the dock ships
-   pinned, several GB and mostly from the AUR (`--no-apps` skips them).
-3. **Copies the shell** to `~/.config/quickshell`, moving an existing one to
+1. **Checks your system** and refuses to start anything it cannot finish, rather
+   than leaving you half-installed: Fedora or a derivative, `dnf`, not root, and
+   run from inside the repo. A missing Hyprland is a warning at this point, not
+   an error.
+2. **Installs dependencies with `dnf`**, the official repos first (Fedora, RPM
+   Fusion and Terra, which Ultramarine ships). It lists what is missing and asks;
+   a name no repo knows is skipped, so one gap never sinks the batch, and if you
+   say no it carries on, naming the features that won't work. What Fedora doesn't
+   carry comes from COPRs, each one asked about separately and only when
+   something is still missing. COPRs are unofficial and maintained by
+   individuals:
+   - `errornointernet/quickshell` for quickshell
+   - `avengemedia/danklinux` for matugen, cliphist, hyprsunset, hypridle and cava
+     (matugen is built with `cargo` if no repo has it)
+   - `ashbuk/Hyprland-Fedora` for Hyprland itself
+   - `aahsnr-work/base-pkgs` for `hyprland-guiutils`, if the other repos lack it
+3. **Fetches what Fedora doesn't package:** the JetBrainsMono Nerd Font (once,
+   into `~/.local/share/fonts`), and the dock's default apps as **Flatpaks** from
+   Flathub (Zen, VSCodium, Vesktop, Spotify and Steam; several GB, `--no-apps`
+   skips them, and an equivalent you already have counts).
+4. **Copies the shell** to `~/.config/quickshell`, moving an existing one to
    `~/.config/quickshell.backup-<timestamp>` first, and carries your settings,
    pins, reminders and keys forward. Lumen and Lens come with it: Lumen opens
    folders, `SUPER`+`E` and every app's open and save dialog, and Lens opens
    pictures.
-4. **Sets up Hyprland:** `hyprland.lua` and its modules, the keybinds, window
+5. **Checks who serves notifications** and offers to stop another installed
+   daemon from taking over (see [Troubleshooting](#troubleshooting)).
+6. **Sets up Hyprland:** `hyprland.lua` and its modules, the keybinds, window
    and layer rules, blur, animations and an autostart. A config of your own is
    backed up and you are asked first (`--no-hypr` keeps it untouched, and it
    still gets the one module Lumen's dialogs need). On a re-run every module is
    checked against the one in place: new and updated ones are named, and so is
    one you edited, with your version in the backup.
-5. **Sets up theming:** the palettes, the wallpaper hook and the matugen
+7. **Sets up theming:** the palettes, the wallpaper hook and the matugen
    templates. An existing `matugen/config.toml` is appended to, never replaced.
-6. **Applies the look:** kitty's colours, opacity and fish, the starship prompt,
+8. **Applies the look:** kitty's colours, opacity and fish, the starship prompt,
    a fastfetch config (only where you have none), the VSCodium theme, and GTK as
    `adw-gtk3-dark` with the FairyWren icons, in `gsettings` and both
    `settings.ini`. `--no-look` skips it.
-7. **Builds the tilting cursor**, a Hyprland plugin compiled against your own
-   Hyprland and rebuilt by itself after an update (`--no-plugins` skips it).
-8. **Offers the login screen** when SDDM is there, or to make SDDM the login
-   screen, and **pins the dock** with the apps you actually have.
+9. **Builds the tilting cursor**, a Hyprland plugin compiled against your own
+   Hyprland (`hyprland-devel`) and rebuilt by itself after an update
+   (`--no-plugins` skips it). A failed build only leaves a cursor that doesn't
+   tilt. See [Known issues](#known-issues).
+10. **Installs the login screen theme** when SDDM is there (it needs `sudo`),
+    without switching to it, and offers fingerprint login if `pam_fprintd` is
+    present. Then it **pins the dock** with the apps you actually have, and
+    builds the colour picker when `colorpicker/` ships.
 
 </details>
 
@@ -175,57 +203,51 @@ that is what your colours come from.
 
 | Flag | What it does |
 | --- | --- |
-| `--gui` | The installer window, its switches set from the other options given. The default in a Wayland session |
-| `--terminal` | Stays in the terminal |
 | `--no-theming` | Skips the palette layer and leaves `~/.config/lucid` and `~/.config/matugen` alone |
 | `--no-hypr` | Keeps your Hyprland config. Lucid's binds, rules, blur and autostart are not installed |
 | `--with-hypr` | Reinstalls Lucid's Hyprland config even when one is in place |
-| `--no-apps` | Doesn't install the apps the dock ships pinned (Zen, VSCodium, Spotify, Vesktop, Steam, Proton VPN) |
-| `--no-look` | Leaves kitty, starship, fastfetch, your shell rc files, VSCode and GTK alone |
+| `--no-apps` | Doesn't install the dock's default apps (Zen, VSCodium, Vesktop, Spotify, Steam, as Flatpaks) |
+| `--no-look` | Leaves kitty, starship, fastfetch and VSCode settings alone |
 | `--no-wallpapers` | Doesn't copy the bundled wallpapers (about 1.3 GB, live ones included) |
 | `--no-plugins` | Doesn't build the tilting-cursor plugin |
-| `--no-sddm` | Leaves the login screen theme out |
-| `--login-screen` | Makes Lucid's theme the one the login screen shows (`Current=lucid`, backed up first) |
 | `--skip-deps` | Never installs packages, only reports what is missing |
 | `-y`, `--yes` | Accepts every prompt |
+| `-h`, `--help` | Shows the list above |
+
+</details>
+
+<details>
+<summary><b>The login screen</b></summary>
+<br>
+
+With SDDM installed, the installer puts Lucid's theme in
+`/usr/share/sddm/themes/lucid` but never makes it the active one: that stays your
+call. To switch to it, set this in `/etc/sddm.conf`:
+
+```ini
+[Theme]
+Current=lucid
+```
+
+Fingerprint login, if you want it, adds two lines to `/etc/pam.d/sddm`, backed up
+first. The installer asks before touching it.
 
 </details>
 
 ### Updating
 
-From v1.21 on, **Settings → About** has an **Update** button whenever a new
-release is out (the notification that announces it has one too): a warning,
-your password once, then a pop-up with a progress bar that also asks anything
-the installer would ask in a terminal. It runs that release's own installer and
-offers to restart Lucid at the end. The password goes to `sudo` once and is
-never stored. Only a published release counts, unless you turn on **Beta
-updates**, which offers the newest commit on `main` and warns that beta builds
-are untested. By hand it is the same as installing:
+Update by hand, the same as installing:
 
 ```sh
+cd lucid-marine
 git pull
 ./install.sh
 ```
 
-<details>
-<summary><b>How the update check works, and older versions</b></summary>
-<br>
-
-Once a day Lucid asks GitHub's public API for the newest release, a plain
-`curl` for `api.github.com/repos/Sn3akyy1/lucid/releases/latest` that carries
-nothing about you, and posts one notification per version. *Settings → About*
-shows what it found and turns it off.
-
-```sh
-qs ipc call updates status   # what it knows
-qs ipc call updates check    # ask now
-qs ipc call updates update   # install the new release (warning first)
-```
-
-Older versions stay on the [releases page](https://github.com/Sn3akyy1/lucid/releases)
-and as tags: `git clone --branch v1.20.1 https://github.com/Sn3akyy1/lucid.git`.
-
-</details>
+Your settings, pins, reminders and keys are carried forward, and whatever the
+installer replaces is backed up beside it. Older versions stay on the
+[releases page](https://github.com/Lily4U/lucid-marine/releases) and as tags:
+`git clone --branch <tag> https://github.com/Lily4U/lucid-marine.git`.
 
 <details>
 <summary><b>Uninstall</b></summary>
@@ -243,6 +265,30 @@ login screen, the GTK theme, icons and dark mode, and your own Hyprland config
 lists what else it left in place, each with a timestamped backup beside it.
 
 </details>
+
+## Differences from upstream
+
+<table>
+<tr>
+<th width="20%"></th>
+<th width="40%">Upstream (Arch)</th>
+<th width="40%">Lucid Marine (Fedora)</th>
+</tr>
+<tr valign="top"><td><b>Distro</b></td><td>Arch Linux</td><td>Ultramarine Linux, Fedora and its derivatives</td></tr>
+<tr valign="top"><td><b>Packages</b></td><td><code>pacman</code>, and <code>paru</code> or <code>yay</code> for the AUR</td><td><code>dnf</code>, with COPRs for what Fedora doesn't carry, each asked about first</td></tr>
+<tr valign="top"><td><b>Hyprland</b></td><td>Brought by the installer if missing</td><td>Brought from the <code>ashbuk/Hyprland-Fedora</code> COPR if missing</td></tr>
+<tr valign="top"><td><b>Dock apps</b></td><td>Installed as packages, mostly from the AUR</td><td>Flatpaks from Flathub. Proton VPN is left out: it has no Flathub build</td></tr>
+<tr valign="top"><td><b>Nerd Font</b></td><td>A package</td><td>Fetched once from the Nerd Fonts release</td></tr>
+<tr valign="top"><td><b>Installer</b></td><td>A window in a Wayland session, or the terminal</td><td>The terminal</td></tr>
+<tr valign="top"><td><b>Login screen</b></td><td><code>--login-screen</code> makes it the active theme</td><td>The theme is installed; you switch to it by hand</td></tr>
+<tr valign="top"><td><b>No Fedora package</b></td><td></td><td><code>awww</code> (the wallpaper daemon: build it from source) and <code>songrec</code> (optional: <code>cargo install songrec</code>)</td></tr>
+</table>
+
+### Known issues
+
+- **The pointer.** The tilting cursor is built by the installer, but the mouse
+  pointer isn't fixed in this port yet. Pull requests are welcome. Nothing else
+  depends on it.
 
 ## What's in it
 
@@ -730,39 +776,51 @@ Lumen and Lens run as their own processes with launchers of their own:
 <summary><b>What the installer pulls in</b></summary>
 <br>
 
-**Required:** `hyprland` · `quickshell` · `qt6-5compat` · `qt6-declarative` ·
-`qt6-multimedia` · `qt6-webengine` (Qt's PDF module, which Lumen's window needs)
+**Required:** `hyprland` · `quickshell` · `qt6-qt5compat` · `qt6-qtdeclarative` ·
+`qt6-qtmultimedia` · `qt6-qtpdf` (Qt's PDF module, which Lumen's window needs)
 
 **Per feature**, where a missing one breaks only its own feature:
 
 | Packages | Back |
 | --- | --- |
-| `matugen` `jq` `python-pywal` `awww` `git` | Colours, themes, wallpapers, importing schemes |
-| `networkmanager` `qrencode` | Wi-Fi and sharing a network as a QR code |
-| `bluez` `bluez-utils` `bluez-obex` `python-gobject` | Bluetooth, and files both ways |
-| `kdeconnect` `sshfs` | The Phone page and browsing a phone's files |
-| `libpulse` `wireplumber` `pipewire-audio` `sound-theme-freedesktop` | Sound, its devices and its tests |
-| `gvfs` `gvfs-smb` `gvfs-nfs` `gvfs-dnssd` `gvfs-wsdd` `ffmpegthumbnailer` | Drives, network shares and thumbnails |
-| `qt6-imageformats` `kimageformats` `libjpeg-turbo` `exiv2` | Lens and pictures in every format |
-| `grim` `wf-recorder` `ffmpeg` `imagemagick` | Screenshots and recording |
-| `tesseract` `tesseract-data-eng` `python-pillow` `python-numpy` `python-fonttools` | Reading text off the screen, emoji included |
+| `matugen` `jq` `python3-pywal` `awww` | Colours, themes and wallpapers |
+| `NetworkManager` `qrencode` | Wi-Fi and sharing a network as a QR code |
+| `bluez` `bluez-obexd` `python3-gobject` | Bluetooth, and files both ways |
+| `kde-connect` `fuse-sshfs` | The Phone page and browsing a phone's files |
+| `pulseaudio-utils` `wireplumber` `pipewire-utils` `sound-theme-freedesktop` | Sound, its devices and its tests |
+| `gvfs` `gvfs-smb` `gvfs-nfs` `ffmpegthumbnailer` | Drives, network shares and thumbnails |
+| `qt6-qtimageformats` `kf6-kimageformats` `libjpeg-turbo-utils` `exiv2` | Lens and pictures in every format |
+| `grim` `wf-recorder` `ffmpeg-free` `ImageMagick` | Screenshots and recording |
+| `tesseract` `tesseract-langpack-eng` `python3-pillow` `python3-numpy` `python3-fonttools` | Reading text off the screen, emoji included |
 | `wl-clipboard` `wtype` `cliphist` | Pasting and clipboard history |
 | `cava` `songrec` | The visualiser and song identification |
 | `brightnessctl` `upower` `hypridle` `hyprsunset` | Brightness, battery, idle and night light |
 | `polkit` `accountsservice` | Administrator prompts and the Users page |
-| `librsvg` `python-cairo` | Lucid's pointer and the cursor shadow switch |
-| `xdg-desktop-portal-hyprland` `xdg-desktop-portal-gtk` | Screen sharing and portals |
+| `qt6ct` `gsettings-desktop-schemas` `xdg-desktop-portal-gtk` `gtk-update-icon-cache` | The Environment page, and the file chooser KDE Connect sends files with |
+| `librsvg2` | Lucid's pointer and the cursor shadow switch |
+| `xdg-desktop-portal-hyprland` | Screen sharing and portals (installed with Hyprland) |
 | `smartmontools` `udisks2` `inotify-tools` | Drive health, mounting, the camera toast |
-| `curl` `libnotify` `xdg-utils` `noto-fonts-emoji` | Weather, lyrics, notifications, links, emoji |
+| `curl` `libnotify` `xdg-utils` `zenity` `google-noto-color-emoji-fonts` | Weather, lyrics, notifications, links, dialogs, emoji |
+| `xdg-terminal-exec` | The launcher's `$` mode, which falls back to your terminal without it |
+
+A package already covered by an equivalent you chose yourself counts as
+installed (`ffmpeg` for `ffmpeg-free`, say). `awww` and `songrec` have no Fedora
+package and stay off until you build them.
 
 **The Hyprland config and the look** (unless `--no-hypr` / `--no-look`): `kitty`
-· `fish` · `playerctl` · `gnome-calculator` · `starship` ·
-`ttf-jetbrains-mono-nerd` · `adw-gtk-theme` · `papirus-icon-theme`
+· `fish` · `playerctl` · `gnome-calculator` · `starship` · `fastfetch` ·
+`adw-gtk3-theme` · `papirus-icon-theme`. The JetBrainsMono Nerd Font and the
+FairyWren icons are downloaded rather than installed.
 
-**The dock's default pins** (unless `--no-apps`): `zen-browser-bin` ·
-`vscodium-bin` · `spotify` · `vesktop` · `steam` · `proton-vpn-gtk-app`. An
-equivalent you already have counts, and Steam brings the Vulkan drivers for the
-graphics cards you have.
+**Built on your machine when needed:** the colour picker (`clang` `make`
+`wayland-devel` `wayland-protocols-devel`), the tilting-cursor plugin
+(`hyprland-devel` `gcc-c++` `make` `pkgconf-pkg-config` `git`), and matugen
+through `cargo` when no repo has it.
+
+**The dock's default pins** (unless `--no-apps`), as Flatpaks:
+`app.zen_browser.zen` · `com.vscodium.codium` · `dev.vencord.Vesktop` ·
+`com.spotify.Client` · `com.valvesoftware.Steam`. An RPM or binary you already
+have counts as an equivalent.
 
 **Fonts:** Google Sans Flex ships with Lucid under the Open Font License, so
 nothing needs installing; any installed font can be picked in Settings.
@@ -873,18 +931,50 @@ scale, and size the shell with *Interface size* in Settings → General instead.
 
 </details>
 
+<details>
+<summary><b>The installer says Hyprland is missing, or too old</b></summary>
+<br>
+
+Fedora has no official Hyprland package. The installer offers the
+`ashbuk/Hyprland-Fedora` COPR, which builds the stable releases. Lucid's Lua
+config needs 0.55 or newer; `hyprctl version` says which you have.
+
+</details>
+
+<details>
+<summary><b>The wallpaper never changes</b></summary>
+<br>
+
+`awww`, the wallpaper daemon, has no Fedora package. Build it from source, put it
+on your `PATH`, then pick a wallpaper in Settings → General.
+
+</details>
+
+<details>
+<summary><b>The pointer doesn't tilt, or looks wrong</b></summary>
+<br>
+
+This is a [known issue](#known-issues). The plugin has its own script, which can
+say what happened and try again, and nothing else in the shell depends on it:
+
+```sh
+~/.config/hypr/scripts/cursor-plugin.sh status
+~/.config/hypr/scripts/cursor-plugin.sh build && ~/.config/hypr/scripts/cursor-plugin.sh load
+```
+
+</details>
+
 ## Contributing
 
-Issues and pull requests are welcome. For a bug, `qs log` and your Hyprland
-version help a lot. A good part of Lucid is the work of its contributors, above
-all **Ciro Rivera**, Lucid's co-developer:
+Issues and pull requests are welcome. For a bug, `qs log`, your Hyprland version
+and your Fedora or Ultramarine release help a lot. Something that isn't about
+Fedora may belong [upstream](https://github.com/Sn3akyy1/lucid/issues) instead.
 
-<a href="https://github.com/Sn3akyy1/lucid/graphs/contributors"><img src="https://contrib.rocks/image?repo=Sn3akyy1/lucid" alt="Contributors"></a>
+Lucid itself is the work of **Sn3akyy1** and its contributors, above all **Ciro
+Rivera**, Lucid's co-developer. Lucid Marine is the Fedora port, by
+[**Lily4U**](https://github.com/Lily4U).
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=Sn3akyy1/lucid&type=Date&theme=dark">
-  <img alt="Star history" src="https://api.star-history.com/svg?repos=Sn3akyy1/lucid&type=Date" width="600">
-</picture>
+<a href="https://github.com/Sn3akyy1/lucid/graphs/contributors"><img src="https://contrib.rocks/image?repo=Sn3akyy1/lucid" alt="Lucid's contributors"></a>
 
 ## The mark
 
